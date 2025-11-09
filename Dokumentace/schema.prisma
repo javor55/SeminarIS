@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  GUEST
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum Status {
+  DRAFT
+  SCHEDULED
+  OPEN
+  CLOSED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  firstName    String
+  lastName     String
+  email        String   @unique
+  passwordHash String?
+  role         Role     @default(GUEST)
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // ====== zpětné relace ======
+  // Subject
+  subjectsCreated  Subject[] @relation("SubjectCreatedBy")
+  subjectsUpdated  Subject[] @relation("SubjectUpdatedBy")
+
+  // EnrollmentWindow
+  enrollmentWindowsCreated EnrollmentWindow[] @relation("EnrollmentWindowCreatedBy")
+  enrollmentWindowsUpdated EnrollmentWindow[] @relation("EnrollmentWindowUpdatedBy")
+
+  // Block
+  blocksCreated Block[] @relation("BlockCreatedBy")
+  blocksUpdated Block[] @relation("BlockUpdatedBy")
+  blocksDeleted Block[] @relation("BlockDeletedBy")
+
+  // SubjectOccurrence
+  subjectOccurrencesTaught   SubjectOccurrence[] @relation("SubjectOccurrenceTeacher")
+  subjectOccurrencesCreated  SubjectOccurrence[] @relation("SubjectOccurrenceCreatedBy")
+  subjectOccurrencesUpdated  SubjectOccurrence[] @relation("SubjectOccurrenceUpdatedBy")
+  subjectOccurrencesDeleted  SubjectOccurrence[] @relation("SubjectOccurrenceDeletedBy")
+
+  // StudentEnrollment
+  studentEnrollments         StudentEnrollment[] @relation("EnrollmentStudent")
+  studentEnrollmentsCreated  StudentEnrollment[] @relation("EnrollmentCreatedBy")
+  studentEnrollmentsUpdated  StudentEnrollment[] @relation("EnrollmentUpdatedBy")
+  studentEnrollmentsDeleted  StudentEnrollment[] @relation("EnrollmentDeletedBy")
+}
+
+model Subject {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?
+  syllabus    String
+
+  createdById String
+  createdBy   User     @relation("SubjectCreatedBy", fields: [createdById], references: [id])
+
+  updatedById String?
+  updatedBy   User?    @relation("SubjectUpdatedBy", fields: [updatedById], references: [id])
+
+  // výskyty tohoto předmětu
+  subjectOccurrences SubjectOccurrence[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model EnrollmentWindow {
+  id                String   @id @default(cuid())
+  name              String
+  description       String?
+  status            Status   @default(DRAFT)
+  startsAt          DateTime
+  endsAt            DateTime
+  visibleToStudents Boolean  @default(false)
+
+  createdById       String
+  createdBy         User     @relation("EnrollmentWindowCreatedBy", fields: [createdById], references: [id])
+
+  updatedById       String?
+  updatedBy         User?    @relation("EnrollmentWindowUpdatedBy", fields: [updatedById], references: [id])
+
+  blocks            Block[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Block {
+  id                 String   @id @default(cuid())
+  name               String
+  order              Int
+  description        String?
+
+  enrollmentWindowId String
+  enrollmentWindow   EnrollmentWindow @relation(fields: [enrollmentWindowId], references: [id])
+
+  createdById        String
+  createdBy          User     @relation("BlockCreatedBy", fields: [createdById], references: [id])
+
+  updatedById        String?
+  updatedBy          User?    @relation("BlockUpdatedBy", fields: [updatedById], references: [id])
+
+  subjectOccurrences SubjectOccurrence[]
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+  deletedById        String?
+  deletedBy          User?    @relation("BlockDeletedBy", fields: [deletedById], references: [id])
+
+  @@index([enrollmentWindowId])
+  @@unique([enrollmentWindowId, order])
+}
+
+model SubjectOccurrence {
+  id          String   @id @default(cuid())
+
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+
+  blockId     String
+  block       Block    @relation(fields: [blockId], references: [id])
+
+  teacherId   String
+  teacher     User     @relation("SubjectOccurrenceTeacher", fields: [teacherId], references: [id])
+
+  subCode     String?
+  capacity    Int?     // null = neomezená kapacita
+
+  createdById String
+  createdBy   User     @relation("SubjectOccurrenceCreatedBy", fields: [createdById], references: [id])
+
+  updatedById String?
+  updatedBy   User?    @relation("SubjectOccurrenceUpdatedBy", fields: [updatedById], references: [id])
+
+  studentEnrollments StudentEnrollment[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+  deletedBy   User?    @relation("SubjectOccurrenceDeletedBy", fields: [deletedById], references: [id])
+
+  @@index([subjectId])
+  @@index([blockId])
+}
+
+model StudentEnrollment {
+  id                  String   @id @default(cuid())
+
+  studentId           String
+  student             User     @relation("EnrollmentStudent", fields: [studentId], references: [id])
+
+  subjectOccurrenceId String
+  subjectOccurrence   SubjectOccurrence @relation(fields: [subjectOccurrenceId], references: [id])
+
+  createdById         String
+  createdBy           User     @relation("EnrollmentCreatedBy", fields: [createdById], references: [id])
+
+  updatedById         String?
+  updatedBy           User?    @relation("EnrollmentUpdatedBy", fields: [updatedById], references: [id])
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  deletedAt           DateTime?
+  deletedById         String?
+  deletedBy           User?    @relation("EnrollmentDeletedBy", fields: [deletedById], references: [id])
+
+  @@index([studentId])
+  @@index([subjectOccurrenceId])
+}
+
+
