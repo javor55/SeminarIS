@@ -40,6 +40,7 @@ export function EnrollmentBlocks({
           <EnrollmentBlockCard
             key={block.id}
             block={block}
+            allBlocks={enrollment.blocks}
             index={index}
             total={enrollment.blocks.length}
             currentUser={currentUser}            

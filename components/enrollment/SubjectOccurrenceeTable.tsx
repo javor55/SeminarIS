@@ -35,6 +35,7 @@ export function SubjectOccurrenceTable({
   isTeacher,
   onChanged,
   onDeleteOccurrence,
+  allBlocks, // 👈 nové – všechny bloky v rámci stejného zápisu
 }: {
   block: Block & { occurrences: any[] };
   occurrences: Array<SubjectOccurrence & any>;
@@ -43,6 +44,7 @@ export function SubjectOccurrenceTable({
   isTeacher: boolean;
   onChanged?: () => void;
   onDeleteOccurrence?: (id: string) => void;
+  allBlocks?: Array<Block & { occurrences: any[] }>; // volitelné
 }) {
   const [editOccurrence, setEditOccurrence] = useState<(SubjectOccurrence & any) | null>(null);
   const [studentsOccurrenceId, setStudentsOccurrenceId] = useState<string | null>(null);
@@ -53,7 +55,14 @@ export function SubjectOccurrenceTable({
     toOccurrenceId: string;
   } | null>(null);
 
-  // pomocná funkce – najdi, jestli je student někde v tomhle bloku zapsaný
+  // pro případ „jsem už zapsaný na stejný subject.code v jiném bloku“
+  const [sameSubjectAlert, setSameSubjectAlert] = useState<{
+    subjectName: string;
+    subjectCode: string;
+    blockName: string;
+    occurrenceCode: string;
+  } | null>(null);
+
   function findMyOccurrenceInBlock() {
     if (currentUser.role !== "STUDENT") return null;
     for (const occ of block.occurrences) {
@@ -67,11 +76,58 @@ export function SubjectOccurrenceTable({
     return null;
   }
 
+  // projde všechny bloky (pokud jsou k dispozici) a zjistí,
+  // jestli je student zapsaný na stejný subject.code v jiném bloku
+  function findSameSubjectInOtherBlock(targetOccId: string) {
+    if (currentUser.role !== "STUDENT") return null;
+    if (!allBlocks || allBlocks.length === 0) return null;
+
+    // najdeme cílový výskyt
+    const currentBlockOcc =
+      block.occurrences.find((o: any) => o.id === targetOccId) ?? null;
+    if (!currentBlockOcc || !currentBlockOcc.subject?.code) return null;
+
+    const targetCode = currentBlockOcc.subject.code;
+
+    for (const b of allBlocks) {
+      for (const occ of b.occurrences) {
+        if (occ.id === targetOccId) continue; // to je ten, do kterého se chceme zapsat
+        if (!occ.subject?.code) continue;
+        if (occ.subject.code !== targetCode) continue;
+
+        const isEnrolled = occ.enrollments.some(
+          (e: any) => e.studentId === currentUser.id && !e.deletedAt
+        );
+        if (isEnrolled) {
+          // našli jsme zápis na stejný předmět v jiném bloku
+          const occCode = occ.subject.code
+            ? `${occ.subject.code}/${occ.subCode ?? ""}`
+            : occ.subCode ?? "—";
+
+          return {
+            subjectName: occ.subject.name,
+            subjectCode: occ.subject.code,
+            blockName: b.name,
+            occurrenceCode: occCode,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
   function handleEnroll(targetOccurrenceId: string) {
-    // zjistíme, jestli už jsem v tomhle bloku zapsaný
+    // 1) kontrola: není už student zapsaný na stejný predmet.code v jiném bloku?
+    const same = findSameSubjectInOtherBlock(targetOccurrenceId);
+    if (same) {
+      setSameSubjectAlert(same);
+      return;
+    }
+
+    // 2) kontrola: není už zapsaný v *tomto* bloku?
     const current = findMyOccurrenceInBlock();
     if (current && current.occurrenceId !== targetOccurrenceId) {
-      // už jsem zapsaný jinde → zeptat se
       setSwitchEnroll({
         fromOccurrenceId: current.occurrenceId,
         toOccurrenceId: targetOccurrenceId,
@@ -79,7 +135,7 @@ export function SubjectOccurrenceTable({
       return;
     }
 
-    // nejsem zapsaný nebo se zapisuju do stejného
+    // 3) normální zápis
     const enr = enrollStudent(currentUser.id, targetOccurrenceId);
     if (enr) {
       onChanged?.();
@@ -87,7 +143,6 @@ export function SubjectOccurrenceTable({
   }
 
   function handleUnenroll(occ: any) {
-    // najdu svoji enrollment
     const myEnr = occ.enrollments.find(
       (e: any) => e.studentId === currentUser.id && !e.deletedAt
     );
@@ -159,7 +214,6 @@ export function SubjectOccurrenceTable({
 
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2 flex-wrap">
-                    {/* student – zapsat / odepsat */}
                     {currentUser.role === "STUDENT" && (
                       <>
                         {enrolledByMe ? (
@@ -234,7 +288,6 @@ export function SubjectOccurrenceTable({
         </TableBody>
       </Table>
 
-      {/* dialog pro editaci výskytu */}
       {editOccurrence && (
         <EditSubjectOccurrenceDialog
           open={!!editOccurrence}
@@ -253,7 +306,6 @@ export function SubjectOccurrenceTable({
         />
       )}
 
-      {/* dialog se studenty */}
       {studentsOccurrenceId && (
         <StudentsDialog
           occurrenceId={studentsOccurrenceId}
@@ -263,8 +315,7 @@ export function SubjectOccurrenceTable({
         />
       )}
 
-      {/* potvrzení přepsání zápisu */}
-      
+      {/* potvrzení přepsání zápisu v rámci stejného bloku */}
       {switchEnroll && (
         <AlertDialog open onOpenChange={(open) => !open && setSwitchEnroll(null)}>
           <AlertDialogContent>
@@ -339,7 +390,37 @@ export function SubjectOccurrenceTable({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      )}      
+      )}
+
+      {/* info dialog: stejné subject.code v jiném bloku */}
+      {sameSubjectAlert && (
+        <AlertDialog open onOpenChange={() => setSameSubjectAlert(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Nelze zapsat tento předmět</AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>
+                  Už jste zapsán na předmět <strong>{sameSubjectAlert.subjectName}</strong>{" "}
+                  se stejným kódem <strong>{sameSubjectAlert.subjectCode}</strong> v jiném bloku.
+                </p>
+                <p>
+                  Aktuálně jste zapsán v bloku{" "}
+                  <strong>{sameSubjectAlert.blockName}</strong>{" "}
+                  ({sameSubjectAlert.occurrenceCode}).
+                </p>
+                <p>
+                  Nejprve se prosím odepište z předchozího výskytu tohoto předmětu.
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => setSameSubjectAlert(null)}>
+                OK
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

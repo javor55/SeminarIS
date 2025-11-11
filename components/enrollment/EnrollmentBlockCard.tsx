@@ -10,11 +10,13 @@ import { SubjectOccurrenceTable } from "@/components/enrollment/SubjectOccurrenc
 
 export function EnrollmentBlockCard({
   block,
+  allBlocks,
   index,
   total,
   currentUser,
 }: {
   block: Block & { occurrences: any[]; description?: string };
+  allBlocks?: Array<Block & { occurrences: any[] }>;
   index: number;
   total: number;
   currentUser: User;
@@ -51,6 +53,7 @@ export function EnrollmentBlockCard({
           currentUser={currentUser}
           isAdmin={isAdmin}
           isTeacher={isTeacher}
+          allBlocks={allBlocks}
           onChanged={() => console.log("Změna")}
           onDeleteOccurrence={(id) => console.log("Smazat výskyt:", id)}
         />
