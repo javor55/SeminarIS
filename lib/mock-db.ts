@@ -88,6 +88,34 @@ export function updateSubject(subject: Subject & { syllabus?: string }) {
   return true;
 }
 
+export function createSubject(newSubject: Partial<Subject>): Subject {
+  const id =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2, 10);
+
+  const authorId =
+    newSubject.createdById ||
+    newSubject.updatedById ||
+    users[0]?.id || // fallback na prvního uživatele z mocku
+    "system";
+
+  const subject: Subject = {
+    id,
+    name: newSubject.name || "Nový předmět",
+    code: newSubject.code || "",
+    description: newSubject.description || "",
+    syllabus: newSubject.syllabus || "",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdById: authorId,   // 👈 DOPLNĚNO
+    updatedById: authorId,   // 👈 ať je to konzistentní
+  };
+
+  subjects.push(subject);
+  return subject;
+}
+
 
 /* ---------------------- USERS ---------------------- */
 export const users: User[] = [
@@ -327,6 +355,30 @@ export const enrollmentWindows: EnrollmentWindow[] = [
     createdById: "u-admin1",
     createdAt: now,
     updatedAt: now,
+  },  
+  {
+    id: "ew-ls-2024",
+    name: "Zápis LS 2023",
+    description: "Vyberte si jeden seminář v každém bloku.",
+    status: "OPEN",
+    startsAt: new Date().toISOString(),
+    endsAt: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+    visibleToStudents: true,
+    createdById: "u-admin1",
+    createdAt: now,
+    updatedAt: now,
+  },
+    {
+    id: "ew-ls-2023",
+    name: "Zápis LS 2023",
+    description: "Vyberte si jeden seminář v každém bloku.",
+    status: "OPEN",
+    startsAt: new Date().toISOString(),
+    endsAt: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+    visibleToStudents: true,
+    createdById: "u-admin1",
+    createdAt: now,
+    updatedAt: now,
   },
 ];
 
@@ -352,6 +404,46 @@ export const blocks: Block[] = [
     createdAt: now,
     updatedAt: now,
   },
+   {
+    id: "b-3",
+    name: "Blok 2 – volitelné předměty",
+    order: 2,
+    description: "Blok 2 – volitelné předměty",
+    enrollmentWindowId: "ew-ls-2024",
+    createdById: "u-admin1",
+    createdAt: now,
+    updatedAt: now,
+  },
+    {
+    id: "b-4",
+    name: "Blok 1 – povinné předměty",
+    order: 1,
+    description: "Blok 1 – povinné předměty",
+    enrollmentWindowId: "ew-ls-2023",
+    createdById: "u-admin1",
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "b-5",
+    name: "Blok 2 – volitelné předměty",
+    order: 2,
+    description: "Blok 2 – volitelné předměty",
+    enrollmentWindowId: "ew-ls-2023",
+    createdById: "u-admin1",
+    createdAt: now,
+    updatedAt: now,
+  },
+   {
+    id: "b-6",
+    name: "Blok 2 – volitelné předměty",
+    order: 2,
+    description: "Blok 2 – volitelné předměty",
+    enrollmentWindowId: "ew-ls-2023",
+    createdById: "u-admin1",
+    createdAt: now,
+    updatedAt: now,
+  },
 ];
 
 /* ---------------------- SUBJECT OCCURRENCES ---------------------- */
@@ -363,6 +455,17 @@ export const subjectOccurrences: SubjectOccurrence[] = [
     blockId: "b-1",
     teacherId: "u-teacher1",
     subCode: "A",
+    capacity: 25,
+    createdById: "u-admin1",
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "so-uml-B",
+    subjectId: "s-uml",
+    blockId: "b-2",
+    teacherId: "u-teacher1",
+    subCode: "B",
     capacity: 25,
     createdById: "u-admin1",
     createdAt: now,

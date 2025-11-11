@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Block } from "@/lib/types";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,94 +9,89 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { updateBlock } from "@/lib/mock-db";
-import { toast } from "sonner";
 
-// blok v UI má u tebe navíc description, tak si to tu doplníme
-type EditableBlock = Block & {
-  description?: string;
+type EditBlockDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  block: {
+    id: string;
+    name: string;
+    description?: string | null;
+  };
+  onSubmit?: (data: { id: string; name: string; description?: string | null }) => void;
+  // případně můžeš přidat isSaving?: boolean
 };
 
 export function EditBlockDialog({
-  block,
+  open,
   onOpenChange,
-}: {
-  block: EditableBlock;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const [name, setName] = useState(block.name ?? "");
-  const [description, setDescription] = useState(block.description ?? "");
-  const [saving, setSaving] = useState(false);
+  block,
+  onSubmit,
+}: EditBlockDialogProps) {
+  const [name, setName] = useState(block?.name ?? "");
+  const [description, setDescription] = useState(block?.description ?? "");
+
+  // když se otevře dialog s jiným blokem, přenačti hodnoty
+  useEffect(() => {
+    if (open && block) {
+      setName(block.name ?? "");
+      setDescription(block.description ?? "");
+    }
+  }, [open, block]);
+
+  function handleSave() {
+    // jednoduchá validace
+    if (!name.trim()) return;
+    onSubmit?.({
+      id: block.id,
+      name: name.trim(),
+      description: description.trim() || null,
+    });
+    onOpenChange(false);
+  }
 
   return (
-    <Dialog open onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Upravit blok</DialogTitle>
-          <DialogDescription>
-            Změňte název a popis bloku. Uložení probíhá do mock databáze v paměti.
-          </DialogDescription>
+          <DialogTitle>Upravit blok</DialogTitle> 
+          <DialogDescription>Mock formulář – zatím se neukládá.</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 py-2">
-          <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="block-name">
-              Název bloku
-            </label>
+        <div className="flex flex-col gap-4 py-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="block-name">Název bloku</Label>
             <Input
               id="block-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="např. Blok 1 – povinné předměty"
+              placeholder="Např. Blok A"
+              autoFocus
+              required
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="block-desc">
-              Popis bloku
-            </label>
-            <Input
-              id="block-desc"
-              value={description}
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="block-description">Popis bloku</Label>
+            <Textarea
+              id="block-description"
+              value={description ?? ""}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="např. Vyberte si jeden z nabízených předmětů."
+              placeholder="Popis bloku (nepovinné)…"
+              rows={4}
             />
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Zavřít
+            Zrušit
           </Button>
-          <Button
-            disabled={saving || name.trim().length === 0}
-            onClick={() => {
-              setSaving(true);
-
-              // připravíme objekt se stejnou strukturou, jakou máme v mocku
-              const updated: EditableBlock = {
-                ...block,
-                name: name.trim(),
-                description: description.trim(),
-              };
-
-              const ok = updateBlock(updated as Block);
-
-              // hned přepíšeme i původní objekt, aby se to promítlo v headeru
-              block.name = updated.name;
-              block.description = updated.description;
-
-              if (ok) {
-                toast.success("Blok byl uložen");
-              } else {
-                toast.error("Blok se nepodařilo uložit");
-              }
-
-              setSaving(false);
-              onOpenChange(false);
-            }}
-          >
+          <Button onClick={handleSave} disabled={!name.trim()}>
             Uložit
           </Button>
         </DialogFooter>

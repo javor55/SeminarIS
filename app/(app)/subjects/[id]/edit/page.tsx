@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { getSubjects } from "@/lib/data";
 import { updateSubject } from "@/lib/mock-db";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea"; // 👈 přidáme Textarea
 import { Button } from "@/components/ui/button";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { Subject } from "@/lib/types";
@@ -24,6 +25,7 @@ export default function EditSubjectPage({
 
   const [name, setName] = useState(subject?.name ?? "");
   const [code, setCode] = useState(subject?.code ?? "");
+  const [description, setDescription] = useState(subject?.description ?? ""); // 👈 nový state
   const [syllabus, setSyllabus] = useState<string>(subject?.syllabus ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +54,7 @@ export default function EditSubjectPage({
         ...subject,
         name,
         code,
+        description, // 👈 přidáme popis do ukládání
         syllabus,
         updatedAt: new Date().toISOString(),
         updatedById: user.id,
@@ -101,7 +104,21 @@ export default function EditSubjectPage({
           />
         </div>
 
-        {/* Sylabus (Tiptap) */}
+        {/* Popis */}
+        <div className="space-y-1">
+          <label className="text-sm font-medium" htmlFor="description">
+            Popis
+          </label>
+          <Textarea
+            id="description"
+            rows={4}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Krátký popis předmětu..."
+          />
+        </div>
+
+        {/* Sylabus */}
         <div className="space-y-1">
           <label className="text-sm font-medium">Sylabus</label>
           <TiptapEditor value={syllabus} onChange={setSyllabus} />

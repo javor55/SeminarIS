@@ -1,8 +1,7 @@
-// components/enrollment/StudentsDialog.tsx
 "use client";
 
 import { useMemo, useState } from "react";
-import { EnrollmentWindowWithBlocks, User } from "@/lib/types";
+import { Block, User } from "@/lib/types";
 import {
   Dialog,
   DialogContent,
@@ -27,39 +26,30 @@ import { unenrollStudent, enrollStudent } from "@/lib/mock-db";
 
 export function StudentsDialog({
   occurrenceId,
-  enrollment,
+  block,
   currentUser,
   onOpenChange,
 }: {
   occurrenceId: string;
-  enrollment: EnrollmentWindowWithBlocks;
+  block: Block & { occurrences: any[] };
   currentUser: User;
   onOpenChange: (open: boolean) => void;
 }) {
-  // najdeme výskyt
+  // najdeme výskyt v rámci JEDNOHO bloku
   const occurrence = useMemo(() => {
-    for (const b of enrollment.blocks) {
-      const o = b.occurrences.find((x) => x.id === occurrenceId);
-      if (o) return o;
-    }
-    return null;
-  }, [occurrenceId, enrollment]);
+    return block.occurrences.find((x) => x.id === occurrenceId) ?? null;
+  }, [occurrenceId, block]);
 
   if (!occurrence) return null;
 
   const allUsers = getAllUsers();
   const isAdmin = currentUser.role === "ADMIN";
 
-  // lokální seznam zápisů (aby se UI hned aktualizovalo)
   const [localEnrollments, setLocalEnrollments] = useState(
     () => occurrence.enrollments
   );
-
-  // pro odhlášení
   const [toUnenroll, setToUnenroll] = useState<string | null>(null);
 
-  // pro ruční zapsání
-  // vezmeme jen studenty, kteří ještě nejsou na tomhle occurrence
   const alreadyEnrolledIds = new Set(localEnrollments.map((e) => e.studentId));
   const enrollableStudents = allUsers.filter(
     (u) => u.role === "STUDENT" && !alreadyEnrolledIds.has(u.id)
@@ -85,7 +75,6 @@ export function StudentsDialog({
             </DialogDescription>
           </DialogHeader>
 
-          {/* ADMIN: přidat studenta */}
           {isAdmin && (
             <div className="mb-3 rounded-md border p-3 space-y-2">
               <p className="text-sm font-medium">Ruční zapsání studenta</p>
@@ -110,20 +99,12 @@ export function StudentsDialog({
                     size="sm"
                     onClick={() => {
                       if (!selectedStudentId) return;
-                      // 1) zapsat do mock DB
                       const newEnr = enrollStudent(
                         selectedStudentId,
                         occurrenceId
                       );
-                      // 2) přidat do lokálního state
-                      setLocalEnrollments((prev) => [
-                        ...prev,
-                        {
-                          ...newEnr,
-                          // aby měl dialog stejný tvar jako původní data
-                        },
-                      ]);
-                      // 3) vybrat dalšího studenta (pokud nějaký zbývá)
+                      setLocalEnrollments((prev) => [...prev, { ...newEnr }]);
+
                       const nextStudents = enrollableStudents.filter(
                         (s) => s.id !== selectedStudentId
                       );
@@ -184,7 +165,6 @@ export function StudentsDialog({
         </DialogContent>
       </Dialog>
 
-      {/* potvrzení odhlášení */}
       {toUnenroll && enrollmentToDelete && (
         <AlertDialog open onOpenChange={(open) => !open && setToUnenroll(null)}>
           <AlertDialogContent>

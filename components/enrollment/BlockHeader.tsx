@@ -121,12 +121,15 @@ export function BlockHeader({
         )}
       </div>
 
-      {/* Dialogy */}
       {editBlock && (
-        <EditBlockDialog
-          block={editBlock}
-          onOpenChange={(open) => !open && setEditBlock(null)}
-        />
+          <EditBlockDialog
+            open={!!editBlock}
+            block={editBlock}
+            onOpenChange={(open) => {
+              // když se dialog zavře, smažeme vybraný blok
+              if (!open) setEditBlock(null);
+            }}
+          />
       )}
 
       {editOccurrence && (

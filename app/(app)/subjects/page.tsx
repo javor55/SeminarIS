@@ -4,15 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { getSubjects } from "@/lib/data";
-import { users } from "@/lib/mock-db";
+import { users, createSubject } from "@/lib/mock-db"; // 👈 importujeme createSubject
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export default function SubjectsPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const subjects = getSubjects();
   const [query, setQuery] = useState("");
+  const [subjects, setSubjects] = useState(getSubjects());
 
   const filtered = subjects.filter((s) =>
     s.name.toLowerCase().includes(query.toLowerCase())
@@ -32,9 +32,23 @@ export default function SubjectsPage() {
     return d.toLocaleString();
   }
 
+  function handleNewSubject() {
+    // 🆕 vytvoření nového předmětu v mock databázi
+    const subject = createSubject({
+      name: "Nový předmět",
+      updatedById: user?.id,
+    });
+
+    // aktualizujeme lokální seznam (aby se hned zobrazil)
+    setSubjects([...subjects, subject]);
+
+    // přesměrujeme na edit
+    router.push(`/subjects/${subject.id}/edit`);
+  }
+
   return (
     <div className="space-y-6">
-      {/* HLAVIČKA */}
+      {/* Hlavička */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Předměty</h1>
@@ -42,15 +56,21 @@ export default function SubjectsPage() {
             Přehled všech dostupných předmětů.
           </p>
         </div>
-        <Input
-          placeholder="Hledat předmět..."
-          className="w-full md:w-72"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+
+        <div className="flex gap-2 w-full md:w-auto">
+          <Input
+            placeholder="Hledat předmět..."
+            className="w-full md:w-72"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {(user?.role === "ADMIN" || user?.role === "TEACHER") && (
+            <Button onClick={handleNewSubject}>Nový předmět</Button>
+          )}
+        </div>
       </div>
 
-      {/* TABULKA */}
+      {/* Tabulka */}
       <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-slate-600 border-b text-left">
@@ -65,7 +85,9 @@ export default function SubjectsPage() {
           <tbody>
             {filtered.map((s) => {
               const editor = getEditorName((s as any).updatedById);
-              const editedAt = formatDate((s as any).updatedAt || (s as any).createdAt);
+              const editedAt = formatDate(
+                (s as any).updatedAt || (s as any).createdAt
+              );
 
               return (
                 <tr
@@ -85,8 +107,7 @@ export default function SubjectsPage() {
                       <span className="text-xs text-slate-400">{editedAt}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-right space-x-2">                    
-                    {/* Učitel i Admin mají stejné akce */}
+                  <td className="px-4 py-2 text-right space-x-2">
                     {(user?.role === "TEACHER" || user?.role === "ADMIN") && (
                       <>
                         <Button

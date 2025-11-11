@@ -10,9 +10,12 @@ import {
 } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { StudentsDialog } from "@/components/enrollment/StudentsDialog";
-import { EnrollmentWindowWithBlocks, SubjectOccurrence } from "@/lib/types";
+import {
+  EnrollmentWindowWithBlocks,
+  SubjectOccurrence,
+  Block,
+} from "@/lib/types";
 import { EditSubjectOccurrenceDialog } from "@/components/enrollment/EditSubjectOccurrenceDialog";
-import { EditBlockDialog } from "@/components/enrollment/EditBlockDialog";
 
 function getWindowStatusLabel(ew: EnrollmentWindowWithBlocks, now = new Date()) {
   const start = new Date(ew.startsAt);
@@ -36,6 +39,7 @@ export default function SubjectDetailPage({
     .map((w) => getEnrollmentWindowByIdWithBlocks(w.id))
     .filter(Boolean) as EnrollmentWindowWithBlocks[];
 
+  // ❗ tady přidáme i block
   const occurrences =
     enrollmentWindows.flatMap((ew) =>
       ew.blocks.flatMap((block) =>
@@ -44,20 +48,19 @@ export default function SubjectDetailPage({
           .map((occ: any) => ({
             ...occ,
             blockName: block.name,
+            block, // <- přidáno
             enrollmentWindow: ew,
           }))
       )
     ) || [];
 
+  // teď už nebudeme držet enrollment, ale block
   const [selectedStudents, setSelectedStudents] = useState<{
     occurrenceId: string;
-    enrollment: EnrollmentWindowWithBlocks;
+    block: Block & { occurrences: any[] };
   } | null>(null);
 
   const [editOccurrence, setEditOccurrence] = useState<
-    (SubjectOccurrence & any) | null
-  >(null);
-  const [deleteOccurrence, setDeleteOccurrence] = useState<
     (SubjectOccurrence & any) | null
   >(null);
 
@@ -157,7 +160,9 @@ export default function SubjectDetailPage({
                   const ew = occ.enrollmentWindow as EnrollmentWindowWithBlocks;
                   const statusLabel = getWindowStatusLabel(ew);
                   const fullCode = occ.subject?.code
-                    ? `${occ.subject.code}${occ.subCode ? "/" + occ.subCode : ""}`
+                    ? `${occ.subject.code}${
+                        occ.subCode ? "/" + occ.subCode : ""
+                      }`
                     : occ.subCode || "—";
 
                   return (
@@ -199,7 +204,7 @@ export default function SubjectDetailPage({
                               onClick={() =>
                                 setSelectedStudents({
                                   occurrenceId: occ.id,
-                                  enrollment: ew,
+                                  block: occ.block, // <- tady pošleme blok
                                 })
                               }
                             >
@@ -220,7 +225,10 @@ export default function SubjectDetailPage({
                                 variant="destructive"
                                 size="sm"
                                 disabled={hasStudents}
-                                onClick={() => setDeleteOccurrence(occ)}
+                                onClick={() => {
+                                  // tady bys řešil smazání výskytu
+                                  console.log("smazat výskyt", occ.id);
+                                }}
                               >
                                 Smazat
                               </Button>
@@ -237,10 +245,11 @@ export default function SubjectDetailPage({
         </div>
       </div>
 
+      {/* dialog se studenty – teď jen s blockem */}
       {selectedStudents && user && (
         <StudentsDialog
           occurrenceId={selectedStudents.occurrenceId}
-          enrollment={selectedStudents.enrollment}
+          block={selectedStudents.block}
           currentUser={user}
           onOpenChange={(open) => {
             if (!open) setSelectedStudents(null);
@@ -254,8 +263,6 @@ export default function SubjectDetailPage({
           onOpenChange={(open) => !open && setEditOccurrence(null)}
         />
       )}
-
-
     </>
   );
 }

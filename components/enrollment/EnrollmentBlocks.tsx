@@ -42,8 +42,7 @@ export function EnrollmentBlocks({
             block={block}
             index={index}
             total={enrollment.blocks.length}
-            currentUser={currentUser}
-            enrollment={enrollment}   // pošleme celé, karta si umí vytáhnout occurrence
+            currentUser={currentUser}            
           />
         ))}
       </div>
