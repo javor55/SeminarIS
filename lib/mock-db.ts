@@ -116,6 +116,24 @@ export function createSubject(newSubject: Partial<Subject>): Subject {
   return subject;
 }
 
+export function updateUserRole(userId: string, role: string) {
+  const user = users.find((u) => u.id === userId);
+  if (!user) return false;
+  user.role = role as any;
+  return true;
+}
+
+export function toggleUserActive(userId: string) {
+  const user = users.find((u) => u.id === userId);
+  if (!user) return false;
+  user.isActive = !user.isActive;
+  return true;
+}
+
+
+
+
+
 
 /* ---------------------- USERS ---------------------- */
 export const users: User[] = [
@@ -256,6 +274,208 @@ export const users: User[] = [
     createdAt: now,
     updatedAt: now,
   },
+{
+    id: "newu-admin1",
+    firstName: "Petr",
+    lastName: "Novák",
+    email: "petr.novak@skola.cz",
+    role: "ADMIN",
+    isActive: true,
+    createdAt: "2023-01-10T08:00:00Z",
+    updatedAt: "2023-11-05T10:30:00Z",
+  },
+  {
+    id: "newu-user3",
+    firstName: "Jana",
+    lastName: "Svobodová",
+    email: "jana.svobodova@skola.cz",
+    role: "STUDENT",
+    isActive: true,
+    createdAt: "2023-02-15T10:30:15Z",
+    updatedAt: "2023-10-20T14:00:00Z",
+  },
+  {
+    id: "newu-user4",
+    firstName: "Martin",
+    lastName: "Dvořák",
+    email: "martin.dvorak@skola.cz",
+    role: "STUDENT",
+    isActive: false,
+    createdAt: "2023-03-01T11:00:00Z",
+    updatedAt: "2023-09-01T11:00:00Z",
+  },
+  {
+    id: "newu-user5",
+    firstName: "Eva",
+    lastName: "Černá",
+    email: "eva.cerna@skola.cz",
+    role: "STUDENT",
+    isActive: true,
+    createdAt: "2023-03-05T14:20:00Z",
+    updatedAt: "2023-03-05T14:20:00Z",
+  },
+  {
+    id: "newu-guest3",
+    firstName: "Tomáš",
+    lastName: "Procházka",
+    email: "tomas.prochazka@skola.cz",
+    role: "GUEST",
+    isActive: true,
+    createdAt: "2023-04-10T09:05:00Z",
+    updatedAt: "2023-04-10T09:05:00Z",
+  },
+  {
+    id: "newu-user6",
+    firstName: "Lucie",
+    lastName: "Kučerová",
+    email: "lucie.kucerova@skola.cz",
+    role: "STUDENT",
+    isActive: true,
+    createdAt: "2023-04-22T16:00:00Z",
+    updatedAt: "2023-11-01T12:15:00Z",
+  },
+  {
+    id: "newu-user7",
+    firstName: "Jakub",
+    lastName: "Veselý",
+    email: "jakub.vesely@skola.cz",
+    role: "STUDENT",
+    isActive: true,
+    createdAt: "2023-05-02T07:30:00Z",
+    updatedAt: "2023-05-02T07:30:00Z",
+  },
+  {
+    id: "newu-user8",
+    firstName: "Kateřina",
+    lastName: "Horáková",
+    email: "katerina.horakova@skola.cz",
+    role: "STUDENT",
+    isActive: true,
+    createdAt: "2023-05-15T13:00:00Z",
+    updatedAt: "2023-05-15T13:00:00Z",
+  },
+  {
+    id: "newu-guest4",
+    firstName: "Pavel",
+    lastName: "Němec",
+    email: "pavel.nemec@skola.cz",
+    role: "GUEST",
+    isActive: false,
+    createdAt: "2023-06-01T10:00:00Z",
+    updatedAt: "2023-07-20T09:00:00Z",
+  },
+  {
+    id: "newu-user9",
+    firstName: "Veronika",
+    lastName: "Marková",
+    email: "veronika.markova@skola.cz",
+    role: "STUDENT",
+    isActive: true,
+    createdAt: "2023-06-10T11:45:00Z",
+    updatedAt: "2023-10-30T18:00:00Z",
+  },
+  {
+    id: "newu-user10",
+    firstName: "Lukáš",
+    lastName: "Novotný",
+    email: "lukas.novotny@skola.cz",
+    role: "STUDENT",
+    isActive: true,
+    createdAt: "2023-07-07T08:10:00Z",
+    updatedAt: "2023-07-07T08:10:00Z",
+  },
+  {
+    id: "newu-user11",
+    firstName: "Anna",
+    lastName: "Doležalová",
+    email: "anna.dolezalova@skola.cz",
+    role: "STUDENT",
+    isActive: true,
+    createdAt: "2023-07-20T12:00:00Z",
+    updatedAt: "2023-07-20T12:00:00Z",
+  },
+  {
+    id: "newu-admin2",
+    firstName: "Ondřej",
+    lastName: "Krejčí",
+    email: "ondrej.krejci@skola.cz",
+    role: "ADMIN",
+    isActive: true,
+    createdAt: "2023-08-01T06:00:00Z",
+    updatedAt: "2023-11-10T09:00:00Z",
+  },
+  {
+    id: "newu-user12",
+    firstName: "Barbora",
+    lastName: "Čermáková",
+    email: "barbora.cermakova@skola.cz",
+    role: "STUDENT",
+    isActive: false,
+    createdAt: "2023-08-15T14:50:00Z",
+    updatedAt: "2023-08-15T14:50:00Z",
+  },
+  {
+    id: "newu-user13",
+    firstName: "Marek",
+    lastName: "Malý",
+    email: "marek.maly@skola.cz",
+    role: "STUDENT",
+    isActive: true,
+    createdAt: "2023-09-01T09:25:00Z",
+    updatedAt: "2023-09-10T10:10:00Z",
+  },
+  {
+    id: "newu-user14",
+    firstName: "Tereza",
+    lastName: "Kolářová",
+    email: "tereza.kolarova@skola.cz",
+    role: "STUDENT",
+    isActive: true,
+    createdAt: "2023-09-10T10:00:00Z",
+    updatedAt: "2023-09-10T10:00:00Z",
+  },
+  {
+    id: "newu-guest5",
+    firstName: "Michal",
+    lastName: "Růžička",
+    email: "michal.ruzicka@skola.cz",
+    role: "GUEST",
+    isActive: true,
+    createdAt: "2023-10-01T11:11:00Z",
+    updatedAt: "2023-10-01T11:11:00Z",
+  },
+  {
+    id: "newu-user15",
+    firstName: "Zuzana",
+    lastName: "Fialová",
+    email: "zuzana.fialova@skola.cz",
+    role: "STUDENT",
+    isActive: true,
+    createdAt: "2023-10-15T17:00:00Z",
+    updatedAt: "2023-11-02T13:20:00Z",
+  },
+  {
+    id: "newu-user16",
+    firstName: "David",
+    lastName: "Jelínek",
+    email: "david.jelinek@skola.cz",
+    role: "STUDENT",
+    isActive: true,
+    createdAt: "2023-11-01T10:00:00Z",
+    updatedAt: "2023-11-01T10:00:00Z",
+  },
+  {
+    id: "newu-user17",
+    firstName: "Nikola",
+    lastName: "Benešová",
+    email: "nikola.benesova@skola.cz",
+    role: "STUDENT",
+    isActive: false,
+    createdAt: "2023-11-10T15:00:00Z",
+    updatedAt: "2023-11-10T15:00:00Z",
+  },
+
+
 ];
 
 /* ---------------------- SUBJECTS ---------------------- */
