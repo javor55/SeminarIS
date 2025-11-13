@@ -262,8 +262,8 @@ export function EnrollmentBlockCard({
         <DataTable<OccurrenceRow>
           data={rows}
           columns={columns}
-          searchKeys={["searchText"]}
-          searchPlaceholder="Hledat..."
+          hideToolbar
+          hideFooter
         />
       </div>
 

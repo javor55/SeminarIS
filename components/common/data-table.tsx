@@ -75,6 +75,12 @@ export type DataTableProps<T> = {
   }) => React.ReactNode;
   /** init size */
   initialPageSize?: number;
+
+  // 🔥 NOVÉ PROPS
+  /** Skryje celý horní panel (hledání, filtry) */
+  hideToolbar?: boolean;
+  /** Skryje celý dolní panel (stránkování) */
+  hideFooter?: boolean;
 };
 
 export function DataTable<T>({
@@ -86,6 +92,9 @@ export function DataTable<T>({
   dateFilters = [],
   bulkPopoverRender,
   initialPageSize = 10,
+  // 🔥 NOVÉ PROPS
+  hideToolbar = false,
+  hideFooter = false,
 }: DataTableProps<T>) {
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [columnFilters, setColumnFilters] = React.useState<any>([]);
@@ -154,11 +163,16 @@ export function DataTable<T>({
   const totalRows = filteredRows.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
   const safePageIndex = Math.min(pageIndex, totalPages - 1);
-  const pageSlice = filteredRows.slice(
-    safePageIndex * pageSize,
-    safePageIndex * pageSize + pageSize
-  );
-
+  
+  // 🔥 ZMĚNA LOGIKY STRÁNKOVÁNÍ
+  // Pokud je patička skrytá, zobrazíme všechny řádky. Jinak stránkujeme.
+  const pageSlice = hideFooter
+    ? filteredRows
+    : filteredRows.slice(
+        safePageIndex * pageSize,
+        safePageIndex * pageSize + pageSize
+      );
+      
   // --- Logika pro RESET ---
   const handleResetFilters = () => {
     setGlobalFilter("");
@@ -182,160 +196,163 @@ export function DataTable<T>({
   return (
     <Card>
       <CardContent className="p-0">
-        {/* Toolbar */}
-        <div className="flex items-center justify-between flex-wrap gap-2 p-2 border-b">
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              placeholder={searchPlaceholder}
-              value={globalFilter}
-              onChange={(e) => {
-                setGlobalFilter(e.target.value);
-                setPageIndex(0);
-              }}
-              className="h-8 w-[240px]"
-            />
+      
+        {/* 🔥 PODMÍNĚNÉ RENDEROVÁNÍ TOOLBARU */}
+        {!hideToolbar && (
+          <div className="flex items-center justify-between flex-wrap gap-2 p-2 border-b">
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                placeholder={searchPlaceholder}
+                value={globalFilter}
+                onChange={(e) => {
+                  setGlobalFilter(e.target.value);
+                  setPageIndex(0);
+                }}
+                className="h-8 w-[240px]"
+              />
 
-            {/* Filtry */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Filter className="w-4 h-4" />
-                  Filtry
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 space-y-3" align="start">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Filtry
-                  </p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={handleResetPopoverFilters}
-                  >
-                    Vymazat
-                  </Button>
-                </div>
-
-                {/* SELECT filtry (faceted) */}
-                {selectFilters.map((sf) => {
-                  const col = table.getColumn(sf.columnId);
-                  const current = (col?.getFilterValue() as string[]) ?? [];
-                  const currentVal = current[0] ?? "ALL";
-                  return (
-                    <div key={sf.columnId} className="space-y-1">
-                      <label className="text-xs text-muted-foreground">
-                        {sf.label}
-                      </label>
-                      <Select
-                        value={currentVal}
-                        onValueChange={(v) => {
-                          if (v === "ALL") col?.setFilterValue([]);
-                          else col?.setFilterValue([v]);
-                          setPageIndex(0);
-                        }}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ALL">Vše</SelectItem>
-                          {sf.options.map((o) => (
-                            <SelectItem key={o.value} value={o.value}>
-                              {o.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  );
-                })}
-
-                {/* DATE RANGE filtry */}
-                {dateFilters.map((df) => {
-                  const st = dateState[df.id] ?? {};
-                  
-                  return (
-                    <div key={df.id} className="space-y-2">
-                      <p className="text-[11px] font-medium text-muted-foreground">
-                        {df.label}
-                      </p>
-                      
-                      {/* Vstup "OD" */}
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs min-w-[30px]">Od:</Label>
-                        <DateTimePicker
-                          className="w-full"
-                          value={st.from ? new Date(st.from) : null}
-                          onChange={(date) => {
-                            setDateState((p) => ({
-                              ...p,
-                              [df.id]: {
-                                ...p[df.id],
-                                from: date ? date.toISOString() : "",
-                              },
-                            }));
-                            setPageIndex(0);
-                          }}
-                        />
-                      </div>
-                      
-                      {/* Vstup "DO" */}
-                       <div className="flex items-center gap-2">
-                        <Label className="text-xs min-w-[30px]">Do:</Label>
-                        <DateTimePicker
-                          className="w-full"
-                          value={st.to ? new Date(st.to) : null}
-                          onChange={(date) => {
-                            setDateState((p) => ({
-                              ...p,
-                              [df.id]: {
-                                ...p[df.id],
-                                to: date ? date.toISOString() : "",
-                              },
-                            }));
-                            setPageIndex(0);
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </PopoverContent>
-            </Popover>
-
-            {isFiltered && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 gap-2 px-2"
-                onClick={handleResetFilters}
-              >
-                Reset
-                <X className="w-4 h-4" />
-              </Button>
-            )}
-
-            {/* Hromadné akce */}
-            {bulkPopoverRender && (
+              {/* Filtry */}
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2">
-                    <Settings2 className="w-4 h-4" />
-                    Hromadné akce
+                    <Filter className="w-4 h-4" />
+                    Filtry
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-72" align="start">
-                  {bulkPopoverRender({
-                    filteredRows: filteredRows.map((r) => r.original as T),
-                    forceRefresh,
+                <PopoverContent className="w-80 space-y-3" align="start">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Filtry
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={handleResetPopoverFilters}
+                    >
+                      Vymazat
+                    </Button>
+                  </div>
+
+                  {/* SELECT filtry (faceted) */}
+                  {selectFilters.map((sf) => {
+                    const col = table.getColumn(sf.columnId);
+                    const current = (col?.getFilterValue() as string[]) ?? [];
+                    const currentVal = current[0] ?? "ALL";
+                    return (
+                      <div key={sf.columnId} className="space-y-1">
+                        <label className="text-xs text-muted-foreground">
+                          {sf.label}
+                        </label>
+                        <Select
+                          value={currentVal}
+                          onValueChange={(v) => {
+                            if (v === "ALL") col?.setFilterValue([]);
+                            else col?.setFilterValue([v]);
+                            setPageIndex(0);
+                          }}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ALL">Vše</SelectItem>
+                            {sf.options.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  })}
+
+                  {/* DATE RANGE filtry */}
+                  {dateFilters.map((df) => {
+                    const st = dateState[df.id] ?? {};
+                    
+                    return (
+                      <div key={df.id} className="space-y-2">
+                        <p className="text-[11px] font-medium text-muted-foreground">
+                          {df.label}
+                        </p>
+                        
+                        {/* Vstup "OD" */}
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs min-w-[30px]">Od:</Label>
+                          <DateTimePicker
+                            className="w-full"
+                            value={st.from ? new Date(st.from) : null}
+                            onChange={(date) => {
+                              setDateState((p) => ({
+                                ...p,
+                                [df.id]: {
+                                  ...p[df.id],
+                                  from: date ? date.toISOString() : "",
+                                },
+                              }));
+                              setPageIndex(0);
+                            }}
+                          />
+                        </div>
+                        
+                        {/* Vstup "DO" */}
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs min-w-[30px]">Do:</Label>
+                          <DateTimePicker
+                            className="w-full"
+                            value={st.to ? new Date(st.to) : null}
+                            onChange={(date) => {
+                              setDateState((p) => ({
+                                ...p,
+                                [df.id]: {
+                                  ...p[df.id],
+                                  to: date ? date.toISOString() : "",
+                                },
+                              }));
+                              setPageIndex(0);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
                   })}
                 </PopoverContent>
               </Popover>
-            )}
+
+              {isFiltered && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-2 px-2"
+                  onClick={handleResetFilters}
+                >
+                  Reset
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+
+              {/* Hromadné akce */}
+              {bulkPopoverRender && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Settings2 className="w-4 h-4" />
+                      Hromadné akce
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72" align="start">
+                    {bulkPopoverRender({
+                      filteredRows: filteredRows.map((r) => r.original as T),
+                      forceRefresh,
+                    })}
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Tabulka */}
         <div className="overflow-auto">
@@ -384,63 +401,65 @@ export function DataTable<T>({
           </Table>
         </div>
 
-        {/* Footer / stránkování */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-3 border-t">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              Řádků na stránku:
-            </span>
-            <Select
-              value={String(pageSize)}
-              onValueChange={(v) => {
-                setPageSize(Number(v));
-                setPageIndex(0);
-              }}
-            >
-              <SelectTrigger className="h-8 w-[90px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {/* 🔥 PODMÍNĚNÉ RENDEROVÁNÍ FOOTERU */}
+        {!hideFooter && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-3 border-t">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                Řádků na stránku:
+              </span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => {
+                  setPageSize(Number(v));
+                  setPageIndex(0);
+                }}
+              >
+                <SelectTrigger className="h-8 w-[90px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="text-xs text-muted-foreground">
-            Strana {safePageIndex + 1} z{" "}
-            {Math.max(1, Math.ceil(totalRows / pageSize))} • {totalRows} záznamů
-          </div>
+            <div className="text-xs text-muted-foreground">
+              Strana {safePageIndex + 1} z{" "}
+              {Math.max(1, Math.ceil(totalRows / pageSize))} • {totalRows} záznamů
+            </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPageIndex((x) => Math.max(0, x - 1))}
-              disabled={safePageIndex === 0}
-            >
-              Předchozí
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                setPageIndex((x) =>
-                  Math.min(
-                    Math.max(0, Math.ceil(totalRows / pageSize) - 1),
-                    x + 1
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPageIndex((x) => Math.max(0, x - 1))}
+                disabled={safePageIndex === 0}
+              >
+                Předchozí
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setPageIndex((x) =>
+                    Math.min(
+                      Math.max(0, Math.ceil(totalRows / pageSize) - 1),
+                      x + 1
+                    )
                   )
-                )
-              }
-              disabled={
-                safePageIndex >= Math.max(0, Math.ceil(totalRows / pageSize) - 1)
-              }
-            >
-              Další
-            </Button>
+                }
+                disabled={
+                  safePageIndex >= Math.max(0, Math.ceil(totalRows / pageSize) - 1)
+                }
+              >
+                Další
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
