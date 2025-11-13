@@ -1,24 +1,38 @@
-import { getCurrentUser } from "@/lib/data";
+"use client";
+
+import { useAuth } from "@/components/auth/auth-provider";
+
+export const dynamic = "force-dynamic";
 
 export default function SettingsPage() {
-  const user = getCurrentUser();
-  if (user.role !== "ADMIN") {
-    return <p>Pouze pro administrátory.</p>;
+  const { user } = useAuth();
+
+  // 💥 Tohle zabrání pádu při buildu i za běhu
+  if (!user) {
+    return (
+      <div className="space-y-2">
+        <h1 className="text-2xl font-semibold">Nastavení</h1>
+        <p className="text-sm text-muted-foreground">
+          Pro zobrazení nastavení se prosím přihlaste.
+        </p>
+      </div>
+    );
   }
+
+  const isAdmin = user.role === "ADMIN";
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Nastavení</h1>
-      <div className="bg-white border rounded-md p-4 space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Název školy</label>
-          <input className="border rounded-md px-2 py-1 w-full" defaultValue="Moje škola" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Popis uvítací stránky</label>
-          <textarea className="border rounded-md px-2 py-1 w-full" rows={3} defaultValue="Popis systému zápisů" />
-        </div>
-        <button className="px-4 py-2 bg-slate-900 text-white rounded-md">Uložit</button>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Přihlášený uživatel: {user.firstName} {user.lastName} ({user.email}) – role {user.role}
+      </p>
+
+      {isAdmin ? (
+        <p className="text-sm">Tady můžeš mít admin nastavení…</p>
+      ) : (
+        <p className="text-sm">Tady můžeš mít uživatelské nastavení…</p>
+      )}
     </div>
   );
 }

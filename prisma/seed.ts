@@ -1,4 +1,6 @@
-import { PrismaClient, Role, Status } from "@prisma/client";
+
+import { PrismaClient } from "@prisma/client";
+
 
 const prisma = new PrismaClient();
 
@@ -18,7 +20,7 @@ async function main() {
         lastName: "Systému",
         email: "admin@skola.cz",
         passwordHash: null,
-        role: "ADMIN" as Role,
+        role: "ADMIN",
         isActive: true,
       },
       {
@@ -27,7 +29,7 @@ async function main() {
         lastName: "Učitel",
         email: "teacher@skola.cz",
         passwordHash: null,
-        role: "TEACHER" as Role,
+        role: "TEACHER",
         isActive: true,
       },
       {
@@ -36,7 +38,7 @@ async function main() {
         lastName: "Student",
         email: "jan.student@skola.cz",
         passwordHash: null,
-        role: "STUDENT" as Role,
+        role: "STUDENT",
         isActive: true,
       },
       {
@@ -45,7 +47,7 @@ async function main() {
         lastName: "Studentová",
         email: "eva.studentova@skola.cz",
         passwordHash: null,
-        role: "STUDENT" as Role,
+        role: "STUDENT",
         isActive: true,
       },
     ],
@@ -93,9 +95,8 @@ async function main() {
       id: enrollmentId,
       name: "Zápis LS 2025",
       description: "Zápis na semináře pro letní semestr 2025",
-      status: "OPEN" as Status,
+      status: "OPEN",
       startsAt: new Date(Date.now() - 1000 * 60 * 60), // hodinu zpět
-      endsAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // za týden
       visibleToStudents: true,
       createdById: adminId,
     },
