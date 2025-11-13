@@ -9,17 +9,35 @@ import {
   useReactTable,
   ColumnDef,
 } from "@tanstack/react-table";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  Popover, PopoverContent, PopoverTrigger,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { Filter, Settings2 } from "lucide-react";
+import { Filter, Settings2, X } from "lucide-react";
+// Importy pro DateTimePicker
+import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { cs } from "date-fns/locale";
+// Import pro popisky "Od:" / "Do:"
+import { Label } from "@/components/ui/label";
 
 type SelectFilterDef = {
   /** id sloupce (ColumnDef.accessorKey) pro filtrování */
@@ -105,10 +123,11 @@ export function DataTable<T>({
   // 1) řádky po tanstack (bez pagination)
   const tableRows = table.getPrePaginationRowModel().rows;
 
-  // 2) datumové filtry – od/do držíme jako stringy v mapě
-  // držme lokální stav per dateFilter
+  // 2) datumové filtry – od/do držíme jako ISO stringy v mapě
   type DateState = { from?: string; to?: string };
-  const [dateState, setDateState] = React.useState<Record<string, DateState>>({});
+  const [dateState, setDateState] = React.useState<Record<string, DateState>>(
+    {}
+  );
 
   const filteredRows = tableRows.filter((row) => {
     if (dateFilters.length === 0) return true;
@@ -117,12 +136,14 @@ export function DataTable<T>({
     for (const df of dateFilters) {
       const st = dateState[df.id] ?? {};
       const d = df.getDate(r);
+      
+      // Porovnáváme přesný čas
       if (st.from && d) {
-        const from = new Date(st.from);
+        const from = new Date(st.from); // 'st.from' je ISO string
         if (d < from) return false;
       }
       if (st.to && d) {
-        const to = new Date(st.to);
+        const to = new Date(st.to); // 'st.to' je ISO string
         if (d > to) return false;
       }
     }
@@ -137,6 +158,26 @@ export function DataTable<T>({
     safePageIndex * pageSize,
     safePageIndex * pageSize + pageSize
   );
+
+  // --- Logika pro RESET ---
+  const handleResetFilters = () => {
+    setGlobalFilter("");
+    setColumnFilters([]);
+    setDateState({});
+    setPageIndex(0);
+  };
+
+  const handleResetPopoverFilters = () => {
+    setColumnFilters([]);
+    setDateState({});
+    setPageIndex(0);
+  };
+
+  // Zjistí, zda je nějaký filtr aktivní
+  const isFiltered =
+    globalFilter !== "" ||
+    columnFilters.length > 0 ||
+    Object.keys(dateState).length > 0;
 
   return (
     <Card>
@@ -163,7 +204,19 @@ export function DataTable<T>({
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-80 space-y-3" align="start">
-                <p className="text-xs font-medium text-muted-foreground">Filtry</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Filtry
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={handleResetPopoverFilters}
+                  >
+                    Vymazat
+                  </Button>
+                </div>
 
                 {/* SELECT filtry (faceted) */}
                 {selectFilters.map((sf) => {
@@ -172,7 +225,9 @@ export function DataTable<T>({
                   const currentVal = current[0] ?? "ALL";
                   return (
                     <div key={sf.columnId} className="space-y-1">
-                      <label className="text-xs text-muted-foreground">{sf.label}</label>
+                      <label className="text-xs text-muted-foreground">
+                        {sf.label}
+                      </label>
                       <Select
                         value={currentVal}
                         onValueChange={(v) => {
@@ -200,32 +255,67 @@ export function DataTable<T>({
                 {/* DATE RANGE filtry */}
                 {dateFilters.map((df) => {
                   const st = dateState[df.id] ?? {};
+                  
                   return (
                     <div key={df.id} className="space-y-2">
-                      <p className="text-[11px] font-medium text-muted-foreground">{df.label}</p>
-                      <Input
-                        type="datetime-local"
-                        className="h-8"
-                        value={st.from ?? ""}
-                        onChange={(e) => {
-                          setDateState((p) => ({ ...p, [df.id]: { ...p[df.id], from: e.target.value } }));
-                          setPageIndex(0);
-                        }}
-                      />
-                      <Input
-                        type="datetime-local"
-                        className="h-8"
-                        value={st.to ?? ""}
-                        onChange={(e) => {
-                          setDateState((p) => ({ ...p, [df.id]: { ...p[df.id], to: e.target.value } }));
-                          setPageIndex(0);
-                        }}
-                      />
+                      <p className="text-[11px] font-medium text-muted-foreground">
+                        {df.label}
+                      </p>
+                      
+                      {/* Vstup "OD" */}
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs min-w-[30px]">Od:</Label>
+                        <DateTimePicker
+                          className="w-full"
+                          value={st.from ? new Date(st.from) : null}
+                          onChange={(date) => {
+                            setDateState((p) => ({
+                              ...p,
+                              [df.id]: {
+                                ...p[df.id],
+                                from: date ? date.toISOString() : "",
+                              },
+                            }));
+                            setPageIndex(0);
+                          }}
+                        />
+                      </div>
+                      
+                      {/* Vstup "DO" */}
+                       <div className="flex items-center gap-2">
+                        <Label className="text-xs min-w-[30px]">Do:</Label>
+                        <DateTimePicker
+                          className="w-full"
+                          value={st.to ? new Date(st.to) : null}
+                          onChange={(date) => {
+                            setDateState((p) => ({
+                              ...p,
+                              [df.id]: {
+                                ...p[df.id],
+                                to: date ? date.toISOString() : "",
+                              },
+                            }));
+                            setPageIndex(0);
+                          }}
+                        />
+                      </div>
                     </div>
                   );
                 })}
               </PopoverContent>
             </Popover>
+
+            {isFiltered && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-2 px-2"
+                onClick={handleResetFilters}
+              >
+                Reset
+                <X className="w-4 h-4" />
+              </Button>
+            )}
 
             {/* Hromadné akce */}
             {bulkPopoverRender && (
@@ -237,7 +327,10 @@ export function DataTable<T>({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-72" align="start">
-                  {bulkPopoverRender({ filteredRows: filteredRows.map(r => r.original as T), forceRefresh })}
+                  {bulkPopoverRender({
+                    filteredRows: filteredRows.map((r) => r.original as T),
+                    forceRefresh,
+                  })}
                 </PopoverContent>
               </Popover>
             )}
@@ -252,7 +345,12 @@ export function DataTable<T>({
                 <TableRow key={hg.id}>
                   {hg.headers.map((h) => (
                     <TableHead key={h.id}>
-                      {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
+                      {h.isPlaceholder
+                        ? null
+                        : flexRender(
+                            h.column.columnDef.header,
+                            h.getContext()
+                          )}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -264,14 +362,20 @@ export function DataTable<T>({
                   <TableRow key={row.id}>
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
                       </TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center">
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center"
+                  >
                     Nic nenalezeno.
                   </TableCell>
                 </TableRow>
@@ -283,7 +387,9 @@ export function DataTable<T>({
         {/* Footer / stránkování */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-3 border-t">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Řádků na stránku:</span>
+            <span className="text-xs text-muted-foreground">
+              Řádků na stránku:
+            </span>
             <Select
               value={String(pageSize)}
               onValueChange={(v) => {
@@ -303,7 +409,8 @@ export function DataTable<T>({
           </div>
 
           <div className="text-xs text-muted-foreground">
-            Strana {safePageIndex + 1} z {Math.max(1, Math.ceil(totalRows / pageSize))} • {totalRows} záznamů
+            Strana {safePageIndex + 1} z{" "}
+            {Math.max(1, Math.ceil(totalRows / pageSize))} • {totalRows} záznamů
           </div>
 
           <div className="flex items-center gap-2">
@@ -319,9 +426,16 @@ export function DataTable<T>({
               variant="outline"
               size="sm"
               onClick={() =>
-                setPageIndex((x) => Math.min(Math.max(0, Math.ceil(totalRows / pageSize) - 1), x + 1))
+                setPageIndex((x) =>
+                  Math.min(
+                    Math.max(0, Math.ceil(totalRows / pageSize) - 1),
+                    x + 1
+                  )
+                )
               }
-              disabled={safePageIndex >= Math.max(0, Math.ceil(totalRows / pageSize) - 1)}
+              disabled={
+                safePageIndex >= Math.max(0, Math.ceil(totalRows / pageSize) - 1)
+              }
             >
               Další
             </Button>
