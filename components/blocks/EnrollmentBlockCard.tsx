@@ -6,7 +6,7 @@ import {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { BlockHeader } from "@/components/blocks/BlockHeader";
-import { SubjectOccurrenceTable } from "@/components/enrollment/SubjectOccurrenceeTable";
+import { SubjectOccurrenceTable } from "@/components/blocks/SubjectOccurrenceeTable";
 
 export function EnrollmentBlockCard({
   block,
