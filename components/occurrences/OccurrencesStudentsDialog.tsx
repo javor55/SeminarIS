@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { unenrollStudent, enrollStudent } from "@/lib/mock-db";
 
-export function StudentsDialog({
+export function OccurrencesStudentsDialog({
   occurrenceId,
   block,
   currentUser,

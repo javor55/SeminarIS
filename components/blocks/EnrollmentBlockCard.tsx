@@ -5,7 +5,7 @@ import {
   User,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { BlockHeader } from "@/components/enrollment/BlockHeader";
+import { BlockHeader } from "@/components/blocks/BlockHeader";
 import { SubjectOccurrenceTable } from "@/components/enrollment/SubjectOccurrenceeTable";
 
 export function EnrollmentBlockCard({

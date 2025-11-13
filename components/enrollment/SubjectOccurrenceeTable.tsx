@@ -13,8 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { EditSubjectOccurrenceDialog } from "@/components/enrollment/EditSubjectOccurrenceDialog";
-import { StudentsDialog } from "@/components/enrollment/StudentsDialog";
+import { EditSubjectOccurrenceDialog } from "@/components/occurrences/EditSubjectOccurrenceDialog";
+import { StudentsDialog } from "@/components/occurrences/OccurrencesStudentsDialog";
 import { enrollStudent, unenrollStudent } from "@/lib/mock-db";
 import {
   AlertDialog,

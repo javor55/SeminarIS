@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Block, SubjectOccurrence } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { EditBlockDialog } from "@/components/enrollment/EditBlockDialog";
-import { EditSubjectOccurrenceDialog } from "@/components/enrollment/EditSubjectOccurrenceDialog";
+import { EditBlockDialog } from "@/components/blocks/EditBlockDialog";
+import { EditSubjectOccurrenceDialog } from "@/components/occurrences/EditSubjectOccurrenceDialog";
 import { moveBlock, deleteBlock } from "@/lib/mock-db";
 import { toast } from "sonner";
 

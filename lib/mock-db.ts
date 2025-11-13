@@ -80,6 +80,13 @@ export function updateBlock(block: Block) {
   }
   return false;
 }
+
+
+export function getSubjectsFromMock(): Subject[] {
+  return subjects;
+}
+
+
 /** Uloží úpravu předmětu (mock) */
 export function updateSubject(subject: Subject & { syllabus?: string }) {
   const idx = subjects.findIndex((s) => s.id === subject.id);
@@ -88,28 +95,24 @@ export function updateSubject(subject: Subject & { syllabus?: string }) {
   return true;
 }
 
-export function createSubject(newSubject: Partial<Subject>): Subject {
+export function createSubject(data: Partial<Subject>): Subject {
   const id =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2, 10);
+      : Math.random().toString(36).substring(2, 10);
 
-  const authorId =
-    newSubject.createdById ||
-    newSubject.updatedById ||
-    users[0]?.id || // fallback na prvního uživatele z mocku
-    "system";
+  const now = new Date().toISOString();
 
   const subject: Subject = {
     id,
-    name: newSubject.name || "Nový předmět",
-    code: newSubject.code || "",
-    description: newSubject.description || "",
-    syllabus: newSubject.syllabus || "",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    createdById: authorId,   // 👈 DOPLNĚNO
-    updatedById: authorId,   // 👈 ať je to konzistentní
+    name: data.name ?? "",
+    code: data.code ?? "",
+    description: data.description ?? "",
+    syllabus: data.syllabus ?? "",
+    createdAt: now,
+    updatedAt: now,
+    createdById: data.createdById ?? "system",
+    updatedById: data.updatedById ?? "system",
   };
 
   subjects.push(subject);
