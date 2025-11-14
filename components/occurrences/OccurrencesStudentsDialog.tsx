@@ -86,7 +86,8 @@ export function OccurrencesStudentsDialog({
                   Všichni studenti jsou už zapsáni.
                 </p>
               ) : (
-                <div className="flex gap-2">
+                // 🔥 ZMĚNA: Přidán 'flex-col sm:flex-row' pro responzivní layout
+                <div className="flex flex-col sm:flex-row gap-2">
                   <select
                     className="flex-1 border rounded-md px-2 py-1 text-sm"
                     value={selectedStudentId}
@@ -100,6 +101,8 @@ export function OccurrencesStudentsDialog({
                   </select>
                   <Button
                     size="sm"
+                    // 🔥 ZMĚNA: Tlačítko se přizpůsobí
+                    className="w-full sm:w-auto"
                     onClick={() => {
                       if (!selectedStudentId) return;
                       const newEnr = enrollStudent(
@@ -132,9 +135,10 @@ export function OccurrencesStudentsDialog({
               localEnrollments.map((enr) => {
                 const u = allUsers.find((x) => x.id === enr.studentId);
                 return (
+                  // 🔥 ZMĚNA: Přidány responzivní třídy pro layout řádku
                   <div
                     key={enr.id}
-                    className="flex items-center justify-between gap-3 border rounded-md px-3 py-2"
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border rounded-md px-3 py-2"
                   >
                     <div>
                       <p className="font-medium">
@@ -151,6 +155,8 @@ export function OccurrencesStudentsDialog({
                       <Button
                         variant="destructive"
                         size="sm"
+                        // 🔥 ZMĚNA: Tlačítko se přizpůsobí
+                        className="w-full sm:w-auto"
                         onClick={() => setToUnenroll(enr.id)}
                       >
                         Odepsat
@@ -177,7 +183,7 @@ export function OccurrencesStudentsDialog({
               <AlertDialogTitle>Odepsat studenta?</AlertDialogTitle>
               <AlertDialogDescription>
                 Tato akce v mock režimu skutečně odstraní zápis z paměti.
-              </AlertDialogDescription> {/* 🔥 ZDE BYLA CHYBA (E-T) */}
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setToUnenroll(null)}>
