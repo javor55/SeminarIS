@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label"; // 🔥 Přidán import pro Label
 
 export default function LoginPage() {
   const { login, mockUsers } = useAuth();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState(""); // 🔥 Přidán stav pro heslo
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -16,7 +18,8 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await login(email);
+      // 🔥 Upraveno volání - nyní posílá email i heslo
+      await login(email, password);
     } catch (err: any) {
       setError(err.message ?? "Nepodařilo se přihlásit.");
     } finally {
@@ -30,15 +33,16 @@ export default function LoginPage() {
         <div>
           <h1 className="text-xl font-semibold">Přihlášení</h1>
           <p className="text-sm text-muted-foreground">
-            Zadejte svůj e-mail nebo klikněte na jednu z testovacích rolí.
+            Zadejte svůj e-mail a heslo nebo klikněte na jednu z testovacích
+            rolí.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {" "}
+          {/* Zvýšena mezera pro lepší vzhled */}
           <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="email">
-              E-mail
-            </label>
+            <Label htmlFor="email">E-mail</Label>
             <Input
               id="email"
               type="email"
@@ -49,6 +53,21 @@ export default function LoginPage() {
               required
             />
           </div>
+
+          {/* 🔥 Nová sekce pro heslo */}
+          <div className="space-y-1">
+            <Label htmlFor="password">Heslo</Label>
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
           {error && <p className="text-sm text-red-500">{error}</p>}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Přihlašuji..." : "Přihlásit se"}
@@ -67,7 +86,8 @@ export default function LoginPage() {
                 onClick={async () => {
                   setError(null);
                   try {
-                    await login(u.email);
+                    // 🔥 Upraveno volání - posílá email a "falešné" heslo
+                    await login(u.email, "mockpass");
                   } catch (err: any) {
                     setError(err.message ?? "Nepodařilo se přihlásit.");
                   }

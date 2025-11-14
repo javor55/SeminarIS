@@ -13,7 +13,7 @@ import { users } from "@/lib/mock-db"; // ⬅️ použijeme mock uživatele z da
 
 type AuthContextValue = {
   user: User | null;
-  login: (email: string) => Promise<void>;
+  login: (email: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
   mockUsers: User[];
 };
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   // 🔐 Přihlášení – jen podle e-mailu
-  async function login(email: string) {
+  const login = async (email: string, password?: string) => {
     const found = users.find(
       (u) => u.email.toLowerCase() === email.toLowerCase()
     );
