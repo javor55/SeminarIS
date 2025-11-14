@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Block, User } from "@/lib/types";
 import {
   Dialog,
@@ -35,6 +36,8 @@ export function OccurrencesStudentsDialog({
   currentUser: User;
   onOpenChange: (open: boolean) => void;
 }) {
+  const router = useRouter();
+
   // najdeme výskyt v rámci JEDNOHO bloku
   const occurrence = useMemo(() => {
     return block.occurrences.find((x) => x.id === occurrenceId) ?? null;
@@ -104,6 +107,8 @@ export function OccurrencesStudentsDialog({
                         occurrenceId
                       );
                       setLocalEnrollments((prev) => [...prev, { ...newEnr }]);
+                      
+                      router.refresh();
 
                       const nextStudents = enrollableStudents.filter(
                         (s) => s.id !== selectedStudentId
@@ -172,7 +177,7 @@ export function OccurrencesStudentsDialog({
               <AlertDialogTitle>Odepsat studenta?</AlertDialogTitle>
               <AlertDialogDescription>
                 Tato akce v mock režimu skutečně odstraní zápis z paměti.
-              </AlertDialogDescription>
+              </AlertDialogDescription> {/* 🔥 ZDE BYLA CHYBA (E-T) */}
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setToUnenroll(null)}>
@@ -185,6 +190,7 @@ export function OccurrencesStudentsDialog({
                     setLocalEnrollments((prev) =>
                       prev.filter((e) => e.id !== toUnenroll)
                     );
+                    router.refresh();
                   }
                   setToUnenroll(null);
                 }}

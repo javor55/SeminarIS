@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState } from "react"; // 🔥 Opraveno
+import { useRouter } from "next/navigation";
 import { Block, SubjectOccurrence, User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 import { BlockHeader } from "@/components/blocks/BlockHeader";
-import { DataTable } from "@/components/common/data-table";
+import { DataTable } from "@/components/ui/data-table";
 import {
   getOccurrenceColumns,
   OccurrenceRow,
@@ -42,12 +43,10 @@ export function EnrollmentBlockCard({
   total: number;
   currentUser: User;
 }) {
+  const router = useRouter();
   const isAdmin = currentUser.role === "ADMIN";
   const isTeacher = currentUser.role === "TEACHER";
   const isStudent = currentUser.role === "STUDENT";
-
-  /** Force re-render po změně zápisu */
-  const [version, setVersion] = useState(0);
 
   /** Dialogy */
   const [editOccurrence, setEditOccurrence] = useState<any | null>(null);
@@ -143,7 +142,7 @@ export function EnrollmentBlockCard({
 
     // 3. normální zápis
     enrollStudent(currentUser.id, occId);
-    setVersion((v) => v + 1);
+    router.refresh();
   }
 
   //
@@ -157,7 +156,7 @@ export function EnrollmentBlockCard({
     );
     if (!enr) return;
     unenrollStudent(enr.id);
-    setVersion((v) => v + 1);
+    router.refresh();
   }
 
   //
@@ -212,7 +211,7 @@ export function EnrollmentBlockCard({
         enrolledByMe,
       };
     });
-  }, [block, version, currentUser.id, isStudent]);
+  }, [block, currentUser.id, isStudent]);
 
   //
   // 🟦 6) Sloupce z occurrence-columns
@@ -302,7 +301,7 @@ export function EnrollmentBlockCard({
                   Jste zapsán v bloku{" "}
                   <strong>{sameSubjectAlert.blockName}</strong>{" "}
                   ({sameSubjectAlert.occurrenceCode}).
-                </p>
+                </p> {/* 🔥 Opraveno */}
                 <p>Nejdříve se prosím odepište.</p>
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -345,7 +344,7 @@ export function EnrollmentBlockCard({
                     <p>
                       Jste již zapsán na jiný výskyt v tomto bloku. Pokud budete
                       pokračovat, vaše volba se přepíše.
-                    </p>
+                    </p> {/* 🔥 Opraveno */}
 
                     <div className="bg-muted p-3 rounded text-sm space-y-1">
                       <p>
@@ -373,7 +372,7 @@ export function EnrollmentBlockCard({
                   const my = findMyOccurrenceInThisBlock();
                   if (my) unenrollStudent(my.enrollmentId);
                   enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
-                  setVersion((v) => v + 1);
+                  router.refresh();
                   setSwitchEnroll(null);
                 }}
               >

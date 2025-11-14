@@ -3,7 +3,7 @@
 import { useAuth } from "@/components/auth/auth-provider";
 import { getAllUsers } from "@/lib/data";
 import { getSubjectsFromMock } from "@/lib/mock-db";
-import { DataTable } from "@/components/common/data-table";
+import { DataTable } from "@/components/ui/data-table";
 import { subjectsColumns, SubjectRow } from "@/components/subjects/subjects-columns";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";

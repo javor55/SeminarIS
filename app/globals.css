@@ -98,6 +98,99 @@
   }
 }
 
+/* ================================================================== */
+/* STYLY PRO TIPTAP EDITOR                             */
+/* ================================================================== */
+
+/* Wrapper (ten má na sobě border z Tailwindu) */
+.tiptap-wrapper {
+  /* Jen se ujistíme, že se správně roztahuje */
+  width: 100%;
+}
+
+/* Nástrojová lišta (MenuBar) */
+.tiptap-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0.5rem;
+  border-bottom: 1px solid #e5e7eb; /* odpovídá tailwind gray-200 */
+}
+
+/* Skupina tlačítek (pokud byste je chtěli) */
+.tiptap-button-group {
+  display: flex;
+  flex-wrap: wrap;
+  margin-right: 0.5rem;
+}
+
+/* Jednotlivá tlačítka v liště */
+.tiptap-toolbar button {
+  padding: 0.25rem 0.5rem;
+  margin: 0.125rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  background-color: transparent;
+  border: 1px solid transparent;
+  transition: all 0.1s ease-in-out;
+}
+
+.tiptap-toolbar button:hover {
+  background-color: #f3f4f6; /* odpovídá tailwind gray-100 */
+}
+
+.tiptap-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Aktivní tlačítko */
+.tiptap-toolbar button.is-active {
+  background-color: #d1d5db; /* odpovídá tailwind gray-300 */
+  color: #1f2937; /* odpovídá tailwind gray-800 */
+}
+
+/* --- TOTO JE NEJDŮLEŽITĚJŠÍ ČÁST --- */
+
+/* Třída .tiptap, kterou jste nastavil na EditorContent */
+/* Cílíme na interní .ProseMirror div, který vytváří Tiptap */
+.tiptap > .ProseMirror {
+  /* Přidá vnitřní odsazení, aby se text "odlepil" od ohraničení */
+  padding: 0.75rem; 
+  
+  /* Nastaví minimální výšku, aby editor vypadal dobře i prázdný */
+  min-height: 200px;
+}
+
+/* Odstraní výchozí ohraničení při fokusu */
+.tiptap > .ProseMirror:focus {
+  outline: none;
+}
+
+/* Základní styly pro obsah, aby vypadal rozumně */
+.tiptap .ProseMirror p {
+  margin-bottom: 0.5rem;
+}
+.tiptap .ProseMirror h1,
+.tiptap .ProseMirror h2,
+.tiptap .ProseMirror h3 {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+.tiptap .ProseMirror ul,
+.tiptap .ProseMirror ol {
+  padding-left: 1.5rem;
+  margin-bottom: 0.5rem;
+  list-style: revert;
+}
+.tiptap .ProseMirror blockquote {
+  border-left: 4px solid #e5e7eb;
+  padding-left: 1rem;
+  font-style: italic;
+  color: #6b7280;
+}
 
 /* Tiptap wrapper + toolbar */
 /* obal */

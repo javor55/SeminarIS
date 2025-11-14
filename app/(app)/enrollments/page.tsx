@@ -9,7 +9,7 @@ import {
 } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { EditEnrollmentDialog } from "@/components/enrollment/EditEnrollmentDialog";
-import { DataTable } from "@/components/common/data-table";
+import { DataTable } from "@/components/ui/data-table";
 import {
   getEnrollmentColumns,
   EnrollmentRow,

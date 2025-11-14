@@ -15,7 +15,7 @@ import {
   EnrollmentWindowWithBlocks,
 } from "@/lib/types";
 import { EditSubjectOccurrenceDialog } from "@/components/occurrences/EditSubjectOccurrenceDialog";
-import { DataTable } from "@/components/common/data-table";
+import { DataTable } from "@/components/ui/data-table";
 import {
   OccurrenceRow,
   getOccurrenceColumns,

@@ -2,7 +2,7 @@
 
 import * as React from "react"; // Potřeba pro useState
 import { getAllUsers } from "@/lib/data";
-import { DataTable } from "@/components/common/data-table";
+import { DataTable } from "@/components/ui/data-table";
 import { usersColumns, UserRow } from "@/components/users/users-columns";
 import { updateUserRole, toggleUserActive } from "@/lib/mock-db"; // Import funkcí z mock-db
 

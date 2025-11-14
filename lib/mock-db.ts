@@ -784,6 +784,7 @@ export const studentEnrollments: StudentEnrollment[] = [
     createdById: "u-student1",
     createdAt: now,
     updatedAt: now,
+    deletedAt: null, // <-- PŘIDÁNO
   },
   {
     id: "se-2",
@@ -792,6 +793,7 @@ export const studentEnrollments: StudentEnrollment[] = [
     createdById: "u-student2",
     createdAt: now,
     updatedAt: now,
+    deletedAt: null, // <-- PŘIDÁNO
   },
   {
     id: "se-3",
@@ -800,6 +802,7 @@ export const studentEnrollments: StudentEnrollment[] = [
     createdById: "u-student3",
     createdAt: now,
     updatedAt: now,
+    deletedAt: null, // <-- PŘIDÁNO
   },
   {
     id: "se-4",
@@ -808,6 +811,7 @@ export const studentEnrollments: StudentEnrollment[] = [
     createdById: "u-student4",
     createdAt: now,
     updatedAt: now,
+    deletedAt: null, // <-- PŘIDÁNO
   },
   {
     id: "se-5",
@@ -816,5 +820,6 @@ export const studentEnrollments: StudentEnrollment[] = [
     createdById: "u-student5",
     createdAt: now,
     updatedAt: now,
+    deletedAt: null, // <-- PŘIDÁNO
   },
 ];
