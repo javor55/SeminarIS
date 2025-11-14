@@ -6,20 +6,21 @@ import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 
+// 🔥 ZMĚNA: Všechny 'href: "/dashboard"' jsou nyní 'href: "/"'
 const linksByRole: Record<string, Array<{ label: string; href: string }>> = {
   ADMIN: [
-    { label: "Dashboard", href: "/dashboard" },
+    { label: "Dashboard", href: "/" },
     { label: "Zápisy", href: "/enrollments" },
     { label: "Předměty", href: "/subjects" },
     { label: "Uživatelé", href: "/users" },
     { label: "Nastavení", href: "/settings" },
   ],
   TEACHER: [
-    { label: "Dashboard", href: "/dashboard" },
+    { label: "Dashboard", href: "/" },
     { label: "Zápisy", href: "/enrollments" },
     { label: "Předměty", href: "/subjects" },
   ],
-  STUDENT: [{ label: "Dashboard", href: "/dashboard" }],
+  STUDENT: [{ label: "Dashboard", href: "/" }],
   GUEST: [],
 };
 
@@ -33,22 +34,33 @@ export function AppTopbar({ user }: { user?: User }) {
     <header className="border-b bg-white">
       <div className="container mx-auto flex h-14 items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="font-semibold">
+          {/* 🔥 ZMĚNA: Odkaz na logo nyní směřuje na "/" */}
+          <Link href="/" className="font-semibold">
             Zápis seminářů
           </Link>
           <nav className="flex gap-2">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "text-sm px-3 py-1 rounded-md hover:bg-slate-100",
-                  pathname.startsWith(link.href) && "bg-slate-100 font-medium"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {links.map((link) => {
+              // 🔥 ZMĚNA: Logika pro aktivní odkaz
+              // Musíme zajistit, aby se "/" zvýraznil jen při PŘESNÉ shodě,
+              // zatímco ostatní odkazy se zvýrazní, pokud cesta ZAČÍNÁ s jejich href.
+              const isActive =
+                link.href === "/"
+                  ? pathname === "/" // Přesná shoda pro root
+                  : pathname.startsWith(link.href); // 'startsWith' pro všechny ostatní
+
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={cn(
+                    "text-sm px-3 py-1 rounded-md hover:bg-slate-100",
+                    isActive && "bg-slate-100 font-medium" // Použije novou 'isActive' logiku
+                  )}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
         </div>
         <div className="flex items-center gap-2">
