@@ -6,7 +6,19 @@ import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 
-// 🔥 ZMĚNA: Všechny 'href: "/dashboard"' jsou nyní 'href: "/"'
+// 🔥 Importy pro responzivní menu
+import { Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+// Definice odkazů (stejná jako ve vašem souboru)
 const linksByRole: Record<string, Array<{ label: string; href: string }>> = {
   ADMIN: [
     { label: "Dashboard", href: "/" },
@@ -34,19 +46,18 @@ export function AppTopbar({ user }: { user?: User }) {
     <header className="border-b bg-white">
       <div className="container mx-auto flex h-14 items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          {/* 🔥 ZMĚNA: Odkaz na logo nyní směřuje na "/" */}
+          {/* Logo/Název - Vždy viditelné */}
           <Link href="/" className="font-semibold">
             Zápis seminářů
           </Link>
-          <nav className="flex gap-2">
+
+          {/* 🔥 DESKTOP Navigace: Skrytá na mobilu (hidden), viditelná od 'md' (md:flex) */}
+          <nav className="hidden md:flex gap-2">
             {links.map((link) => {
-              // 🔥 ZMĚNA: Logika pro aktivní odkaz
-              // Musíme zajistit, aby se "/" zvýraznil jen při PŘESNÉ shodě,
-              // zatímco ostatní odkazy se zvýrazní, pokud cesta ZAČÍNÁ s jejich href.
               const isActive =
                 link.href === "/"
-                  ? pathname === "/" // Přesná shoda pro root
-                  : pathname.startsWith(link.href); // 'startsWith' pro všechny ostatní
+                  ? pathname === "/"
+                  : pathname.startsWith(link.href);
 
               return (
                 <Link
@@ -54,7 +65,7 @@ export function AppTopbar({ user }: { user?: User }) {
                   href={link.href}
                   className={cn(
                     "text-sm px-3 py-1 rounded-md hover:bg-slate-100",
-                    isActive && "bg-slate-100 font-medium" // Použije novou 'isActive' logiku
+                    isActive && "bg-slate-100 font-medium"
                   )}
                 >
                   {link.label}
@@ -63,7 +74,9 @@ export function AppTopbar({ user }: { user?: User }) {
             })}
           </nav>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* 🔥 DESKTOP User Info: Skryté na mobilu, viditelné od 'md' */}
+        <div className="hidden md:flex items-center gap-2">
           {user ? (
             <>
               <span className="text-sm text-slate-700">{user.email}</span>
@@ -81,6 +94,54 @@ export function AppTopbar({ user }: { user?: User }) {
             >
               Přihlásit
             </Link>
+          )}
+        </div>
+
+        {/* 🔥 MOBILNÍ Menu: Viditelné jen na mobilu (md:hidden) */}
+        <div className="flex md:hidden">
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Otevřít menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel className="font-normal">
+                  {user.email}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {links.map((link) => {
+                  const isActive =
+                    link.href === "/"
+                      ? pathname === "/"
+                      : pathname.startsWith(link.href);
+
+                  return (
+                    <DropdownMenuItem key={link.href} asChild>
+                      <Link
+                        href={link.href}
+                        className={cn(
+                          isActive && "font-medium bg-slate-100"
+                        )}
+                      >
+                        {link.label}
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout}>
+                  Odhlásit
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            // Na mobilu, pokud není přihlášen, zobrazíme jen tlačítko
+            <Button asChild size="sm">
+              <Link href="/login">Přihlásit</Link>
+            </Button>
           )}
         </div>
       </div>
