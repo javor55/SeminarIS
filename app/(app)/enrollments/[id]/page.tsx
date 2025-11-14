@@ -1,30 +1,34 @@
-import { getCurrentUser, getEnrollmentWindowByIdWithBlocks } from "@/lib/data";
-import { notFound } from "next/navigation";
-import { EnrollmentBlocks } from "@/components/enrollment/EnrollmentBlocks";
+"use client";
 
-export default function EnrollmentDetail({ params }: { params: { id: string } }) {
-  const user = getCurrentUser();
-  const enrollment = getEnrollmentWindowByIdWithBlocks(params.id);
-  if (!enrollment) notFound();
+import { useAuth } from "@/components/auth/auth-provider";
+import { getEnrollmentWindowByIdWithBlocks } from "@/lib/data"; // <-- Načítá podle ID
+import { EnrollmentView } from "@/components/enrollment/EnrollmentView"; // <-- Naše nová komponenta
 
-  const isAdmin = user.role === "ADMIN";
+// Přijímá 'params' z URL
+export default function EnrollmentDetailPage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  const { user } = useAuth();
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{enrollment.name}</h1>
-          <p className="text-slate-500">
-            {enrollment.status} • {new Date(enrollment.startsAt).toLocaleString()} – {new Date(enrollment.endsAt).toLocaleString()}
-          </p>
-        </div>
-        {isAdmin && (
-          <button className="px-4 py-2 bg-slate-900 text-white rounded-md">
-            Uložit nastavení
-          </button>
-        )}
+  // 1. Načtení dat pomocí ID
+  const ew = getEnrollmentWindowByIdWithBlocks(params.id);
+
+  if (!user) return null; // Čekání na přihlášení
+
+  // 2. Ošetření, pokud zápis neexistuje
+  if (!ew) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold">Zápis nenalezen</h1>
+        <p className="text-muted-foreground">
+          Hledané zápisové období neexistuje nebo k němu nemáte přístup.
+        </p>
       </div>
-      <EnrollmentBlocks enrollment={enrollment} currentUser={user} />
-    </div>
-  );
+    );
+  }
+
+  // 3. Renderování naší znovupoužitelné komponenty
+  return <EnrollmentView enrollmentWindow={ew} currentUser={user} />;
 }

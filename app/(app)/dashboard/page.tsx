@@ -1,178 +1,94 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import {
   getEnrollmentWindowsVisible,
   getEnrollmentWindowByIdWithBlocks,
 } from "@/lib/data";
-import { EnrollmentBlocks } from "@/components/enrollment/EnrollmentBlocks";
-import { Button } from "@/components/ui/button";
-import { EditEnrollmentDialog } from "@/components/enrollment/EditEnrollmentDialog";
+import { EnrollmentView } from "@/components/enrollment/EnrollmentView";
+import { EnrollmentWindow, User } from "@/lib/types"; // Předpokládám import typů
 
-// 🕒 formátování d + hh:mm:ss
-function formatDuration(ms: number) {
-  if (ms < 0) ms = 0;
-  const totalSeconds = Math.floor(ms / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const restSeconds = totalSeconds - days * 86400;
-  const h = Math.floor(restSeconds / 3600);
-  const m = Math.floor((restSeconds % 3600) / 60);
-  const s = restSeconds % 60;
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  if (days > 0) return `${days} d ${pad(h)}:${pad(m)}:${pad(s)}`;
-  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+/**
+ * Najde nejrelevantnější zápis pro zobrazení na dashboardu
+ * podle vámi definovaných pravidel.
+ */
+function findDashboardEnrollment(
+  allWindows: EnrollmentWindow[],
+  currentUser: User
+): EnrollmentWindow | null {
+  
+  // 1. Předfiltrování podle role
+  const windowsToSearch =
+    currentUser.role === "STUDENT"
+      ? allWindows.filter((ew) => ew.visibleToStudents)
+      : allWindows;
+
+  // 2. Priorita: "OPEN" (ten, co končí nejdříve)
+  const openWindows = windowsToSearch
+    .filter((ew) => ew.status === "OPEN")
+    .sort((a, b) => new Date(a.endsAt).getTime() - new Date(b.endsAt).getTime());
+  
+  if (openWindows.length > 0) return openWindows[0];
+
+  // 3. Priorita: "SCHEDULED" (ten, co začíná nejdříve)
+  const scheduledWindows = windowsToSearch
+    .filter((ew) => ew.status === "SCHEDULED")
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  
+  if (scheduledWindows.length > 0) return scheduledWindows[0];
+
+  // 4. Priorita: "DRAFT" (pouze Admin/Teacher, ten, co byl naposledy upraven)
+  // Poznámka: Tato logika předpokládá, že getEnrollmentWindowsVisible() 
+  // vrací i DRAFT. Pokud ne, tato sekce se neuplatní.
+  if (currentUser.role !== "STUDENT") {
+    const draftWindows = windowsToSearch
+      .filter((ew) => ew.status === "DRAFT")
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    
+    if (draftWindows.length > 0) return draftWindows[0];
+  }
+
+  // 5. Priorita: "CLOSED" (ten, co skončil nejpozději)
+  const closedWindows = windowsToSearch
+    .filter((ew) => ew.status === "CLOSED")
+    .sort((a, b) => new Date(b.endsAt).getTime() - new Date(a.endsAt).getTime());
+  
+  if (closedWindows.length > 0) return closedWindows[0];
+
+  // 6. Nic nenalezeno
+  return null;
 }
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const enrollments = getEnrollmentWindowsVisible();
-  const ew = enrollments.length
-    ? getEnrollmentWindowByIdWithBlocks(enrollments[0].id)!
+
+  // Načteme data až když máme uživatele
+  const enrollmentToShow = user
+    ? findDashboardEnrollment(getEnrollmentWindowsVisible() ?? [], user)
     : null;
 
-  const [now, setNow] = useState(() => new Date());
-  const [editEnrollment, setEditEnrollment] = useState<any | null>(null);
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const start = ew ? new Date(ew.startsAt) : new Date(0);
-  const end = ew ? new Date(ew.endsAt) : new Date(0);
-
-  const { statusLabel, statusColor, countdownLabel } = useMemo(() => {
-    if (!ew) {
-      return {
-        statusLabel: "Žádný zápis",
-        statusColor: "text-slate-400",
-        countdownLabel: "",
-      };
-    }
-
-    if (now < start) {
-      return {
-        statusLabel: "Naplánováno",
-        statusColor: "text-blue-600",
-        countdownLabel: `Začíná za: ${formatDuration(
-          start.getTime() - now.getTime()
-        )}`,
-      };
-    } else if (now >= start && now <= end) {
-      return {
-        statusLabel: "Otevřeno",
-        statusColor: "text-emerald-600",
-        countdownLabel: `Končí za: ${formatDuration(
-          end.getTime() - now.getTime()
-        )}`,
-      };
-    } else {
-      return {
-        statusLabel: "Uzavřeno",
-        statusColor: "text-slate-500",
-        countdownLabel: "",
-      };
-    }
-  }, [ew, now, start, end]);
+  // Načteme plná data *jen* pro vybraný zápis
+  const ew = enrollmentToShow
+    ? getEnrollmentWindowByIdWithBlocks(enrollmentToShow.id)
+    : null;
 
   if (!user) {
-    return (
-      <p className="text-sm text-slate-500">
-        Nejste přihlášen.{" "}
-        <a href="/login" className="underline">
-          Přihlásit se
-        </a>
-      </p>
-    );
+    return null; // Čekání na přihlášení
   }
 
+  // Ošetření, pokud se nenašel žádný relevantní zápis
   if (!ew) {
     return (
-      <div className="rounded-lg border bg-white p-4 shadow-sm">
-        <h1 className="text-2xl font-semibold">Zápis</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Aktuálně není k dispozici žádné zápisové období.
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold">Vítejte</h1>
+        <p className="text-muted-foreground">
+          Momentálně zde není žádné aktivní ani naplánované zápisové období
+          k zobrazení.
         </p>
       </div>
     );
   }
 
-  return (
-    <>
-      <div className="space-y-6">
-        {/* 🧭 KARTA 1 a KARTA 2 vedle sebe */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* KARTA 1 – název + popis */}
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-2xl font-semibold">{ew.name}</h1>
-                {ew.description ? (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {ew.description}
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Zápis nemá popis.
-                  </p>
-                )}
-              </div>
-
-              {/* tlačítko vpravo nahoře */}
-              {(user.role === "ADMIN" || user.role === "TEACHER") && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setEditEnrollment(ew)}
-                >
-                  Upravit zápis
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* KARTA 2 – stav + časy + odpočet */}
-          <div className="rounded-lg border bg-white shadow-sm">
-            <div className="px-4 py-3 border-b flex items-center gap-4">
-              <p className={`text-base font-semibold ${statusColor}`}>
-                {statusLabel}
-              </p>
-              {countdownLabel && (
-                <span className="text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
-                  {countdownLabel}
-                </span>
-              )}
-            </div>
-
-            <div className="px-4 py-3 space-y-1 text-sm">
-              <p>
-                <span className="text-slate-500">Začátek:</span>{" "}
-                {start.toLocaleString()}
-              </p>
-              <p>
-                <span className="text-slate-500">Konec:</span>{" "}
-                {end.toLocaleString()}
-              </p>
-              {!countdownLabel && now > end ? (
-                <p className="text-xs text-slate-500">Zápis již byl ukončen.</p>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        {/* 🧩 KARTA 3 – bloky zápisu */}
-        <EnrollmentBlocks enrollment={ew} currentUser={user} />
-      </div>
-
-      {editEnrollment && (
-        <EditEnrollmentDialog
-          enrollment={editEnrollment}
-          onOpenChange={(open) => {
-            if (!open) setEditEnrollment(null);
-          }}
-        />
-      )}
-    </>
-  );
+  // Renderování znovupoužitelné komponenty s nalezeným zápisem
+  return <EnrollmentView enrollmentWindow={ew} currentUser={user} />;
 }
