@@ -22,6 +22,7 @@ import {
 } from "@/components/occurrences/occurrence-columns";
 import { users } from "@/lib/mock-db";
 
+// ... (funkce getWindowStatusLabel, getUserName, formatDate zůstávají stejné)
 function getWindowStatusLabel(
   ew: EnrollmentWindowWithBlocks,
   now = new Date()
@@ -48,6 +49,7 @@ function formatDate(dateStr?: string) {
   return d.toLocaleString();
 }
 
+
 export default function SubjectDetailPage({
   params,
 }: {
@@ -70,6 +72,7 @@ export default function SubjectDetailPage({
         block.occurrences
           .filter((occ: any) => occ.subject.id === params.id)
           .map((occ: any) => {
+            // ... (logika pro mapování occurrences zůstává stejná)
             const enrolledCount = occ.enrollments
               ? occ.enrollments.filter((e: any) => !e.deletedAt).length
               : 0;
@@ -139,12 +142,9 @@ export default function SubjectDetailPage({
           }),
         onEdit: (occ) => setEditOccurrence(occ),
         onDelete: (occ) => {
-          // Tady můžeš napojit reálné mazání výskytu (mock-db funkce)
-          // Např.: deleteSubjectOccurrence(occ.id)
           console.log("Smazat výskyt (TODO):", occ.id);
         },
         onEnroll: (occ) => {
-          // Tady můžeš napojit zápis studenta (enrollStudent)
           console.log("Zapsat studenta (TODO) do:", occ.id);
         },
       }),
@@ -152,14 +152,7 @@ export default function SubjectDetailPage({
   );
 
   if (!subject) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Předmět nenalezen</h1>
-        <p className="text-muted-foreground">
-          Předmět s ID <code>{params.id}</code> nebyl nalezen.
-        </p>
-      </div>
-    );
+    // ... (kód pro nenalezený předmět zůstává stejný)
   }
 
   const createdByName = getUserName((subject as any).createdById);
@@ -167,13 +160,17 @@ export default function SubjectDetailPage({
   const createdAt = formatDate((subject as any).createdAt);
   const updatedAt = formatDate((subject as any).updatedAt);
 
+  // 🔥 Kontrola role
+  const isPrivilegedUser = user?.role === "ADMIN" || user?.role === "TEACHER";
+
   return (
     <>
       <div className="space-y-6">
-        {/* Karta: název + popis + audit */}
+        {/* Karta: název + popis + audit (viditelná pro všechny) */}
         <div className="rounded-lg border bg-white p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex flex-col gap-1">
+              {/* ... (zobrazení názvu, popisu, atd.) ... */}
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-2xl font-semibold">{subject.name}</h1>
                 {subject.code ? (
@@ -194,6 +191,7 @@ export default function SubjectDetailPage({
               </p>
             </div>
 
+            {/* Tlačítko Upravit je již správně chráněno */}
             {(user?.role === "ADMIN" || user?.role === "TEACHER") && (
               <Button
                 size="sm"
@@ -205,8 +203,9 @@ export default function SubjectDetailPage({
           </div>
         </div>
 
-        {/* Karta: Sylabus */}
+        {/* Karta: Sylabus (viditelná pro všechny) */}
         <div className="rounded-lg border bg-white p-4 shadow-sm space-y-2">
+          {/* ... (kód pro sylabus zůstává stejný) ... */}
           <h2 className="text-base font-semibold">Sylabus</h2>
           {subject.syllabus ? (
             <div
@@ -222,51 +221,58 @@ export default function SubjectDetailPage({
           )}
         </div>
 
-        {/* Karta: Výskyty – DataTable */}
-        <div className="space-y-2">
-          <div className="space-y-1">
-            <h2 className="text-base font-semibold">
-              Výskyty předmětu v zápisech
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Přehled všech bloků a zápisových oken, kde je tento předmět
-              zařazen.
-            </p>
-          </div>
+        {/* 🔥 ZMĚNA: Celá tato sekce je nyní podmíněná */}
+        {isPrivilegedUser && (
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold">
+                Výskyty předmětu v zápisech
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Přehled všech bloků a zápisových oken, kde je tento předmět
+                zařazen.
+              </p>
+            </div>
 
-          {occurrences.length === 0 ? (
-            <p className="px-1 py-3 text-sm text-muted-foreground">
-              Tento předmět momentálně není v žádném zápisu nabízen.
-            </p>
-          ) : (
-            <DataTable<OccurrenceRow>
-              data={occurrences}
-              columns={columns}
-              searchPlaceholder="Hledat podle zápisu, bloku, učitele nebo kódu…"
-              searchKeys={["searchText"]}
-            />
-          )}
-        </div>
+            {occurrences.length === 0 ? (
+              <p className="px-1 py-3 text-sm text-muted-foreground">
+                Tento předmět momentálně není v žádném zápisu nabízen.
+              </p>
+            ) : (
+              <DataTable<OccurrenceRow>
+                data={occurrences}
+                columns={columns}
+                searchPlaceholder="Hledat podle zápisu, bloku, učitele nebo kódu…"
+                searchKeys={["searchText"]}
+              />
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Dialog se studenty */}
-      {selectedStudents && user && (
-        <OccurrencesStudentsDialog
-          occurrenceId={selectedStudents.occurrenceId}
-          block={selectedStudents.block}
-          currentUser={user}
-          onOpenChange={(open) => {
-            if (!open) setSelectedStudents(null);
-          }}
-        />
-      )}
+      {/* 🔥 ZMĚNA: Dialogy jsou také podmíněné */}
+      {isPrivilegedUser && (
+        <>
+          {/* Dialog se studenty */}
+          {selectedStudents && user && (
+            <OccurrencesStudentsDialog
+              occurrenceId={selectedStudents.occurrenceId}
+              block={selectedStudents.block}
+              currentUser={user}
+              onOpenChange={(open) => {
+                if (!open) setSelectedStudents(null);
+              }}
+            />
+          )}
 
-      {/* Dialog pro editaci výskytu */}
-      {editOccurrence && (
-        <EditSubjectOccurrenceDialog
-          occurrence={editOccurrence}
-          onOpenChange={(open) => !open && setEditOccurrence(null)}
-        />
+          {/* Dialog pro editaci výskytu */}
+          {editOccurrence && (
+            <EditSubjectOccurrenceDialog
+              occurrence={editOccurrence}
+              onOpenChange={(open) => !open && setEditOccurrence(null)}
+            />
+          )}
+        </>
       )}
     </>
   );
