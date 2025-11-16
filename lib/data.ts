@@ -13,9 +13,9 @@ import {
   EnrollmentWindow,
 } from "./types";
 
-export function getCurrentUser(): User {
-  return users.find((u) => u.id === "u-admin")!;
-}
+//export function getCurrentUser(): User {
+//  return users.find((u) => u.id === "u-admin")!;
+//}
 
 export function getSubjects(): Subject[] {
   return subjects;
