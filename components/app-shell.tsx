@@ -16,15 +16,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     pathname === "/login" ||
     pathname === "/register";
 
-  const content =
-    user && !isPublicPage ? (
-      <div className="min-h-screen flex flex-col bg-background">
-        <AppTopbar user={user} />
-        <main className="flex-1 container mx-auto py-6">{children}</main>
-      </div>
-    ) : (
-      <>{children}</>
-    );
+  //const content =
+  //  user && !isPublicPage ? (
+  //    <div className="min-h-screen flex flex-col bg-background">
+  //      <AppTopbar user={user} />
+  //      <main className="flex-1 container mx-auto py-6">{children}</main>
+  //    </div>
+  //  ) : (
+  //    <>{children}</>
+  //  );
 
   //return (
   //  <>
@@ -41,6 +41,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
     <main className="flex-1 container mx-auto py-6">
       {children}
+      <Toaster position="top-right" richColors closeButton />
     </main>
 
     {/* případně */}

@@ -12,8 +12,6 @@ import {
   OccurrenceRow,
 } from "@/components/occurrences/occurrence-columns";
 
-import { Button } from "@/components/ui/button";
-
 import {
   AlertDialog,
   AlertDialogTitle,
@@ -44,8 +42,7 @@ export function EnrollmentBlockCard({
   currentUser: User;
 }) {
   const router = useRouter();
-  const isAdmin = currentUser.role === "ADMIN";
-  const isTeacher = currentUser.role === "TEACHER";
+  const isAdmin = currentUser.role === "ADMIN"; 
   const isStudent = currentUser.role === "STUDENT";
 
   /** Dialogy */

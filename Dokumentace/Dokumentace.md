@@ -25,8 +25,6 @@ SEO má význam především u veřejně dostupných webů, které se mají zobr
 
 Teoreticky by SEO dávalo smysl v případě, že bychom chtěli aby ji byly studenti schopni najít ve vyhledávači, namísto odkazu na stránkach školy. To však není cílem tohoto interního systému.
 
-
-
 ## Přihlášení a role
 
 1. Po otevření aplikace se uživatel musí **přihlásit nebo registrovat**.  
@@ -400,6 +398,24 @@ ADMIN navíc může otevřít dialog pro úpravu výskytu.
 
 Tabulka je založena na komponentě `DataTable` s vlastním setem sloupců.
 
+![Dashboard](./Screeny/dashboard.png)
+![Editace zapsaných uživatelů ](./Screeny/dashboard_studenti.png)
+
+#### /subjects — Seznam předmětů
+
+Stránka **/subjects** slouží k přehledu všech předmětů.  
+
+##### Obsah stránky
+
+Stránka obsahuje:
+
+- nadpis a stručný popis,
+- komponentu `DataTable` se seznamem předmětů,
+- nástroje pro vyhledávání a filtrování,
+- tlačítko pro vytvoření nového předmětu.
+
+![Přehled všech předmětů](./Screeny/subjects.png)
+
 #### /subjects/[id] — Detail a editace předmětu
 
 Stránka předmětu má dva režimy:
@@ -440,6 +456,8 @@ Tabulka je postavená pomocí komponenty `DataTable`.
 
 Role TEACHER/ADMIN mají v pravé horní části tlačítko **„Upravit“**, které vede na `/subjects/[id]/edit`.
 
+![Detail předmětu](./Screeny/subjects_id.png)
+
 ##### `/subjects/[id]/edit/page.tsx` — Režim editace
 
 Stránka umožňuje upravit základní informace o předmětu.  
@@ -468,7 +486,7 @@ Stránka obsahuje následující akce:
 - **Smazat předmět**  
   - V aktuální verzi není implementováno (tlačítko se nezobrazuje)
   
----
+![Editace předmětu](./Screeny/subjects_id_edit.png)
 
 #### /enrollments
 
@@ -561,17 +579,19 @@ Tabulka obsahuje následující sloupce:
 - **Nevidí** tlačítko „Vytvořit nový zápis“.
 - Ve sloupci **Akce** se tlačítko „Upravit zápis“ nezobrazuje.
 
-#### 🛠️ /enrollments/[id]
+![Seznam zápisů](./Screeny/enrollments.png)
+
+#### /enrollments/[id]
 
 Stránka **/enrollments/[id]** zobrazuje detail jednoho zápisového období (`EnrollmentWindow`). Stránka znovu využívá **stejné komponenty jako dashboard**.
 
 Je dostupná pro role, které mají odkaz v navigaci ( **ADMIN** a **TEACHER**).
 
-#### 👥 /users
+#### /users
 
 Stránka **/users** slouží k přehledu a správě uživatelů.  
 
-##### Obsah stránky
+##### Obsah stránky users
 
 Stránka `/users` obsahuje:
 
@@ -585,14 +605,14 @@ Stránka `/users` obsahuje:
 - Načítají se **všichni uživatelé** z aktuálního datasetu.
 - Vyhledávání, filtrování, třídění a výběr probíhá **na klientu** (bez serverových volání).
 
-##### Ovládací prvky
+##### Ovládací prvky uživatelů
 
 Nad tabulkou jsou dostupné tyto prvky:
 
 - **Fulltext vyhledávání** v `firstName`, `lastName`, `email`.
 - **Filtry** podle role, stavu, datumu vytvoření nebo datumu posledního přihlášení
 
-##### Sloupce tabulky
+##### Sloupce tabulky uživatelů
 
 Tabulka obsahuje následující sloupce:
 
@@ -618,6 +638,8 @@ Tabulka nabízí vedle filtrů i možnost hromadných změn, kdy se akce provedo
 V každém řádku je kontextové menu (`DropdownMenu`) pro změnu role a přepínač pro aktivování/deaktivovaní uživatelů:
 
 Detaily uživatele se nezobrazují na vlastní stránce — vše je řešeno přímo v tabulce pomocí inline akcí a hromadného panelu.
+
+![Seznam uživatelů](./Screeny/users.png)
 
 #### /settings
 
@@ -730,3 +752,150 @@ Aplikace podle Lighthouse dosahuje vynikajících výsledků:
 
 Identifikované drobnosti (kontrast textu) lze snadno doladit v budoucí verzi.  
 Celkově systém splňuje standardy moderní webové aplikace.
+
+## ESLint
+
+Pro statickou analýzu zdrojového kódu na straně frontendu je v projektu použit nástroj **ESLint** (integrovaný pomocí `next lint`).
+
+ESLint slouží k automatickému odhalování chyb a nekonzistencí v kódu ještě před jeho spuštěním. Pomáhá zvyšovat čitelnost, udržovatelnost a celkovou kvalitu projektu.
+Používá sadu pravidel zaměřených na správné používání TypeScriptu, Reactu a doporučených praktik Next.js.
+
+Analýza je spouštěna příkazem:
+
+```bash
+npm run lint
+```
+
+### Detekované problémy a jejich význam
+
+ESLint odhalil několik hlavních kategorií problémů, které se v projektu opakují:
+
+---
+
+### 1. Typování pomocí `any`
+
+**Chyby typu:**
+
+```typescript
+Error: Unexpected any. Specify a different type.
+```
+
+**Výskyt např. v:**
+
+- `app/(auth)/login/page.tsx`
+- `app/enrollments/page.tsx`
+- `app/subjects/[id]/page.tsx`
+- `components/ui/data-table.tsx`
+- `components/blocks/EnrollmentBlockCard.tsx`
+
+**Význam:**
+Použití `any` snižuje typovou bezpečnost. TypeScript tím ztrácí schopnost odhalovat chyby v hodnotách na vstupu i výstupu funkcí.
+
+**Návrh řešení:**
+
+- Nahrazovat `any` konkrétními typy (např. `User`, `Subject`, `EnrollmentWindow`).
+- U tabulek a sloupců využít generické typy (`TData`, `TValue`).
+- Pokud má být `any` jen dočasné, lze ho přepsat alespoň na `unknown`.
+
+---
+
+### 2. Nepoužité proměnné (no-unused-vars)
+
+**Chyby typu:**
+
+```typescript
+Error: 'b' is defined but never used.
+Error: 'isPublicPage' is assigned a value but never used.
+```
+
+**Výskyt např. v:**
+
+- `dashboard/page.tsx`
+- `components/app-shell.tsx`
+- `components/auth/auth-provider.tsx`
+- `lib/data.ts`
+- `components/occurrences/EditSubjectOccurrenceDialog.tsx`
+
+**Význam:**
+Nepoužité proměnné zhoršují čitelnost a často ukazují na nedokončený nebo "mrtvý" kód.
+
+**Návrh řešení:**
+
+- Odebrat nepoužívané proměnné a importy.
+- Pokud je potřeba proměnnou ponechat, přejmenovat ji na `_name` a upravit ESLint, aby ignoroval podtržítko.
+
+---
+
+### 3. Nesprávné použití React Hooks
+
+**Chyby typu:**
+
+```plaintext
+React Hook "useState" is called conditionally.
+React Hook "useMemo" is called conditionally.
+React Hook is called in function that is not a component.
+```
+
+**Výskyt např. v:**
+
+- `app/enrollments/page.tsx`
+- `subjects/[id]/page.tsx`
+- `components/users/columns.tsx`
+- `components/occurrences/OccurrencesStudentsDialog.tsx`
+
+**Význam:**
+React Hooks musí být volány vždy ve stejném pořadí. Pokud jsou uvnitř `if`, `for`, nebo v obyčejných funkcích, může to vést k runtime chybám a nekonzistentnímu stavu komponent.
+
+**Návrh řešení:**
+
+- Přesunout hooky do horní úrovně komponent.
+- U tabulkových „cell“ rendererů vytvořit malé komponenty (např. `<RoleCell />`, `<ActionsCell />`) a hooky volat uvnitř nich.
+- Vyhnout se podmíněnému volání hooků.
+
+---
+
+### 4. Neescapované uvozovky v JSX
+
+**Chyby typu:**
+
+```javascript
+Error: '"' can be escaped with &quot; ...
+```
+
+**Výskyt např. v:**
+
+- `EditEnrollmentDialog.tsx`
+
+**Návrh řešení:**
+
+- Nahradit `"` za `&quot;`.
+- Nebo přepsat text tak, aby uvozovky nebyly v běžném JSX literálu.
+
+---
+
+### Shrnutí přínosů ESLintu
+
+ESLint významně přispěl k odhalení:
+
+- Nadměrného používání `any`.
+- Nepoužívaného a „mrtvého“ kódu.
+- Potenciálně nebezpečných vzorů v práci s React Hooks.
+- Drobných problémů v syntaxi JSX.
+
+Díky těmto výsledkům lze v dalších iteracích projektu provést úpravy, které zvýší bezpečnost, přehlednost a udržovatelnost celého systému. ESLint tak slouží jako automatizovaný nástroj kvality, srovnatelný s průběžným code review.
+
+## Zadavací dokumentace
+
+Tento dokument je možné použít jako **zadávací dokumentace** celého systému.  
+Obsahuje kompletní popis všech funkčních požadavků, uživatelských rolí, toků aplikace, pravidel zápisu, struktury stránek i způsobu zpracování dat.  
+
+Dokumentace je strukturována tak, aby ji bylo možné přímo použít jako:
+
+- **zadání pro vývojáře**,  
+- **specifikaci pro zadavatele**,  
+- **referenční popis chování hotového systému**,  
+- **podklad pro prezentaci nebo schválení projektu**.
+
+Všechny kapitoly společně tvoří ucelený přehled, který pokrývá hlavní funkční i nefunkční požadavky. Na základě této dokumentace je možné nezávisle systém navrhnout, implementovat nebo dále rozšiřovat.
+
+Systém je popsán do takové hloubky, že dokumentace může být využita i jako finální **předávací dokument**, protože přesně popisuje aktuálně implementované funkcionality, uživatelské rozhraní i technické komponenty.
