@@ -3,13 +3,26 @@
 Tento dokument popisuje funkční chování systému **Zápis seminářů**.  
 Cílem je umožnit studentům přihlásit se na nabízené semináře (předměty) v rámci definovaného zápisu, který spravuje administrátor.
 
----
+## Motivace
+
+Tento systém vznikl jako jednoduchý, přehledný a interaktivní nástroj pro **organizaci školních seminářů a zápisů studentů**.  
+Je navržen tak, aby pokryl všechny klíčové potřeby konkrétná školy kde se planuje systém nasadit, ale zároveň zůstal dostatečně lehký, intuitivní a snadno upravitelný.
+
+### 🎯 hlavní cíle
+
+Cílem systému je vytvořit **jednotné místo**, kde:
+
+- studenti mohou snadno **vybírat semináře** podle svých preferencí  
+- učitelé mají přehled o svých skupinách a mohou vidět zapsané studenty  
+- administrátoři mohou **spravovat předměty, bloky, zápisová období a uživatele**  
+- celý proces zápisu je jasně strukturovaný, přehledný a transparentní
+
+Systém tak eliminuje ruční evidenci, zdlouhavou komunikaci e-mailem nebo tabulkovými procesory a přináší **automatizaci a pořádek**.
 
 ## Přihlášení a role
 
 1. Po otevření aplikace se uživatel musí **přihlásit nebo registrovat**.  
-   Bez přihlášení nemá přístup k žádným datům systému.  
-   Na stránce registrace je upozornění, že registrace je možná pouze se **školním e-mailem**.
+   Nepřihlášený uživatel vidí pouze veřejnou úvodní stránku s tlačítky *Přihlásit se* a *Vytvořit účet*.
 2. Po registraci má uživatel vždy výchozí roli **GUEST**.
 3. **Admin** spravuje seznam uživatelů, jejich aktivaci a přiřazování rolí (`Role` = GUEST, STUDENT, TEACHER, ADMIN).
 4. Uživatel může být aktivní nebo zablokovaný (`isActive`).
@@ -20,31 +33,40 @@ Cílem je umožnit studentům přihlásit se na nabízené semináře (předmět
 #### Guest (`GUEST`)
 
 - Výchozí role po registraci.
-- Nevidí žádná data.
-- Zobrazuje se mu pouze informace, že čeká na schválení správcem.
+- Navigace pro GUEST zobrazuje pouze **přehled zápisů**.
+- GUEST se nemůže zapisovat ani upravovat data.
 
 #### Student (`STUDENT`)
 
-- Vidí přehled dostupných zápisů (`EnrollmentWindow`), které mají `visibleToStudents = true` a `status` ≠ `DRAFT`.
-- Pokud je zápis ve stavu **OPEN**, může se **zapisovat a odhlašovat** z výskytů předmětů (`SubjectOccurrence`).
-- V každém **bloku** (`Block`) může mít **nejvýše jeden aktivní zápis** (`StudentEnrollment` bez `deletedAt`).
-- Pokud je předmět (`Subject`) dostupný ve více blocích, může být zapsán pouze do jednoho z nich.
-- Může zobrazit detail předmětu s popisem (`syllabus`).
-- Vidí obsazenost výskytů (např. „7/30“).
+- Vidí **dashboard** s dostupnými zápisovými obdobími (`EnrollmentWindow`).
+- Pokud má zápis stav **OPEN**, může:
+  - **zapsat se** na výskyt předmětu (`SubjectOccurrence`),
+  - **odhlásit se** ze svého zápisu.
+- Omezení implementovaná v UI:
+  - v rámci jednoho **bloku** (`Block`) může mít student **nejvýše jeden aktivní zápis**,  
+  - pokud je stejný předmět (`Subject`) nabízen ve více blocích, může být zapsán pouze do jednoho z nich.
+- Vidí obsazenost výskytů (např. `7/30`).
+- Může zobrazit detail předmětu a jeho syllabus.
 
 #### Teacher (`TEACHER`)
 
+- Má přístup k sekci **Předměty**.
 - Může vytvářet a upravovat **předměty** (`Subject`).
-- Vidí existující **zápisy** (`EnrollmentWindow`) a jejich bloky, ale **nemůže se přihlašovat**.
-- Vidí seznam studentů zapsaných na výskyty, kde je uveden jako vyučující (`teacherId` = jeho `User.id`).
+- Vidí zápisy (`EnrollmentWindow`) a jejich bloky, ale **nemůže se zapisovat**.
+- Vidí obsazenost výskytů (např. `7/30`) a může otevřít dialog se seznamem zapsaných studentů.
 
 #### Admin (`ADMIN`)
 
-- Má přístup ke všem částem systému.
+- Vidí v navigaci všechny sekce aplikace:
+  - **Dashboard**
+  - **Zápisy**
+  - **Předměty**
+  - **Uživatelé**
+  - **Nastavení** (základní informace)
 - Může spravovat role a aktivaci uživatelů.
-- Může vytvářet, upravovat a mazat **předměty**, **bloky**, **výskyty** i **zápisy**.
+- Může vytvářet, upravovat **předměty**, **bloky**, **výskyty** i **zápisy**.
 - Může **spouštět a ukončovat zápisy** (mění `Status` na OPEN nebo CLOSED).
-- Může **zapisovat studenty ručně**, i pokud je kapacita plná, nebo je ze zápisu odstranit.
+- Může **zapisovat studenty ručně**, nebo je ze zápisu odstranit.
 - Může dělat **exporty dat** ze všech seznamů.
 - Má přístup k auditním údajům (`createdById`, `updatedById`, `deletedById`).
 
@@ -86,10 +108,6 @@ Reprezentuje uživatele systému (student, učitel, admin nebo guest).
   - časové rozmezí (`startsAt` → `endsAt`),
   - viditelnost pro studenty (`visibleToStudents`),
   - seznam bloků (`Block`).
-- Student vidí zápis pouze tehdy, pokud:
-  - má roli **STUDENT**,
-  - `visibleToStudents = true`,
-  - a `status` není `DRAFT`.
 
 | Název | Typ | Popis |
 |-------|-----|-------|
@@ -216,344 +234,408 @@ představuje konkrétní instanci předmětu v určitém bloku:
 
 ## Front end
 
-Toto zadání popisuje strukturu a funkčnost front-endové části aplikace postavené na Next.js (App Router) a shadcn/ui.
+Toto zadání popisuje strukturu a funkčnost front-endové části aplikace postavené na Next.js a shadcn/ui.
 
 ---
 
 ### 1. Strom stránek (Site Map)
 
-Aplikace bude využívat chráněnou "Route Group" `(app)` pro všechny přihlášené uživatele. Hlavní layout `(app)/layout.tsx` načte roli uživatele a podle ní zobrazí správnou navigaci (topbar).
+Aplikace používá standardní adresářovou strukturu Next.js App Routeru.
+
+Přihlášený uživatel vidí navigaci dle své role (ADMIN / TEACHER / STUDENT / GUEST).  
+Nepřihlášený uživatel vidí pouze veřejnou úvodní stránku a formuláře pro přihlášení/registraci.
 
 ```bash
 /app
-├── (auth)/                  # Skupina pro přihlášení/registraci
+├── (auth)/                  
 │   ├── login/
 │   │   └── page.tsx         # Přihlašovací formulář
 │   └── register/
 │       └── page.tsx         # Registrační formulář
 │
-├── (app)/                   # CHRÁNĚNÁ skupina pro všechny přihlášené
-│   │
-│   ├── layout.tsx           # Hlavní layout (načte roli, zobrazí správný sidebar)
-│   │
-│   ├── dashboard/           # HLAVNÍ STRÁNKA
-│   │   └── page.tsx
-│   │
-│   ├── subjects/            # Stránka "Předměty"
-│   │   ├── page.tsx         # Seznam všech předmětů
-│   │   └── [id]/            # Dynamická routa pro konkrétní předmět
-│   │       ├── page.tsx     # Detail předmětu
-│   │       └── edit/        # Editace
-│   │           └── page.tsx 
-│   │
-│   ├── enrollments/         # Stránka "Zápisy"
-│   │   ├── page.tsx         # Seznam všech zápisů
-│   │   └── [id]/            # Dynamická routa pro konkrétní zápis
-│   │       └── page.tsx     # Detail a editace Zápisu
-│   │
-│   ├── users/               # Stránka "Uživatelé" (jen Admin)
-│   │   └── page.tsx
-│   │
-│   └── settings/            # NOVÁ STRÁNKA: Nastavení (jen Admin)
-│       └── page.tsx
+├── dashboard/
+│   └── page.tsx             # Hlavní stránka pro přihlášené (výběr zápisu)
 │
-└── page.tsx                 # Kořenová stránka (přesměruje na /login)
+├── subjects/                
+│   ├── page.tsx             # Seznam všech předmětů
+│   └── [id]/                # Dynamická routa pro konkrétní předmět
+│       ├── page.tsx         # Detail předmětu
+│       └── edit/
+│           └── page.tsx     # Editace předmětu
+│
+├── enrollments/
+│   ├── page.tsx             # Přehled všech zápisů
+│   └── [id]/
+│       └── page.tsx         # Detail zápisu (používá EnrollmentView stejně jako dashboard)
+│
+├── users/
+│   └── page.tsx             # Přehled uživatelů (přístup omezen dle role přes UI)
+│
+├── settings/
+│   └── page.tsx             # Základní informace o uživateli a placeholder pro nastavení
+│
+├── layout.tsx               # Klientský layout (AuthProvider + AppShell + AppTopbar)
+├── globals.css              # Globální styly
+└── page.tsx                 # Veřejná úvodní stránka (Landing page)
 
 ```
 
 ### 2. Navigace (Top Bar Layout)
 
-Tato sekce popisuje hlavní layout a navigaci v `(app)/layout.tsx`. Místo postranního panelu (sidebar) bude použita horní lišta (Top Bar).
+Aplikace používá horní navigační lištu (**Top Bar**), která se zobrazuje na všech stránkách pro přihlášené uživatele.  
+Veřejné stránky (`/`, `/login`, `/register`) navigaci nenačítají.
 
-- **Komponenta:** `(app)/layout.tsx`
-- **Funkce:** Na serveru zjistí roli přihlášeného uživatele.
+- **Komponenta:** `AppShell` (client) a `AppTopbar`
+- **Soubor:** `components/app-shell.tsx` a `components/app-topbar.tsx`
 - **Struktura Top Baru:**
-  - Vlevo: Logo/Název aplikace.
-  - Uprostřed: Dynamická navigační tlačítka (podle role).
-  - Vpravo: Dropdown menu pro uživatele (zobrazení e-mailu, odkaz na `/settings` (pro admina), a tlačítko "Odhlásit").
+  1. **Vlevo – Logo / Název aplikace**
+  2. **Uprostřed – Navigační odkazy (liší se podle role)**
+  3. **Vpravo – Uživatelské menu**
 
 #### Navigační odkazy (podle role)
 
 Komponenta Top Baru zobrazí následující odkazy v závislosti na roli uživatele:
 
-- **Role: ADMIN**
-  - `Dashboard` (vede na `/dashboard`)
-  - `Zápisy` (vede na `/enrollments`)
-  - `Předměty` (vede na `/subjects`)
-  - `Uživatelé` (vede na `/users`)
-  - `Nastavení` (vede na `/settings`)
+- **Role: `ADMIN`**
+  - `Dashboard` → `/dashboard`
+  - `Zápisy` → `/enrollments`
+  - `Předměty` → `/subjects`
+  - `Uživatelé` → `/users`
+  - `Nastavení` → `/settings`
 
-- **Role: TEACHER**
-  - `Dashboard` (vede na `/dashboard`)
-  - `Zápisy` (vede na `/enrollments`)
-  - `Předměty` (vede na `/subjects`)
+- **Role: `TEACHER`**
+  - `Dashboard` → `/dashboard`
+  - `Zápisy` → `/enrollments`
+  - `Předměty` → `/subjects`
 
-- **Role: STUDENT**
-  - `Dashboard` (vede na `/dashboard`)
+- **Role: `STUDENT`**
+  - `Dashboard` → `/dashboard`
 
-- **Role: GUEST**
-  - Nejsou zobrazena žádná navigační tlačítka. Top Bar zobrazí pouze logo a "Odhlásit".
+- **Role: `GUEST`**
+  - `Dashboard` → `/dashboard`
 
 ### 3. Zadání pro programátora (Popis stránek)
 
-#### 🏠 /dashboard
+#### /dashboard
 
-Toto je hlavní stránka po přihlášení pro všechny role. Komponenta (`page.tsx`) na serveru zjistí roli uživatele a zobrazí jeden z následujících pohledů:
+Tato stránka je hlavní vstupní stránkou po přihlášení.  
 
-##### Varianta A: Role GUEST
+- `/dashboard/page.tsx` je **client komponenta**
+- získá přihlášeného uživatele pomocí `useAuth()`
+- vybere **jeden** vhodný zápis pomocí funkce `findDashboardEnrollment(...)`
+- zobrazí obsah pomocí sdílené komponenty `EnrollmentView`
+- Dashboard vždy zobrazí **jeden vybraný zápis**, nikoliv selektor zápisů.
 
-- **Obsah:** Zobrazí se pouze komponenta `Card` uprostřed stránky.
-- **Text:** Obsah této karty je spravovatelný administrátorem (např. na stránce `/admin/settings`). Výchozí text: "Váš účet čeká na schválení administrátorem. Nemáte přístup do systému."
+##### Chování podle role
 
-##### Varianta B: Role STUDENT, TEACHER, ADMIN
+Implementace je zjednodušená — dashboard používá **stejný Layout a stejnou komponentu pro všechny role** (ADMIN, TEACHER, STUDENT, GUEST).
 
-Na serveru se načtou všechny `EnrollmentWindow`, které jsou pro studenty viditelné (`visibleToStudents = true` a `status` není `DRAFT`).
+Rozdíly jsou pouze v tom, co jednotlivé role mohou **vidět** nebo **klikat**, ne v samotném layoutu.
 
-- **Případ 1: Není nalezen žádný viditelný zápis.**
-  - Zobrazí se `Card` uprostřed stránky. Její text je spravovatelný adminem. Výchozí text: "Aktuálně není otevřený ani naplánovaný žádný zápis."
+Pro všechny  role dashboard funguje stejně:
 
-- **Případ 2: Je nalezen 1 a více viditelných zápisů.**
-  - **Přepínač zápisů:** Pokud je nalezeno více zápisů, zobrazí se nahoře `Select` ("Zobrazit zápis: [možnosti]"), aby si uživatel mohl vybrat, který zápis prohlíží.
-  - Následující sekce se vztahují k **vybranému** zápisu.
+1. Funkce `findDashboardEnrollment` vybere nejvhodnější zápis podle stavu (OPEN → SCHEDULED → DRAFT → CLOSED).
 
-###### 1. Globální informace o zápisu
+2. Pokud zápis existuje, zobrazí se.
+3. Pokud zápis neexistuje, zobrazí se jednoduchá hláška: "Momentálně zde není žádné aktivní ani naplánované zápisové období."
 
-Nad přehledem bloků se zobrazí sekce s globálními informacemi o tomto zápisu:
+---
 
-- **Tlačítko pro Admina:**
-  - **Pohled (ADMIN):** Zobrazí se `Button` ("Spravovat zápis"), který přesměruje na `/enrollments/[id]`.
-  - **Pohled (Ostatní):** Tlačítko se nezobrazí.
-- **Karta Odpočtu:**
-  - Zobrazí se `Card`, která ukazuje stav zápisu (`status`).
-  - Pokud je `status = SCHEDULED`, zobrazí odpočet "Otevírá za: [ČAS]".
-  - Pokud je `status = OPEN`, zobrazí odpočet "Zavírá za: [ČAS]".
-  - Toto musí být klientská komponenta (kvůli aktualizaci času).
-- **Karta Popisu (Pokyny):**
-  - Pokud má `EnrollmentWindow.description` (popis) nějaký obsah, zobrazí se `Card` s tímto popisem.
-  - `CardHeader`: "Pokyny a informace k zápisu".
-  - `CardContent`: Obsah `EnrollmentWindow.description`.
+###### Globální informace o zápisu (EnrollmentHeader)
 
-###### 2. Přehled bloků
+Komponenta `EnrollmentHeader` zobrazuje:
 
-Pod globálními informacemi se zobrazí samotný obsah zápisu.
+- Název zápisu
+- Datum začátku a konce
+- Stav zápisu (`DRAFT`, `SCHEDULED`, `OPEN`, `CLOSED`)
+- Tlačítko „Upravit zápis“ pro ADMIN/TEACHER  
+  (otevírá dialog `EditEnrollmentDialog`)
 
-- **Layout:** Mřížka (`grid grid-cols-1 lg:grid-cols-3 gap-4`) zobrazující komponenty `Card` vedle sebe. Každá karta reprezentuje jeden **Blok** (`Block`) ze zápisu.
-- **Komponenta `Card` (Blok):**
-  - `CardHeader`: Obsahuje `CardTitle` (název bloku, např. "Blok 1 – povinné").
-  - **Zpětná vazba (STUDENT):** Pokud je student zapsán na předmět v tomto bloku, `Card` má vizuální zvýraznění (např. zelený okraj).
-  - `CardContent`: Obsahuje komponentu `Table` (jednoduchou, ne `DataTable`) se seznamem výskytů předmětů (`SubjectOccurrence`).
-- **Tabulka v kartě bloku:**
-  - **Zpětná vazba (STUDENT):** Řádek `TableRow`, kde je student zapsán, je vizuálně zvýrazněn.
-  - **Sloupec "Předmět":** Název předmětu.
-    - **Akce:** Kliknutím na název se uživatel přesměruje na `/subjects/[id]`.
-  - **Sloupec "Vyučující":** Jméno učitele.
-  - **Sloupec "Obsazenost":** Zobrazuje text (např. "7/30" nebo "5/∞").
-    - **Akce (TEACHER, ADMIN):** Po kliknutí se otevře `Dialog` (`shadcn/ui`) se seznamem zapsaných studentů (celý prvek `Badge` je interaktivní).
-    - **Akce (STUDENT):** Pouze text, neinteraktivní `Badge`.
-  - **Sloupec "Akce":**
-    - **Pohled (STUDENT):**
-      - Pokud je zapsán: Zobrazí `Button` ("Odhlásit", varianta `destructive`).
-      - Pokud není zapsán: Zobrazí `Button` ("Zapsat").
-      - Tlačítka jsou aktivní pouze pokud je `EnrollmentWindow.status = OPEN` a student splňuje pravidla.
-    - **Pohled (TEACHER, ADMIN):** Zobrazí se `Button` (např. "Zapsat"), ale je **neaktivní** (`disabled`).
+###### Přehled bloků (EnrollmentBlocks)
 
-#### 📚 /subjects
+Pod hlavičkou se zobrazuje mřížka bloků pomocí `EnrollmentBlocks` v layoutu podle velikosti displeje. Každý blok je potom reprezentován komponentou `EnrollmentBlockCard`.
 
-Stránka je dostupná pro role **TEACHER** a **ADMIN**.
+EnrollmentBlockCard obsahuje:
 
-- **Komponenty:** Hlavní komponentou je `DataTable` (`shadcn/ui`) zobrazující seznam předmětů (`Subject`) s integrovanou **server-side paginací** (stránkováním).
-- **Načtení dat:**
-  - Načítá se vždy jen jedna stránka dat (např. 20 předmětů) dle aktuální stránky, nastaveného řazení a filtru.
-- **Ovládací prvky nad tabulkou:**
-  - `Input` pro **globální filtrování** (hledá v `name` a `code`).
-  - `Dropdown Menu` ("Zobrazit sloupce") s `Checkboxy` pro zapnutí/vypnutí viditelnosti sloupců (např. "Kód", "Poslední úprava").
-  - `Button` ("Nový předmět").
-- **Funkce tabulky:**
-  - Zobrazuje sloupce: `Název`, `Kód`, `Poslední úprava` (kdo), `Poslední úprava` (kdy).
-  - **Řazení:** Všechny viditelné sloupce jsou interaktivní a umožňují server-side řazení (vzestupně/sestupně).
-- **Akce "Nový předmět":**
-  - Tlačítko `Button` ("Nový předmět") nad tabulkou. Po kliknutí se (pomocí Server Action) vytvoří nový prázdný předmět a uživatel je přesměrován na `/subjects/[id]/edit` pro jeho úpravu.
-- **Akce (Řádek tabulky):**
-  - Kliknutím na **název předmětu** se uživatel přesměruje na `/subjects/[id]` (stránka zobrazení).
-  - Na konci každého řádku je `Dropdown Menu` (`...`) s akcemi:
-    - "Upravit" (přesměruje rovnou na `/subjects/[id]/edit`)
-    - "Smazat" (otevře `AlertDialog` pro potvrzení; tlačítko je `disabled`, pokud je předmět použit ve `SubjectOccurrence`)
+- název bloku
+- vizuální zvýraznění vybraného výskytu (pro STUDENT)
+- tabulku výskytů předmětů (SubjectOccurrence)
+- akce podle role uživatele
 
-#### 📖 /subjects/[id] (a editace)
+###### Chování STUDENT
 
-Stránka má dva režimy: **zobrazení** (pro všechny) a **editace** (pro učitele/admina). Oprávnění k úpravám mají role **TEACHER** a **ADMIN** pro **všechny** předměty v systému.
+Student může:
 
-##### `/subjects/[id]/page.tsx` (Režim zobrazení)
+- vidět obsazenost výskytů (např. `5/30` nebo `2/∞`),
+- zapsat se nebo odhlásit, pokud:
+  - zápis má stav **OPEN**,
+  - není již zapsán v jiném výskytu téhož bloku,
+  - není zapsán na stejný předmět v jiném bloku.
 
-- **Obsah:** Zobrazí detail předmětu (`Subject`) rozdělený do několika sekcí (`Card`).
-- **Karta 1: Detail předmětu:**
-  - Zobrazí název, kód a `syllabus`.
-  - **Důležité:** Obsah `syllabus` se zde musí vykreslit jako formátovaný HTML obsah (nikoliv jako čistý text), aby se zobrazilo formátování zadané v Rich Text Editoru.
-- **Karta 2: Výskyty předmětu:**
-  - Zobrazí `DataTable` se seznamem všech `SubjectOccurrence`, kde je tento předmět použit.
-  - Sloupce tabulky: "Zápis", "Blok", "Vyučující", "Kapacita".
-- **Metadata (Audit):**
-  - Na stránce je viditelný text "Vytvořil: [Jméno] dne [Datum]" a "Poslední úprava: [Jméno] dne [Datum]".
-- **Akce (TEACHER, ADMIN):**
-  - V rohu stránky je `Button` ("Upravit"), který přesměruje na `/subjects/[id]/edit`.
-- **Akce (STUDENT, GUEST):**
-  - Tlačítko "Upravit" se nezobrazí.
+###### Chování TEACHER a ADMIN
 
-##### `/subjects/[id]/edit/page.tsx` (Režim editace)
+- Vidí všechny výskyty předmětů v daném bloku.
+- Vidí jméno učitele a aktuální obsazenost.
+- Kliknutím na obsazenost se otevře `OccurrencesStudentsDialog`.
+- Tlačítka pro zápis jsou **neaktivní** (`disabled`).
 
-- **Obsah:** Formulář pro editaci předmětu. Přístupné pouze pro **TEACHER** a **ADMIN**.
-- **Komponenty:** `Form` (`react-hook-form` + `shadcn/ui`) s poli:
-  - `Input` (pro `name`).
-  - `Input` (pro `code`).
-  - **Rich Text Editor (RTE):** Pro pole `syllabus`. Musí umožňovat základní formátování (Tiptap).
-- **Akce (Tlačítka):**
-  - `Button` ("Uložit"): Použije Server Action k aktualizaci databáze.
-  - `Button` ("Zrušit", varianta `outline`): Přesměruje zpět na `/subjects/[id]` beze změn.
-  - `Button` ("Smazat předmět", varianta `destructive`):
-    - Zobrazí potvrzovací `AlertDialog`.
-    - Tlačítko je **neaktivní (`disabled`)**, pokud je předmět použit v jakémkoliv `SubjectOccurrence`. Tooltip u tlačítka vysvětlí proč.
-- **Metadata (Audit):**
-  - Na stránce je viditelný text "Vytvořil:..." a "Poslední úprava:...".
+ADMIN navíc může otevřít dialog pro úpravu výskytu.
+
+###### Tabulka výskytů — sloupce
+
+| Sloupec      | Popis                                                        |
+|--------------|--------------------------------------------------------------|
+| **Předmět**  | Název předmětu (klik vede na `/subjects/[id]`)               |
+| **Učitel**   | Jméno vyučujícího                                            |
+| **Obsazenost** | Např. `7/30` (pro TEACHER/ADMIN interaktivní)               |
+| **Akce**     | STUDENT: Zapsat/Odhlásit, ostatní role: disabled tlačítka    |
+
+Tabulka je založena na komponentě `DataTable` s vlastním setem sloupců.
+
+#### /subjects/[id] — Detail a editace předmětu
+
+Stránka předmětu má dva režimy:
+
+1. **Zobrazení detailu** — dostupné pro všechny přihlášené role  
+2. **Editace** — dostupná pro role **TEACHER** a **ADMIN**
+
+Následující popis odpovídá skutečné implementaci.
+
+---
+
+##### `/subjects/[id]/page.tsx` — Režim zobrazení
+
+Stránka zobrazuje kompletní informace o vybraném předmětu (`Subject`) ve více sekcích.
+
+Zobrazované údaje:
+
+- Název předmětu
+- Kód předmětu
+- Krátký popis (`description`)
+- Syllabus (`syllabus`)
+- Výskyty předmětu (`SubjectOccurrence`)
+
+Pod základními informacemi je tabulka všech výskytů daného předmětu napříč zápisy a bloky.
+
+Tabulka zobrazuje sloupce:
+
+- **Zápis** (název `EnrollmentWindow`)
+- **Blok** (název `Block`)
+- **Skupina** (subCode)
+- **Vyučující**
+- **Kapacita**
+- **Obsazenost**
+
+Tabulka je postavená pomocí komponenty `DataTable`.
+
+---
+
+Role TEACHER/ADMIN mají v pravé horní části tlačítko **„Upravit“**, které vede na `/subjects/[id]/edit`.
+
+##### `/subjects/[id]/edit/page.tsx` — Režim editace
+
+Stránka umožňuje upravit základní informace o předmětu.  
+Je dostupná pro role **TEACHER** a **ADMIN**.
+
+Editační formulář obsahuje:
+
+- `Input` — název předmětu (`name`)
+- `Input` — kód předmětu (`code`)
+- `Textarea` — krátký popis (`description`)
+- **Rich Text Editor (Tiptap)** — detailní popis (`syllabus`)
+  - podpora formátování (nadpisy, tučné, kurzíva, seznamy)
+
+###### Akce tlačítek
+
+Stránka obsahuje následující akce:
+
+- **Uložit**  
+  - Aktualizuje hodnoty předmětu v paměti
+  - Zobrazí toast o úspěšném uložení
+  - Přesměruje zpět na detail (`/subjects/[id]`)
+
+- **Zrušit**  
+  - Přesměruje zpět bez uložení
+
+- **Smazat předmět**  
+  - V aktuální verzi není implementováno (tlačítko se nezobrazuje)
+  
+---
 
 #### ⚙️ /enrollments
 
-Stránka je dostupná pro role **TEACHER** a **ADMIN**. Na začátku `page.tsx` je nutné ověřit, zda má uživatel jednu z těchto rolí, jinak `redirect`.
+Stránka **/enrollments** slouží k přehledu zápisových období (`EnrollmentWindow`).  
+Je určena pro role **ADMIN** a **TEACHER**, které ji mají dostupnou v navigaci.
 
-- **Práva (ADMIN):** Plný přístup. Může vytvářet, upravovat a mazat zápisy. Všechny interaktivní prvky jsou aktivní.
-- **Práva (TEACHER):** Pouze ke čtení. Všechny manipulační prvky (`Button`, `Select`, `Switch`) jsou neaktivní (`disabled`) nebo skryté.
+---
 
-- **Komponenty:** `DataTable` (`shadcn/ui`) se seznamem všech zápisů (`EnrollmentWindow`).
-- **Ovládací prvky nad tabulkou:**
-  - **Pohled (ADMIN):**
-    - `Button` ("Nový zápis").
-  - **Pohled (ADMIN + TEACHER):**
-    - `Input` pro filtrování podle názvu.
-    - `Select` (nebo `DropdownMenu` s checkboxy) pro filtrování podle `Stavu` (Draft, Open, Closed atd.).
-- **Funkce tabulky:**
-  - Zobrazuje sloupce: `Název`, `Stav`, `Viditelný pro studenty`, `Začátek` (`startsAt`), `Konec` (`endsAt`), `Počet bloků`, `Počet zapsaných` (celkový počet unikátních studentů v zápisu).
-  - **Inline editace (pouze ADMIN):**
-    - Sloupec `Stav` je implementován jako `Select` (`shadcn/ui`). Při změně okamžitě uloží nový stav (pomocí Server Action).
-    - Sloupec `Viditelný pro studenty` je implementován jako `Switch` (`shadcn/ui`). Při změně okamžitě uloží stav.
-  - **Pohled (TEACHER):**
-    - Učitel vidí `Stav` jako `Badge` a `Viditelný` jako `Checkbox` (pouze k čtení), nebo jsou komponenty `Select` a `Switch` zobrazené, ale `disabled`.
-- **Akce "Nový zápis" (Admin):**
-  - Po kliknutí na `Button` ("Nový zápis") se (pomocí Server Action) vytvoří nový prázdný `EnrollmentWindow` s výchozími hodnotami.
-  - Uživatel je okamžitě přesměrován na `/enrollments/[nové_id]`, kde zápis rovnou edituje.
-- **Akce (Řádek tabulky):**
-  - Na konci každého řádku je `Dropdown Menu` (`...`) s akcemi:
-  - **Pohled (ADMIN):**
-    - "Upravit" (přesměruje na `/enrollments/[id]`)
-    - "Duplikovat" (Vytvoří kopii zápisu i s jeho bloky, ale bez studentů; s potvrzením)
-    - "Smazat" (Soft delete, s potvrzovacím `AlertDialog`)
-  - **Pohled (TEACHER):**
-    - "Zobrazit" (přesměruje na `/enrollments/[id]`)
+##### Funkce stránky
+
+Stránka zobrazuje tabulku zápisů s informacemi o:
+
+- názvu a stavu zápisu,
+- viditelnosti pro studenty,
+- termínu začátku a konce,
+- počtu bloků a počtu předmětů v blocích,
+- počtu zapsaných studentů,
+- počtu studentů, kteří mají zápis kompletně vyplněný (mají zapsaný předmět ve všech blocích).
+
+Používá se komponenta `DataTable` s vyhledáváním, filtrováním a tříděním na straně klienta.
+
+---
+
+##### Ovládací prvky
+
+V horní části stránky jsou:
+
+- **Nadpis a popis:**
+  - `Zápisová období`
+  - krátký popis („Přehled všech zápisů, bloků a počtu unikátních studentů.“)
+
+- **Tlačítko „Vytvořit nový zápis“**  
+  - zobrazuje se pouze pro roli **ADMIN**  
+  - otevře dialog pro zadání názvu, popisu, stavu, časového rozmezí a viditelnosti zápisu
+
+Pod hlavičkou je komponenta `DataTable` s těmito funkcemi:
+
+- **Vyhledávání:**
+  - `searchPlaceholder="Hledat podle názvu."`
+  - fulltext vyhledává v názvu zápisu
+
+- **Filtry:**
+  - **Select „Stav“**  
+    - hodnoty: Koncept (`DRAFT`), Naplánováno (`SCHEDULED`), Otevřeno (`OPEN`), Uzavřeno (`CLOSED`)
+  - **Select „Viditelnost“**  
+    - „Viditelné studentům“ (`visibleToStudents = true`)  
+    - „Skryté studentům“ (`visibleToStudents = false`)
+  - **Datumové filtry:**
+    - `Začátek` – filtr podle `startsAt`
+    - `Konec` – filtr podle `endsAt`
+
+---
+
+##### Sloupce tabulky
+
+Tabulka obsahuje následující sloupce:
+
+| Sloupec | Popis |
+|---------|-------|
+| **Název** | Název zápisu. Kliknutím na název se otevře stránka `/enrollments/[id]`. Pod názvem může být zobrazen krátký popis. |
+| **Stav** | Zobrazen jako barevný `Badge` (Koncept, Naplánováno, Otevřeno, Uzavřeno). |
+| **Viditelné pro studenty** | Hodnota „Ano/Ne“ zobrazená jako `Badge`. |
+| **Začátek** | Datum a čas začátku zápisu (`startsAt`). |
+| **Konec** | Datum a čas konce zápisu (`endsAt`). |
+| **Bloky (předměty)** | Seznam bloků s počtem výskytů v každém bloku (např. „Blok 1 [3]“). |
+| **Zapsaní studenti** | Počet unikátních studentů zapsaných v rámci zápisu. |
+| **Kompletně zapsaní** | Počet studentů, kteří mají zapsán předmět ve všech blocích daného zápisu. |
+| **Akce** | Kontextové tlačítko pro úpravu (podle role). |
+
+---
+
+##### Práva a akce podle role
+
+###### Role ADMIN
+
+- Vidí všechna zápisová období v tabulce.
+- V hlavičce má k dispozici tlačítko **„Vytvořit nový zápis“**, které:
+  - otevře dialog pro vytvoření zápisu,
+  - umožní nastavit název, popis, stav, časové rozmezí a viditelnost.
+
+- Ve sloupci **Akce** má k dispozici tlačítko:
+
+  - **„Upravit zápis“**  
+    - otevře dialog pro úpravu vybraného zápisu  
+    - po uložení se dialog zavře a stránka se obnoví
+
+###### Role TEACHER
+
+- Vidí stejnou tabulku zápisů jako ADMIN (včetně filtrů a statistik).
+- **Nevidí** tlačítko „Vytvořit nový zápis“.
+- Ve sloupci **Akce** se tlačítko „Upravit zápis“ nezobrazuje.
 
 #### 🛠️ /enrollments/[id]
 
-Stránka je dostupná pro role **TEACHER** a **ADMIN** a zobrazuje **dva zcela odlišné pohledy** v závislosti na roli.
+Stránka **/enrollments/[id]** zobrazuje detail jednoho zápisového období (`EnrollmentWindow`). Stránka znovu využívá **stejné komponenty jako dashboard**.
 
-##### Pohled (ADMIN)
-
-Admin vidí plně interaktivní "velín" pro správu konkrétního zápisu.
-
-- **Obsah:** Stránka je rozdělena na dvě části.
-- **Část 1: Formulář nastavení zápisu**
-  - Nahoře je formulář (`Form`) pro editaci parametrů `EnrollmentWindow`.
-  - **Komponenty:**
-    - `Input` (pro `name`).
-    - `Textarea` (pro `description`).
-    - `Date and Time Picker` (`shadcn/ui` kombinace `Calendar` a inputů) pro `startsAt` a `endsAt`.
-    - `Switch` (pro `visibleToStudents`).
-  - **Akce:** Tlačítko `Button` ("Uložit nastavení zápisu").
-- **Část 2: Správce bloků (Aktivní Dashboard)**
-  - **Layout:** Mřížka (`grid grid-cols-1 lg:grid-cols-3 gap-4`).
-  - **Akce (Layout):** `Button` ("Nový blok") nad mřížkou, který okamžitě (přes Server Action) přidá novou `Card` (blok) do mřížky.
-- **Komponenta `Card` (Blok):**
-  - **`CardHeader`:** Obsahuje `CardTitle` (název bloku) a `Dropdown Menu` (`...`) s akcemi:
-    - **"Upravit"**: Otevře `Dialog` pro přejmenování bloku.
-    - **"Posunout nahoru" / "Posunout dolů"**: Akce (Server Action) pro jednoduchou změnu `Block.order` a prohození bloků.
-    - **"Smazat"**: Zobrazí `AlertDialog`. Tlačítko je `disabled`, pokud blok obsahuje `SubjectOccurrence`.
-  - **`CardContent`:**
-    - `Button` ("Přidat výskyt předmětu") nad tabulkou.
-    - Jednoduchá `Table` se seznamem výskytů (`SubjectOccurrence`) v tomto bloku.
-- **Dialog "Přidat/Upravit výskyt" (Plnohodnotný):**
-  - Otevře `Dialog` s formulářem, který obsahuje: `Select` (pro `Subject`), `Select` (pro `Teacher`), `Input` (pro `subCode` - např. "A", "B"), `Input type="number"` (pro `capacity`).
-- **Tabulka výskytů v bloku:**
-  - **Sloupce:** "Předmět", "Vyučující", "Kód" (zobrazí např. `[code]/[subcode]`), "Obsazenost", "Akce".
-  - **Sloupec "Akce" (ADMIN):**
-    - `Dropdown Menu` (`...`) s akcemi "Upravit" (otevře dialog) a "Smazat" (zobrazí `AlertDialog`, je `disabled` pokud jsou na výskytu zapsaní studenti).
-
-##### Pohled (TEACHER)
-
-Učitel vidí zjednodušenou "read-only" verzi, která **znovu používá komponenty z dashboardu**.
-
-- **Obsah:** Stránka je rozdělena na dvě části.
-- **Část 1: Informace o zápisu**
-  - Zobrazí se `Card` s detaily `EnrollmentWindow` (název, popis, data). Vše je pouze text, žádný formulář.
-- **Část 2: Přehled bloků (Dashboard Pohled)**
-  - Místo interaktivního správce bloků se zde **zobrazí ta samá komponenta (nebo sada komponent) jako na `/dashboard`**.
-  - Tím je zajištěno, že učitel vidí bloky a výskyty přesně tak, jak je zvyklý, včetně své jediné povolené interakce: **kliknutí na "Obsazenost"** pro zobrazení seznamu studentů.
+Je dostupná pro role, které mají odkaz v navigaci ( **ADMIN** a **TEACHER**).
 
 #### 👥 /users
 
-Stránka je dostupná **pouze pro ADMINA**. Na začátku `page.tsx` je nutné ověřit roli, jinak `redirect`.
+Stránka **/users** slouží k přehledu a správě uživatelů.  
 
-- **Navigace (Tabs):**
-  - Stránka je rozdělena pomocí `Tabs` (`shadcn/ui`) na:
-    - **Tab 1: "Všichni uživatelé"** (zobrazí všechny, kromě GUESTů)
-    - **Tab 2: "Čekající na schválení (GUEST)"** (zobrazí *pouze* uživatele s rolí `GUEST`)
-- **Komponenty:**
-  - V každém tabu je `DataTable` se seznamem uživatelů, s plnou **server-side paginací** a **řazením**.
-- **Ovládací prvky nad tabulkou:**
-  - `Input` pro filtrování (podle jména, e-mailu).
-  - `Select` pro filtrování podle role (relevantní hlavně v tabu "Všichni uživatelé").
-- **Funkce tabulky:**
-  - Zobrazuje sloupce: `Jméno`, `E-mail`, `Role`, `Stav`, `Poslední přihlášení`.
-  - **Sloupec `Role`:** Zobrazen jako `Badge` (`shadcn/ui`) pro vizuální rozlišení.
-  - **Sloupec `Stav`:** Zobrazen jako `Badge` ("Aktivní" / "Blokovaný") podle `isActive`.
-  - Tabulka má `Checkbox` na začátku každého řádku pro výběr.
-  - V hlavičce tabulky je `Checkbox` ("Onačit vše").
-- **Hromadné akce:**
-  - Pokud je alespoň jeden uživatel označen, zobrazí se nad tabulkou panel.
-  - **Panel obsahuje:**
-    - `Select` pro změnu role.
-    - `Button` ("Aktivovat označené").
-    - `Button` ("Blokovat označené").
-    - `Button` ("Uložit změny"), který provede všechny hromadné akce.
-- **Akce (Řádek):**
-  - V každém řádku `Dropdown Menu` (`...`) s akcemi:
-    - "Upravit roli"
-    - "Aktivovat/Blokovat účet"
-    - (Volitelně: "Zobrazit detail" - pokud by existovala detailní stránka uživatele)
+##### Obsah stránky
+
+Stránka `/users` obsahuje:
+
+- nadpis a stručný popis,
+- komponentu `DataTable` se seznamem uživatelů,
+- nástroje pro vyhledávání, filtrování a hromadné akce,
+- akční menu pro úpravu jednoho konkrétního uživatele.
+
+##### Načítání dat
+
+- Načítají se **všichni uživatelé** z aktuálního datasetu.
+- Vyhledávání, filtrování, třídění a výběr probíhá **na klientu** (bez serverových volání).
+
+##### Ovládací prvky
+
+Nad tabulkou jsou dostupné tyto prvky:
+
+- **Fulltext vyhledávání** v `firstName`, `lastName`, `email`.
+- **Filtry** podle role, stavu, datumu vytvoření nebo datumu posledního přihlášení
+
+##### Sloupce tabulky
+
+Tabulka obsahuje následující sloupce:
+
+| Sloupec | Popis |
+|---------|--------|
+| **Jméno** | Kombinace jména a příjmení |
+| **E-mail** | E-mail uživatele |
+| **Role** | Barevný Badge s hodnotou role |
+| **Stav** | Badge „Aktivní“ / „Neaktivní“ |
+| **Vytvořen** | Datum vytvoření uživatele |
+| **Poslední přihlášení** | Datum posledního přihlášení |
+
+##### Hromadné akce
+
+Tabulka nabízí vedle filtrů i možnost hromadných změn, kdy se akce provedou nad všemi aktuálně vyfitrovanými záznamy.
+
+- **Změna role** — dropdown pro výběr nové role
+- **Aktivovat vybrané**
+- **Deaktivovat vybrané**
+
+##### Akce v řádku
+
+V každém řádku je kontextové menu (`DropdownMenu`) pro změnu role a přepínač pro aktivování/deaktivovaní uživatelů:
+
+Detaily uživatele se nezobrazují na vlastní stránce — vše je řešeno přímo v tabulce pomocí inline akcí a hromadného panelu.
 
 #### ⚙️ /settings
 
-Stránka je dostupná **pouze pro ADMINA**. Na začátku `page.tsx` je nutné ověřit roli, jinak `redirect`.
+Stránka je dostupná **pouze pro ADMINA**. Na začátku `page.tsx` je nutné ověřit roli, jinak `redirect`. AKtuálně jsou všechny nastavení napevno v kódu, ale při nasazení by byly jednotlivé zadávací pole pro texty níže.
 
-- **Obsah:** Stránka obsahuje globální nastavení aplikace. Pro přehlednost a budoucí rozšíření je strukturovaná pomocí `Tabs` (`shadcn/ui`).
-- **Akce (Ukládání):** Každá `Card` má v `CardFooter` své vlastní tlačítko `Button` ("Uložit").
-  - Tlačítko je `disabled`, dokud uživatel neprovede změnu v dané kartě.
-  - Po úspěšném uložení (přes Server Action) se zobrazí `Toast` notifikace "Nastavení uloženo".
-- **Komponenty:**
-  - **`<Tabs>`:** Hlavní navigace stránky.
-    - **Tab 1: "Obecné"**
-      - **Karta "Role":**
-        - `CardHeader`: "Výchozí role uživatelů"
-        - `CardContent`: Obsahuje `Select` s popiskem "Role pro nově schválené uživatele".
-        - Možnosti: `STUDENT`, `TEACHER`. (Určuje, jakou roli získá `GUEST` poté, co ho admin "schválí" na stránce `/users`).
-        - `CardFooter`: `Button` ("Uložit").
-      - **Karta "Registrace":**
-        - `CardHeader`: "Omezení registrace"
-        - `CardContent`: `Input` s popiskem "Povolené e-mailové domény (oddělte čárkou)".
-        - `CardDescription`: "Např: `@skola.cz`. Pokud je prázdné, registrace je povolena pro jakýkoliv e-mail."
-        - `CardFooter`: `Button` ("Uložit").
-    - **Tab 2: "Texty"**
-      - **Karta "Text pro GUEST":**
-        - `CardHeader`: "Text na Dashboardu (Role GUEST)"
-        - `CardContent`: Obsahuje `Textarea` pro úpravu textu, který vidí uživatel s rolí `GUEST`.
-        - `CardFooter`: `Button` ("Uložit").
-      - **Karta "Text pro 'Žádný zápis'":**
-        - `CardHeader`: "Text na Dashboardu (Žádný zápis)"
-        - `CardContent`: Obsahuje `Textarea` pro úpravu textu, který vidí přihlášený uživatel, pokud není aktivní žádný `EnrollmentWindow`.
-        - `CardFooter`: `Button` ("Uložit").
-    - **Tab 3: "Pokročilé" (Prázdná pro budoucí použití)**
+**Komponenty:**
+
+- **`<Tabs>`:** Hlavní navigace stránky.
+  - **Tab 1: "Obecné"**
+    - **Karta "Role":**
+      - `CardHeader`: "Výchozí role uživatelů"
+      - `CardContent`: Obsahuje `Select` s popiskem "Role pro nově schválené uživatele".
+      - Možnosti: `STUDENT`, `TEACHER`. (Určuje, jakou roli získá `GUEST` poté, co ho admin "schválí" na stránce `/users`).
+      - `CardFooter`: `Button` ("Uložit").
+    - **Karta "Registrace":**
+      - `CardHeader`: "Omezení registrace"
+      - `CardContent`: `Input` s popiskem "Povolené e-mailové domény (oddělte čárkou)".
+      - `CardDescription`: "Např: `@skola.cz`. Pokud je prázdné, registrace je povolena pro jakýkoliv e-mail."
+      - `CardFooter`: `Button` ("Uložit").
+  - **Tab 2: "Texty"**
+    - **Karta "Text pro GUEST":**
+      - `CardHeader`: "Text na Dashboardu (Role GUEST)"
+      - `CardContent`: Obsahuje `Textarea` pro úpravu textu, který vidí uživatel s rolí `GUEST`.
+      - `CardFooter`: `Button` ("Uložit").
+    - **Karta "Text pro 'Žádný zápis'":**
+      - `CardHeader`: "Text na Dashboardu (Žádný zápis)"
+      - `CardContent`: Obsahuje `Textarea` pro úpravu textu, který vidí přihlášený uživatel, pokud není aktivní žádný `EnrollmentWindow`.
+      - `CardFooter`: `Button` ("Uložit").
+  - **Tab 3: "Pokročilé" (Prázdná pro budoucí použití)**
