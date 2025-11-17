@@ -26,10 +26,25 @@ export function AppShell({ children }: { children: ReactNode }) {
       <>{children}</>
     );
 
+  //return (
+  //  <>
+  //    {content}
+  //    <Toaster position="top-right" richColors closeButton />
+  //  </>
+  //);
+
   return (
-    <>
-      {content}
-      <Toaster position="top-right" richColors closeButton />
-    </>
-  );
+  <>
+    <header>
+      <AppTopbar user={user} />
+    </header>
+
+    <main className="flex-1 container mx-auto py-6">
+      {children}
+    </main>
+
+    {/* případně */}
+    <footer />
+  </>
+);
 }

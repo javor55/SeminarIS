@@ -8,7 +8,7 @@ Cílem je umožnit studentům přihlásit se na nabízené semináře (předmět
 Tento systém vznikl jako jednoduchý, přehledný a interaktivní nástroj pro **organizaci školních seminářů a zápisů studentů**.  
 Je navržen tak, aby pokryl všechny klíčové potřeby konkrétná školy kde se planuje systém nasadit, ale zároveň zůstal dostatečně lehký, intuitivní a snadno upravitelný.
 
-### 🎯 hlavní cíle
+### hlavní cíle
 
 Cílem systému je vytvořit **jednotné místo**, kde:
 
@@ -18,6 +18,14 @@ Cílem systému je vytvořit **jednotné místo**, kde:
 - celý proces zápisu je jasně strukturovaný, přehledný a transparentní
 
 Systém tak eliminuje ruční evidenci, zdlouhavou komunikaci e-mailem nebo tabulkovými procesory a přináší **automatizaci a pořádek**.
+
+## SEO a klíčová slova
+
+SEO má význam především u veřejně dostupných webů, které se mají zobrazovat ve výsledcích vyhledávání a kde je to naše snaha. Tento systém je ale čistě interní – přístup mají pouze přihlášení uživatelé (studenti, učitelé, administrátoři).
+
+Teoreticky by SEO dávalo smysl v případě, že bychom chtěli aby ji byly studenti schopni najít ve vyhledávači, namísto odkazu na stránkach školy. To však není cílem tohoto interního systému.
+
+
 
 ## Přihlášení a role
 
@@ -462,7 +470,7 @@ Stránka obsahuje následující akce:
   
 ---
 
-#### ⚙️ /enrollments
+#### /enrollments
 
 Stránka **/enrollments** slouží k přehledu zápisových období (`EnrollmentWindow`).  
 Je určena pro role **ADMIN** a **TEACHER**, které ji mají dostupnou v navigaci.
@@ -611,7 +619,7 @@ V každém řádku je kontextové menu (`DropdownMenu`) pro změnu role a přep�
 
 Detaily uživatele se nezobrazují na vlastní stránce — vše je řešeno přímo v tabulce pomocí inline akcí a hromadného panelu.
 
-#### ⚙️ /settings
+#### /settings
 
 Stránka je dostupná **pouze pro ADMINA**. Na začátku `page.tsx` je nutné ověřit roli, jinak `redirect`. AKtuálně jsou všechny nastavení napevno v kódu, ale při nasazení by byly jednotlivé zadávací pole pro texty níže.
 
@@ -639,3 +647,86 @@ Stránka je dostupná **pouze pro ADMINA**. Na začátku `page.tsx` je nutné ov
       - `CardContent`: Obsahuje `Textarea` pro úpravu textu, který vidí přihlášený uživatel, pokud není aktivní žádný `EnrollmentWindow`.
       - `CardFooter`: `Button` ("Uložit").
   - **Tab 3: "Pokročilé" (Prázdná pro budoucí použití)**
+
+## Lighthouse Report
+
+Tato kapitola shrnuje výsledky automatizovaného auditu pomocí nástroje **Google Lighthouse**.  
+Audit byl proveden nad stránkou **/dashboard** v produkční verzi aplikace  
+**<https://seminar-is.vercel.app>**.
+
+### 📈 Výsledné skóre
+
+| Kategorie         | Skóre |
+|-------------------|-------|
+| **Performance**   | **100 / 100** |
+| **Accessibility** | **95 / 100** |
+| **Best Practices**| **100 / 100** |
+| **SEO**           | **100 / 100** |
+
+---
+
+### ⚡ Performance (100 %)
+
+Aplikace dosáhla maximálního skóre díky velmi rychlému vykreslení:
+
+- **First Contentful Paint:** 0.2 s :contentReference[oaicite:4]{index=4}  
+- **Largest Contentful Paint:** 0.5 s :contentReference[oaicite:5]{index=5}  
+- **Speed Index:** 0.6 s :contentReference[oaicite:6]{index=6}  
+- **Total Blocking Time:** 0 ms :contentReference[oaicite:7]{index=7}  
+- **Cumulative Layout Shift:** 0 :contentReference[oaicite:8]{index=8}  
+
+Výborný výkon je dosažen kombinací:
+
+- rychlého renderingu díky Next.js server components,
+- minimální velikosti bundle (cca 247 KiB) :contentReference[oaicite:9]{index=9},
+- žádných blokujících skriptů ani přesměrování.
+
+---
+
+### Accessibility (95 %)
+
+Skóre přístupnosti je velmi vysoké. Lighthouse upozornil pouze na:
+
+- **jeden problém s kontrastem textu** na tlačítkách (červená šedá)  
+- několik doporučení k manuálnímu ověření (fokus, pořadí tab indexu atd.)
+
+Nic z toho zásadně nebrání použití aplikace — jde o drobná doporučení.
+
+---
+
+### Best Practices (100 %)
+
+Aplikace splňuje všechny moderní vývojové standardy:
+
+- běží kompletně přes HTTPS,
+- nepoužívá zastaralé API,
+- žádné chyby v konzoli,
+- správná bezpečnostní nastavení,
+- vhodné načítání zdrojů.
+
+Celá sekce prošla bez jediného varování.
+
+---
+
+### SEO (100 %)
+
+Přestože je aplikace interní, Lighthouse potvrzuje, že:
+
+- všechny stránky mají validní HTML,
+- stránka má meta description, viewport a ostatní náležitosti,
+- neobsahuje žádné indexační chyby.
+
+SEO je plně optimalizované — skóre 100 / 100.
+
+---
+
+### Shrnutí
+
+Aplikace podle Lighthouse dosahuje vynikajících výsledků:
+
+- **maximální výkon i best practices**,  
+- **velmi dobrá přístupnost**,  
+- **vynikající technická čistota a optimalizace**.
+
+Identifikované drobnosti (kontrast textu) lze snadno doladit v budoucí verzi.  
+Celkově systém splňuje standardy moderní webové aplikace.
