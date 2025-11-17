@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+// ZMĚNA 1: Přidáváme 'useEffect'
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import {
@@ -55,8 +56,33 @@ export default function SubjectDetailPage({
 }: {
   params: { id: string };
 }) {
-  const { user } = useAuth();
+  // ZMĚNA 2: Načítáme 'user' A 'isLoading'
+  const { user, isLoading } = useAuth();
   const router = useRouter();
+
+  // --- Začátek úpravy "Auth Guard" ---
+
+  // ZMĚNA 3: useEffect nyní čeká na 'isLoading'
+  useEffect(() => {
+    // Přesměrujeme, POUZE POKUD:
+    // 1. Načítání skončilo (isLoading === false)
+    // 2. A ZÁROVEŇ uživatel neexistuje (user === null)
+    if (!isLoading && !user) {
+      router.push("/");
+    }
+  }, [user, isLoading, router]); // Sledujeme obě proměnné
+
+  // ZMĚNA 4: "Guard" (Hlídač)
+  // Pokud se data ještě načítají, NEBO pokud uživatel neexistuje,
+  // tak nic nevykreslíme a počkáme.
+  if (isLoading || !user) {
+    return null; // Můžete sem dát i spinner, např. <p>Načítám...</p>
+  }
+
+  // --- Konec úpravy "Auth Guard" ---
+
+  // OD TOHOTO BODU NÍŽE:
+  // Máme 100% jistotu, že 'isLoading' je 'false' A 'user' je 'objekt'.
 
   const subjects = getSubjects();
   const subject = subjects.find((s) => s.id === params.id);
@@ -134,7 +160,8 @@ export default function SubjectDetailPage({
   const columns = useMemo(
     () =>
       getOccurrenceColumns({
-        currentUser: user ?? null,
+        // ZMĚNA 5: 'user' zde již zaručeně existuje (není null)
+        currentUser: user,
         onStudents: (occ) =>
           setSelectedStudents({
             occurrenceId: occ.id,
@@ -152,7 +179,8 @@ export default function SubjectDetailPage({
   );
 
   if (!subject) {
-    // ... (kód pro nenalezený předmět zůstává stejný)
+    // (Tato logika je v pořádku, protože je až po 'user' guardu)
+    return <p>Předmět nenalezen.</p>; // Lepší než nic
   }
 
   const createdByName = getUserName((subject as any).createdById);
@@ -160,8 +188,8 @@ export default function SubjectDetailPage({
   const createdAt = formatDate((subject as any).createdAt);
   const updatedAt = formatDate((subject as any).updatedAt);
 
-  // 🔥 Kontrola role
-  const isPrivilegedUser = user?.role === "ADMIN" || user?.role === "TEACHER";
+  // ZMĚNA 6: Kontrola role (už nepotřebuje 'user?.')
+  const isPrivilegedUser = user.role === "ADMIN" || user.role === "TEACHER";
 
   return (
     <>
@@ -191,8 +219,8 @@ export default function SubjectDetailPage({
               </p>
             </div>
 
-            {/* Tlačítko Upravit je již správně chráněno */}
-            {(user?.role === "ADMIN" || user?.role === "TEACHER") && (
+            {/* Tlačítko Upravit (už nepotřebuje 'user?.') */}
+            {(user.role === "ADMIN" || user.role === "TEACHER") && (
               <Button
                 size="sm"
                 onClick={() => router.push(`/subjects/${subject.id}/edit`)}
@@ -205,7 +233,7 @@ export default function SubjectDetailPage({
 
         {/* Karta: Sylabus (viditelná pro všechny) */}
         <div className="rounded-lg border bg-white p-4 shadow-sm space-y-2">
-          {/* ... (kód pro sylabus zůstává stejný) ... */}
+          {/* ... (kód pro sylabus) ... */}
           <h2 className="text-base font-semibold">Sylabus</h2>
           {subject.syllabus ? (
             <div
@@ -221,7 +249,7 @@ export default function SubjectDetailPage({
           )}
         </div>
 
-        {/* 🔥 ZMĚNA: Celá tato sekce je nyní podmíněná */}
+        {/* Celá tato sekce je nyní podmíněná 'isPrivilegedUser' */}
         {isPrivilegedUser && (
           <div className="space-y-2">
             <div className="space-y-1">
@@ -250,7 +278,7 @@ export default function SubjectDetailPage({
         )}
       </div>
 
-      {/* 🔥 ZMĚNA: Dialogy jsou také podmíněné */}
+      {/* Dialogy jsou také podmíněné 'isPrivilegedUser' */}
       {isPrivilegedUser && (
         <>
           {/* Dialog se studenty */}
@@ -258,7 +286,7 @@ export default function SubjectDetailPage({
             <OccurrencesStudentsDialog
               occurrenceId={selectedStudents.occurrenceId}
               block={selectedStudents.block}
-              currentUser={user}
+              currentUser={user} // 'user' zde 100% existuje
               onOpenChange={(open) => {
                 if (!open) setSelectedStudents(null);
               }}

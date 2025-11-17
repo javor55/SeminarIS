@@ -1,12 +1,16 @@
 "use client";
 
-import * as React from "react"; // Potřeba pro useState
+// ZMĚNA 1: Přidání 'useEffect'
+import * as React from "react"; // Potřeba pro useState, useEffect
+import { useRouter } from "next/navigation"; // ZMĚNA 2: Import routeru
+import { useAuth } from "@/components/auth/auth-provider"; // ZMĚNA 3: Import useAuth
+
 import { getAllUsers } from "@/lib/data";
 import { DataTable } from "@/components/ui/data-table";
 import { usersColumns, UserRow } from "@/components/users/users-columns";
-import { updateUserRole, toggleUserActive } from "@/lib/mock-db"; // Import funkcí z mock-db
+import { updateUserRole, toggleUserActive } from "@/lib/mock-db";
 
-// Importy pro UI komponenty v popoveru
+// ... (všechny ostatní importy UI komponent zůstávají stejné)
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -19,6 +23,40 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
 export default function UsersPage() {
+  // ZMĚNA 4: Načtení 'user', 'isLoading' a inicializace 'router'
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+
+  // ZMĚNA 5: "Auth Guard" (Hlídač přihlášení)
+  React.useEffect(() => {
+    // Pokud načítání skončilo A uživatel není přihlášen, přesměruj
+    if (!isLoading && !user) {
+      router.push("/");
+    }
+  }, [user, isLoading, router]);
+
+  // ZMĚNA 6: Zobrazení "Načítám..." dokud probíhá ověření
+  if (isLoading || !user) {
+    // Čekáme, dokud se 'isLoading' nevypne a 'user' nenačte
+    return null; // Nebo <p>Načítám...</p>
+  }
+
+  // ZMĚNA 7: "Authorization Guard" (Hlídač oprávnění)
+  // V tomto bodě víme, že 'user' je přihlášen.
+  if (user.role !== "ADMIN") {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-semibold">Přístup odepřen</h1>
+        <p className="text-muted-foreground">
+          Pro přístup k této stránce nemáte dostatečné oprávnění.
+        </p>
+      </div>
+    );
+  }
+  
+  // --- Konec změn ---
+  // Zbytek kódu se vykoná POUZE pokud je uživatel ADMIN
+
   // 1. Načtení dat
   const users = (getAllUsers() ?? []) as UserRow[];
 
@@ -45,29 +83,24 @@ export default function UsersPage() {
   }) => {
     const [selectedRole, setSelectedRole] = React.useState<string | null>(null);
 
-    // Hromadně nastaví roli všem vyfiltrovaným uživatelům
+    // Hromadně nastaví roli
     const handleBulkSetRole = () => {
       if (!selectedRole) return;
-      
       filteredRows.forEach((user) => {
-        // Voláme funkci z mock-db
         updateUserRole(user.id, selectedRole);
       });
-      forceRefresh(); // Obnoví tabulku, aby se změny projevily
+      forceRefresh();
     };
 
-    // Hromadně nastaví stav (aktivní / neaktivní)
+    // Hromadně nastaví stav
     const handleBulkSetActive = (setActive: boolean) => {
       filteredRows.forEach((user) => {
-        // Zkontrolujeme aktuální stav (dle logiky z users-columns.tsx)
         const currentState = user.isActive !== false;
-        
-        // Zavoláme toggle jen pokud je potřeba změna
         if (currentState !== setActive) {
           toggleUserActive(user.id);
         }
       });
-      forceRefresh(); // Obnoví tabulku
+      forceRefresh();
     };
 
     return (
@@ -88,7 +121,6 @@ export default function UsersPage() {
                 <SelectValue placeholder="Vyberte roli..." />
               </SelectTrigger>
               <SelectContent>
-                {/* Role odpovídají těm v users-columns.tsx */}
                 <SelectItem value="ADMIN">ADMIN</SelectItem>
                 <SelectItem value="TEACHER">TEACHER</SelectItem>
                 <SelectItem value="STUDENT">STUDENT</SelectItem>

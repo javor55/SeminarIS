@@ -1,6 +1,10 @@
 // app/dashboard/page.tsx
 "use client";
 
+// 1. Přidáme importy pro useEffect a useRouter
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 import { useAuth } from "@/components/auth/auth-provider";
 import {
   getEnrollmentWindowsVisible,
@@ -14,7 +18,7 @@ function findDashboardEnrollment(
   allWindows: EnrollmentWindow[],
   currentUser: User
 ): EnrollmentWindow | null {
-  // ... (vaše logika pro findDashboardEnrollment)
+  // ... (vaše logika pro findDashboardEnrollment zůstává stejná)
   // 1. Předfiltrování podle role
   const windowsToSearch =
     currentUser.role === "STUDENT"
@@ -30,7 +34,7 @@ function findDashboardEnrollment(
   // 3. Priorita: "SCHEDULED"
   const scheduledWindows = windowsToSearch
     .filter((ew) => ew.status === "SCHEDULED")
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(a.startsAt).getTime());
   if (scheduledWindows.length > 0) return scheduledWindows[0];
 
   // 4. Priorita: "DRAFT"
@@ -52,7 +56,22 @@ function findDashboardEnrollment(
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const router = useRouter(); // 2. Inicializujeme router
 
+  // --- Začátek úpravy ---
+
+  // 3. Přidáme useEffect pro přesměrování
+  useEffect(() => {
+    // Pokud 'user' není k dispozici, přesměrujeme
+    if (!user) {
+      router.push("/");
+    }
+  }, [user, router]); // Sledujeme změny 'user'
+
+  // --- Konec úpravy ---
+
+  // Logika pro nalezení 'ew' musí jít až za 'user' guard
+  // (nebo musí být podmíněná jako zde)
   const enrollmentToShow = user
     ? findDashboardEnrollment(getEnrollmentWindowsVisible() ?? [], user)
     : null;
@@ -61,9 +80,13 @@ export default function DashboardPage() {
     ? getEnrollmentWindowByIdWithBlocks(enrollmentToShow.id)
     : null;
 
+  // 4. Tento "guard" je již na správném místě
+  // Zastaví vykreslení, dokud probíhá přesměrování
   if (!user) {
-    return null; // Čekání na přihlášení (layout se o to postará)
+    return null; // Čekání na přihlášení / přesměrování
   }
+
+  // Od tohoto bodu níže máme jistotu, že 'user' existuje.
 
   if (!ew) {
     return (

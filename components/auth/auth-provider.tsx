@@ -9,10 +9,12 @@ import React, {
 } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/lib/types";
-import { users } from "@/lib/mock-db"; // ⬅️ použijeme mock uživatele z databáze
+import { users } from "@/lib/mock-db";
 
+// ZMĚNA 1: Rozšíření typu o 'isLoading'
 type AuthContextValue = {
   user: User | null;
+  isLoading: boolean; // <-- Přidáno
   login: (email: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
   mockUsers: User[];
@@ -23,20 +25,38 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  
+  // ZMĚNA 2: Přidání 'isLoading' stavu, výchozí je 'true'
+  const [isLoading, setIsLoading] = useState(true);
 
   // 🧭 při startu načteme usera z localStorage
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const saved = window.localStorage.getItem("zapis_user");
-    if (saved) {
-      try {
+    // Vaše logika byla v pořádku, jen musíme na konci
+    // nastavit 'isLoading' na 'false'
+    
+    // Okamžitě nastavíme 'true' na začátku (i když je to teď výchozí)
+    setIsLoading(true); 
+    
+    if (typeof window === "undefined") {
+      setIsLoading(false); // Jsme na serveru, nenačítáme
+      return;
+    }
+    
+    try {
+      const saved = window.localStorage.getItem("zapis_user");
+      if (saved) {
         const parsed = JSON.parse(saved);
         setUser(parsed);
-      } catch {
-        // ignore error
       }
+    } catch {
+      // ignore error, user zůstane null
     }
-  }, []);
+    
+    // ZMĚNA 3: Klíčový krok. Až PO kontrole localStorage
+    // prohlásíme, že načítání skončilo.
+    setIsLoading(false);
+    
+  }, []); // Tento efekt se spustí jen jednou
 
   // 💾 při změně usera uložíme do localStorage
   useEffect(() => {
@@ -58,7 +78,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setUser(found);
-    // po přihlášení přesměrujeme třeba na dashboard
     router.push("/dashboard");
   }
 
@@ -68,16 +87,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem("zapis_user");
     }
-    router.push("/"); // přesměrování na úvodní stránku
+    router.push("/");
   }
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        isLoading, // ZMĚNA 4: Poskytnutí 'isLoading' stavu
         login,
         logout,
-        mockUsers: users, // dostupní mock uživatelé
+        mockUsers: users,
       }}
     >
       {children}
