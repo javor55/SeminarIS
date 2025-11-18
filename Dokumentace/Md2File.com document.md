@@ -997,4 +997,3 @@ Dokumentace je strukturována tak, aby ji bylo možné přímo použít jako:
 Všechny kapitoly společně tvoří ucelený přehled, který pokrývá hlavní funkční i nefunkční požadavky. Na základě této dokumentace je možné nezávisle systém navrhnout, implementovat nebo dále rozšiřovat.
 
 Systém je popsán do takové hloubky, že dokumentace může být využita i jako finální **předávací dokument**, protože přesně popisuje aktuálně implementované funkcionality, uživatelské rozhraní i technické komponenty.
-
