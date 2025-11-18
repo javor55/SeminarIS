@@ -244,6 +244,102 @@ Toto zadání popisuje strukturu a funkčnost front-endové části aplikace pos
 
 ---
 
+### 1. Wireframe
+
+#### Welcome (Úvodní obrazovka)
+
+**Účel:**  
+Slouží jako vstupní stránka pro nepřihlášeného uživatele. Poskytuje dvě hlavní akce: přihlášení nebo registraci.
+
+**Vizuální struktura:**  
+
+- Centrální karta zarovnaná doprostřed obrazovky.  
+- Nadpis *„Login“* (označení sekce).  
+- Dvě velká tlačítka:  
+  - **Login** – přechod na přihlašovací formulář  
+  - **Sign up** – přechod na registrační formulář  
+- Rozhraní je minimalistické, aby uživatel okamžitě pochopil, že je třeba se nejprve přihlásit.
+
+**Cílové chování:**  
+
+- Nepřihlášený uživatel nemá přístup k žádným dalším částem systému.  
+- Stránka funguje jako rozcestník.
+
+![Welcome](https://raw.githubusercontent.com/javor55/SeminarIS/refs/heads/main/Dokumentace/Wireframe/Welcome.png)
+
+#### Login (Přihlášení uživatele)
+
+**Účel:**  
+Umožňuje uživateli zadat e-mail a heslo pro vstup do aplikace.
+
+**Vizuální struktura:**  
+
+- Formulář umístěný ve středu obrazovky.  
+- Prvky formuláře:
+  - Pole **E-mail**
+  - Pole **Password**
+  - Tlačítko **Login** (dominantní primární akce)
+- Čisté a jednoduché rozložení pro snadný přístup.
+
+**Cílové chování:**  
+
+- Po zadání platných údajů je uživatel přesměrován na dashboard dle své role (STUDENT/TEACHER/ADMIN).  
+- Chybné přihlašovací údaje zobrazí upozornění.
+
+![Login](https://raw.githubusercontent.com/javor55/SeminarIS/refs/heads/main/Dokumentace/Wireframe/Login.png)
+
+#### Seznam objektů (List view – práce s entitami)
+
+**Účel:**  
+Stránka pro správu jednotlivých objektů (předmětů, uživatelů, zápisů) podle typu entity.  
+Slouží hlavně administrátorům a učitelům.
+
+**Vizuální struktura:**  
+
+- Horní navigační lišta (Top Bar) se záložkami typu:  
+  - *Link one*  
+  - *Link two*  
+  - *Link three*
+  - tlačítko **Log out**
+- Název stránky (**Title**) vlevo nahoře.
+- Primární akce vpravo nahoře (např. **“This button does something”** – typicky „Nový záznam“, „Export“ apod.).
+- Velká tabulková oblast (**Table of content**) zabírá hlavní část stránky:
+  - seznam všech položek (např. předmětů)
+  - řazení, filtrování, akce nad řádky (editace, mazání)
+
+**Cílové chování:**  
+
+- Seznam je centrálním místem pro operace.  
+- Administrátor/učitel zde může snadno spravovat velké množství dat.
+
+![List](https://raw.githubusercontent.com/javor55/SeminarIS/refs/heads/main/Dokumentace/Wireframe/List.png)
+
+#### Dashboard (Hlavní stránka pro studenty)
+
+**Účel:**  
+Dashboard poskytuje studentovi přehled o aktuálním zápisovém období a dostupných blocích předmětů, do kterých se může zapsat. Ve stejném rozhraní probíhá i úprava zápisů.
+
+**Vizuální struktura:**  
+
+- Horní navigační panel (Top Bar) s odkazy na další sekce a tlačítkem **Log out**.
+- Dva hlavní informační velké boxy:
+  - **Term** – základní informace o zápisu.
+  - **Start / End / State** – technické údaje o začátku, konci a stavu zápisu.
+- Sekce s bloky předmětů:
+  - Každý blok je zobrazen jako samostatná karta s nadpisem (např. *Blok 1*, *Blok 2*).
+  - Uvnitř každého bloku je seznam výskytů předmětů reprezentovaný jako seznam položek.
+  - Struktura je responzivní — bloky se zobrazují vedle sebe nebo pod sebou podle šířky obrazovky.
+
+**Cílové chování:**  
+
+- Student si může prohlédnout všechny dostupné bloky předmětů.  
+- Podle stavu zápisu (OPEN/CLOSED) jsou zobrazené akce:
+  - možnost zapsat se  
+  - možnost odhlásit se  
+- Dashboard slouží jako hlavní rozhraní pro interakci studenta s celým systémem.
+
+![Dashboard](https://raw.githubusercontent.com/javor55/SeminarIS/refs/heads/main/Dokumentace/Wireframe/Dashboard.png)
+
 ### 1. Strom stránek (Site Map)
 
 Aplikace používá standardní adresářovou strukturu Next.js App Routeru.
