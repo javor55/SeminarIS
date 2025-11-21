@@ -52,7 +52,7 @@ export function EditSubjectOccurrenceDialog({
           <DialogTitle>
             {isNew ? "Přidat výskyt předmětu" : "Upravit výskyt předmětu"}
           </DialogTitle>
-          <DialogDescription>Mock formulář – zatím se neukládá.</DialogDescription>
+          <DialogDescription>zatím se neukládá.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-2">
@@ -137,8 +137,8 @@ export function EditSubjectOccurrenceDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Zrušit
             </Button>
-            <Button disabled onClick={() => onSubmit?.(occurrence)}>
-              Uložit (mock)
+            <Button onClick={() => onSubmit?.(occurrence)}>
+              Uložit
             </Button>
           </DialogFooter>
         </div>
