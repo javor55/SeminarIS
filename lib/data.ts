@@ -1,69 +1,284 @@
-import {
-  users,
-  subjects,
-  enrollmentWindows,
-  blocks,
-  subjectOccurrences,
-  studentEnrollments,
-} from "./mock-db";
-import {
-  EnrollmentWindowWithBlocks,
-  User,
-  Subject,
-  EnrollmentWindow,
-} from "./types";
+"use server";
 
-//export function getCurrentUser(): User {
-//  return users.find((u) => u.id === "u-admin")!;
-//}
+import { prisma } from "./prisma";
+import { EnrollmentWindowWithBlocks, User, Subject, EnrollmentWindow } from "./types";
+import { getServerSession } from "next-auth";
+import { authOptions } from "./auth";
+import bcrypt from "bcryptjs";
 
-export function getSubjects(): Subject[] {
-  return subjects;
+// === Pomocné funkce pro autorizaci ===
+async function requireAuth(): Promise<any> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) throw new Error("Unauthorized");
+  return session.user;
 }
 
-export function getSubjectById(id: string): Subject | undefined {
-  return subjects.find((s) => s.id === id);
+async function requireAdmin() {
+  const user = await requireAuth();
+  if (user.role !== "ADMIN") {
+    throw new Error("Unauthorized: Admin role required");
+  }
+  return user;
 }
 
-export function getEnrollmentWindowsVisible(): EnrollmentWindow[] {
-  return enrollmentWindows.filter(
-    (e) => e.visibleToStudents && e.status !== "DRAFT"
-  );
+// === ČTENÍ DAT ===
+
+export async function getSubjects() {
+  return await prisma.subject.findMany();
 }
 
-export function getEnrollmentWindowByIdWithBlocks(
-  id: string
-): EnrollmentWindowWithBlocks | undefined {
-  const ew = enrollmentWindows.find((e) => e.id === id);
-  if (!ew) return;
-  const ewBlocks = blocks
-    .filter((b) => b.enrollmentWindowId === ew.id && !b.deletedAt)
-    .sort((a, b) => a.order - b.order)
-    .map((b) => {
-      const occs = subjectOccurrences
-        .filter((o) => o.blockId === b.id && !o.deletedAt)
-        .map((o) => {
-          const subject = subjects.find((s) => s.id === o.subjectId)!;
-          const teacher = users.find((u) => u.id === o.teacherId)!;
-          const enrolls = studentEnrollments.filter(
-            (se) => se.subjectOccurrenceId === o.id && !se.deletedAt
-          );
-          return {
-            ...o,
-            subject,
-            teacher,
-            enrollments: enrolls,
-          };
-        });
-      return { ...b, occurrences: occs };
-    });
+export async function getSubjectById(id: string) {
+  return await prisma.subject.findUnique({
+    where: { id },
+  });
+}
+
+export async function getEnrollmentWindowsVisible() {
+  return await prisma.enrollmentWindow.findMany({
+    where: {
+      visibleToStudents: true,
+      status: { not: "DRAFT" },
+    },
+  });
+}
+
+export async function getEnrollmentWindowByIdWithBlocks(id: string) {
+  const ew = await prisma.enrollmentWindow.findUnique({
+    where: { id },
+    include: {
+      blocks: {
+        where: { deletedAt: null },
+        orderBy: { order: "asc" },
+        include: {
+          subjectOccurrences: {
+            where: { deletedAt: null },
+            include: {
+              subject: true,
+              teacher: true,
+              studentEnrollments: {
+                where: { deletedAt: null },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!ew) return undefined;
+
+  const blocksObj = ew.blocks.map((b) => ({
+    ...b,
+    occurrences: b.subjectOccurrences.map((o) => ({
+      ...o,
+      enrollments: o.studentEnrollments,
+    })),
+  }));
 
   return {
     ...ew,
-    blocks: ewBlocks,
+    blocks: blocksObj,
   };
 }
 
-export function getAllUsers() {
-  return users;
+// Rozšířené získání uživatelů vcetne historie zapisů
+export async function getAllUsers() {
+  try {
+    const adminUser = await requireAdmin();
+    console.log(`ServerAction: getAllUsers voláno uživatelem ${adminUser.email}`);
+    
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        studentEnrollments: {
+          where: { deletedAt: null },
+          include: {
+            subjectOccurrence: {
+              include: {
+                block: {
+                  include: {
+                    enrollmentWindow: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    
+    console.log(`ServerAction: Nalezeno ${users.length} uživatelů.`);
+    // Převod na prostý objekt pro bezpečnou serializaci přes Next.js Server Actions
+    return JSON.parse(JSON.stringify(users));
+  } catch (err: any) {
+    console.error("ServerAction Error (getAllUsers):", err.message);
+    throw err;
+  }
 }
+
+export async function getUserByEmail(email: string) {
+  return await prisma.user.findUnique({
+    where: { email },
+  });
+}
+
+// === SYSTEM SETTINGS ===
+export async function getGlobalCohort() {
+  try {
+    // @ts-ignore
+    if (!prisma.systemSetting) {
+      console.warn("Prisma: model SystemSetting není v klientovi dostupný (nutný restart serveru)");
+      return "";
+    }
+    // @ts-ignore
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: "current_cohort" },
+    });
+    return setting?.value || "";
+  } catch (e) {
+    console.error("Error fetching global cohort:", e);
+    return "";
+  }
+}
+
+
+export async function setGlobalCohort(cohort: string) {
+  try {
+    await requireAdmin();
+    // @ts-ignore
+    if (!prisma.systemSetting) {
+      throw new Error("Databázový model SystemSetting není připraven. Prosím restartujte server a spusťte 'npx prisma generate' podle instrukcí.");
+    }
+    // @ts-ignore
+    return await prisma.systemSetting.upsert({
+      where: { key: "current_cohort" },
+      update: { value: cohort },
+      create: { key: "current_cohort", value: cohort },
+    });
+  } catch (e: any) {
+    console.error("Error setting global cohort:", e);
+    throw e;
+  }
+}
+
+
+// === MUTACE (zapis) ===
+export async function enrollStudent(studentId: string, subjectOccurrenceId: string) {
+  const user = await requireAuth();
+  // Zamezit komukoliv jinému než sobě, Ledaže je to ADMIN
+  if (user.id !== studentId && user.role !== "ADMIN") {
+    throw new Error("Unauthorized mapping");
+  }
+
+  return await prisma.studentEnrollment.create({
+    data: {
+      studentId,
+      subjectOccurrenceId,
+      createdById: user.id as string,
+    },
+  });
+}
+
+export async function unenrollStudent(enrollmentId: string) {
+  const user = await requireAuth();
+  const enrollment = await prisma.studentEnrollment.findUnique({
+    where: { id: enrollmentId },
+  });
+
+  if (!enrollment) return;
+  if (enrollment.studentId !== user.id && user.role !== "ADMIN") {
+    throw new Error("Unauthorized mapping");
+  }
+
+  return await prisma.studentEnrollment.delete({
+    where: { id: enrollmentId },
+  });
+}
+
+export async function deleteBlock(blockId: string) {
+  await requireAdmin();
+  return await prisma.block.delete({
+    where: { id: blockId },
+  });
+}
+
+export async function moveBlock(blockId: string, direction: "UP" | "DOWN") {
+  await requireAdmin();
+  const block = await prisma.block.findUnique({ where: { id: blockId } });
+  if (!block) return;
+  const blocks = await prisma.block.findMany({
+    where: { enrollmentWindowId: block.enrollmentWindowId },
+    orderBy: { order: "asc" },
+  });
+  const index = blocks.findIndex((b) => b.id === blockId);
+  if (index === -1) return;
+  const newIndex = direction === "UP" ? index - 1 : index + 1;
+  if (newIndex < 0 || newIndex >= blocks.length) return;
+
+  const targetBlock = blocks[newIndex];
+
+  await prisma.$transaction([
+    prisma.block.update({ where: { id: block.id }, data: { order: targetBlock.order } }),
+    prisma.block.update({ where: { id: targetBlock.id }, data: { order: block.order } }),
+  ]);
+  return true;
+}
+
+export async function updateBlock(block: any) {
+  await requireAdmin();
+  return await prisma.block.update({
+    where: { id: block.id },
+    data: {
+      name: block.name,
+      description: block.description,
+    },
+  });
+}
+
+export async function updateSubject(subject: any) {
+  await requireAdmin();
+  return await prisma.subject.update({
+    where: { id: subject.id },
+    data: {
+      name: subject.name,
+      code: subject.code,
+      syllabus: subject.syllabus,
+    },
+  });
+}
+
+export async function updateUserRole(userId: string, role: string) {
+  await requireAdmin();
+  return await prisma.user.update({
+    where: { id: userId },
+    data: { role: role as any },
+  });
+}
+
+export async function toggleUserActive(userId: string) {
+  await requireAdmin();
+  const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (!targetUser) return;
+  return await prisma.user.update({
+    where: { id: userId },
+    data: { isActive: !targetUser.isActive },
+  });
+}
+
+export async function resetUserPassword(userId: string, newPasswordRaw: string) {
+  await requireAdmin();
+  const hashedPassword = await bcrypt.hash(newPasswordRaw, 10);
+  return await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash: hashedPassword },
+  });
+}
+
+export async function updateUsersCohort(userIds: string[], cohort: string) {
+  await requireAdmin();
+  return await prisma.user.updateMany({
+    where: { id: { in: userIds } },
+    data: { cohort },
+  });
+}
+

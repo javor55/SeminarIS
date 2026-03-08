@@ -26,7 +26,7 @@ import {
 import { EditSubjectOccurrenceDialog } from "@/components/occurrences/EditSubjectOccurrenceDialog";
 import { OccurrencesStudentsDialog } from "@/components/occurrences/OccurrencesStudentsDialog";
 
-import { enrollStudent, unenrollStudent } from "@/lib/mock-db";
+import { enrollStudent, unenrollStudent } from "@/lib/data";
 
 export function EnrollmentBlockCard({
   block,
@@ -117,7 +117,7 @@ export function EnrollmentBlockCard({
   //
   // 🟩 3) Finální logika zápisu studenta
   //
-  function handleEnroll(occId: string) {
+  async function handleEnroll(occId: string) {
     if (!isStudent) return;
 
     // 1. zákaz: stejné subject.code v jiném bloku
@@ -138,21 +138,21 @@ export function EnrollmentBlockCard({
     }
 
     // 3. normální zápis
-    enrollStudent(currentUser.id, occId);
+    await enrollStudent(currentUser.id, occId);
     router.refresh();
   }
 
   //
   // 🟧 4) Odepsání studenta
   //
-  function handleUnenroll(occId: string) {
+  async function handleUnenroll(occId: string) {
     const occ = block.occurrences.find((o) => o.id === occId);
     if (!occ) return;
     const enr = occ.enrollments?.find(
       (e: any) => e.studentId === currentUser.id && !e.deletedAt
     );
     if (!enr) return;
-    unenrollStudent(enr.id);
+    await unenrollStudent(enr.id);
     router.refresh();
   }
 
@@ -365,10 +365,10 @@ export function EnrollmentBlockCard({
             <AlertDialogFooter>
               <AlertDialogCancel>Zrušit</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => {
+                onClick={async () => {
                   const my = findMyOccurrenceInThisBlock();
-                  if (my) unenrollStudent(my.enrollmentId);
-                  enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
+                  if (my) await unenrollStudent(my.enrollmentId);
+                  await enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
                   router.refresh();
                   setSwitchEnroll(null);
                 }}

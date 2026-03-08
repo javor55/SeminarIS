@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
-import { getSubjects } from "@/lib/data";
-import { updateSubject } from "@/lib/mock-db";
+import { getSubjects, updateSubject } from "@/lib/data";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea"; // 👈 přidáme Textarea
+import { Textarea } from "@/components/ui/textarea"; 
 import { Button } from "@/components/ui/button";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { Subject } from "@/lib/types";
@@ -18,17 +17,35 @@ export default function EditSubjectPage({
 }) {
   const router = useRouter();
   const { user } = useAuth();
-  const subjects = getSubjects();
-  const subject = subjects.find((s) => s.id === params.id) as
-    | (Subject & { syllabus?: string })
-    | undefined;
-
-  const [name, setName] = useState(subject?.name ?? "");
-  const [code, setCode] = useState(subject?.code ?? "");
-  const [description, setDescription] = useState(subject?.description ?? ""); // 👈 nový state
-  const [syllabus, setSyllabus] = useState<string>(subject?.syllabus ?? "");
+  const [subject, setSubject] = useState<(Subject & { syllabus?: string }) | undefined>();
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [description, setDescription] = useState("");
+  const [syllabus, setSyllabus] = useState("");
+  const [dataLoading, setDataLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadData() {
+       setDataLoading(true);
+       const subjects = await getSubjects();
+       const found = subjects.find((s) => s.id === params.id) as unknown as (Subject & { syllabus?: string }) | undefined;
+       if (found) {
+         setSubject(found);
+         setName(found.name ?? "");
+         setCode(found.code ?? "");
+         setDescription(found.description ?? "");
+         setSyllabus(found.syllabus ?? "");
+       }
+       setDataLoading(false);
+    }
+    loadData();
+  }, [params.id]);
+
+  if (dataLoading) {
+    return <p>Načítám...</p>;
+  }
 
   if (!subject) {
     return (
@@ -50,12 +67,12 @@ export default function EditSubjectPage({
     setError(null);
 
     try {
-      const ok = updateSubject({
+      const ok = await updateSubject({
         ...subject,
         name,
         code,
-        description, // 👈 přidáme popis do ukládání
         syllabus,
+        description,
         updatedAt: new Date().toISOString(),
         updatedById: user.id,
       } as any);

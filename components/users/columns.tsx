@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { User } from "@/lib/types";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { updateUserRole, toggleUserActive } from "@/lib/mock-db";
+import { updateUserRole, toggleUserActive } from "@/lib/data";
 import { useState } from "react";
 
 export type UserRow = User & {
@@ -39,8 +39,8 @@ export const columns: ColumnDef<UserRow>[] = [
       return (
         <Select
           defaultValue={u.role}
-          onValueChange={(value) => {
-            updateUserRole(u.id, value);
+          onValueChange={async (value) => {
+            await updateUserRole(u.id, value);
             setBump((x) => x + 1);
           }}
         >
@@ -72,8 +72,8 @@ export const columns: ColumnDef<UserRow>[] = [
       return (
         <Switch
           checked={checked}
-          onCheckedChange={() => {
-            toggleUserActive(u.id);
+          onCheckedChange={async () => {
+            await toggleUserActive(u.id);
             setBump((x) => x + 1);
           }}
         />

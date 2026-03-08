@@ -47,13 +47,17 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // 🔥 Simulace mock registrace
-      // Zde byste v reálné aplikaci volali např. API
-      // await register({ email, password, firstName, lastName });
-      
-      // Pro účely mocku jen zalogujeme data a počkáme 1s
-      console.log("Mock registrace:", { email, firstName, lastName });
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, firstName, lastName }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Registrace selhala.");
+      }
       
       // Místo přesměrování zobrazíme úspěch
       setIsSuccess(true);
@@ -136,17 +140,19 @@ export default function RegisterPage() {
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="password">Heslo</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="password">Heslo</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
-              
+
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Vytváří se účet..." : "Vytvořit účet"}
               </Button>

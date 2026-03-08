@@ -8,6 +8,7 @@ import {
   getSubjects,
   getEnrollmentWindowsVisible,
   getEnrollmentWindowByIdWithBlocks,
+  getAllUsers,
 } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { OccurrencesStudentsDialog } from "@/components/occurrences/OccurrencesStudentsDialog";
@@ -21,7 +22,7 @@ import {
   OccurrenceRow,
   getOccurrenceColumns,
 } from "@/components/occurrences/occurrence-columns";
-import { users } from "@/lib/mock-db";
+// Mock users are no longer imported directly
 
 // ... (funkce getWindowStatusLabel, getUserName, formatDate zůstávají stejné)
 function getWindowStatusLabel(
@@ -35,9 +36,9 @@ function getWindowStatusLabel(
   return "Uzavřeno";
 }
 
-function getUserName(userId?: string) {
+function getUserName(userId?: string, usersList: any[] = []) {
   if (!userId) return "—";
-  const u = users.find((x) => x.id === userId);
+  const u = usersList.find((x) => x.id === userId);
   if (!u) return userId;
   const full = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
   return full || u.email || userId;
@@ -72,79 +73,11 @@ export default function SubjectDetailPage({
     }
   }, [user, isLoading, router]); // Sledujeme obě proměnné
 
-  // ZMĚNA 4: "Guard" (Hlídač)
-  // Pokud se data ještě načítají, NEBO pokud uživatel neexistuje,
-  // tak nic nevykreslíme a počkáme.
-  if (isLoading || !user) {
-    return null; // Můžete sem dát i spinner, např. <p>Načítám...</p>
-  }
-
-  // --- Konec úpravy "Auth Guard" ---
-
-  // OD TOHOTO BODU NÍŽE:
-  // Máme 100% jistotu, že 'isLoading' je 'false' A 'user' je 'objekt'.
-
-  const subjects = getSubjects();
-  const subject = subjects.find((s) => s.id === params.id);
-
-  const enrollmentWindows = getEnrollmentWindowsVisible()
-    .map((w) => getEnrollmentWindowByIdWithBlocks(w.id))
-    .filter(Boolean) as EnrollmentWindowWithBlocks[];
-
-  // Připravíme řádky pro DataTable (OccurrenceRow)
-  const occurrences: OccurrenceRow[] =
-    enrollmentWindows.flatMap((ew) =>
-      ew.blocks.flatMap((block) =>
-        block.occurrences
-          .filter((occ: any) => occ.subject.id === params.id)
-          .map((occ: any) => {
-            // ... (logika pro mapování occurrences zůstává stejná)
-            const enrolledCount = occ.enrollments
-              ? occ.enrollments.filter((e: any) => !e.deletedAt).length
-              : 0;
-
-            const capacityText =
-              occ.capacity == null
-                ? `${enrolledCount}/∞`
-                : `${enrolledCount}/${occ.capacity}`;
-
-            const hasStudents = enrolledCount > 0;
-
-            const fullCode = occ.subject?.code
-              ? `${occ.subject.code}${occ.subCode ? "/" + occ.subCode : ""}`
-              : occ.subCode ?? "—";
-
-            const teacherName = occ.teacher
-              ? `${occ.teacher.firstName} ${occ.teacher.lastName}`
-              : "—";
-
-            const statusLabel = getWindowStatusLabel(ew);
-
-            const searchText = [
-              ew.name,
-              block.name,
-              fullCode,
-              teacherName,
-            ]
-              .filter(Boolean)
-              .join(" ");
-
-            return {
-              ...(occ as any),
-              blockName: block.name,
-              block: block as Block & { occurrences: any[] },
-              enrollmentWindow: ew,
-              enrollmentName: ew.name,
-              statusLabel,
-              capacityText,
-              hasStudents,
-              fullCode,
-              teacherName,
-              searchText,
-            } as OccurrenceRow;
-          })
-      )
-    ) || [];
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [subject, setSubject] = useState<any | null>(null);
+  const [enrollmentWindows, setEnrollmentWindows] = useState<any[]>([]);
+  const [occurrences, setOccurrences] = useState<OccurrenceRow[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
 
   // Dialog "Studenti"
   const [selectedStudents, setSelectedStudents] = useState<{
@@ -157,10 +90,99 @@ export default function SubjectDetailPage({
     null
   );
 
+  useEffect(() => {
+     async function loadData() {
+        setDataLoading(true);
+        try {
+          // 1. Uživatelé a Předměty
+          const [u, allSubjs, ewVisible] = await Promise.all([
+            getAllUsers(),
+            getSubjects(),
+            getEnrollmentWindowsVisible()
+          ]);
+          setUsersList(u);
+          
+          const foundSubject = allSubjs.find((s) => s.id === params.id);
+          setSubject(foundSubject || null);
+          
+          if (!foundSubject) {
+             setDataLoading(false);
+             return;
+          }
+
+          // 2. Enrollment windows
+          const windowsDetails = await Promise.all(
+            ewVisible.map(async (w: any) => await getEnrollmentWindowByIdWithBlocks(w.id))
+          );
+          const validWindows = windowsDetails.filter(Boolean);
+          setEnrollmentWindows(validWindows);
+
+          // 3. Occurrences
+          const occs: OccurrenceRow[] = validWindows.flatMap((ew: any) =>
+            ew.blocks.flatMap((block: any) =>
+              block.occurrences
+                .filter((occ: any) => occ.subject.id === params.id)
+                .map((occ: any) => {
+                  const enrolledCount = occ.enrollments
+                    ? occ.enrollments.filter((e: any) => !e.deletedAt).length
+                    : 0;
+
+                  const capacityText =
+                    occ.capacity == null
+                      ? `${enrolledCount}/∞`
+                      : `${enrolledCount}/${occ.capacity}`;
+
+                  const hasStudents = enrolledCount > 0;
+
+                  const fullCode = occ.subject?.code
+                    ? `${occ.subject.code}${occ.subCode ? "/" + occ.subCode : ""}`
+                    : occ.subCode ?? "—";
+
+                  const teacherName = occ.teacher
+                    ? `${occ.teacher.firstName} ${occ.teacher.lastName}`
+                    : "—";
+
+                  const statusLabel = getWindowStatusLabel(ew);
+
+                  const searchText = [
+                    ew.name,
+                    block.name,
+                    fullCode,
+                    teacherName,
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+
+                  return {
+                    ...(occ as any),
+                    blockName: block.name,
+                    block: block,
+                    enrollmentWindow: ew,
+                    enrollmentName: ew.name,
+                    statusLabel,
+                    capacityText,
+                    hasStudents,
+                    fullCode,
+                    teacherName,
+                    searchText,
+                  } as OccurrenceRow;
+                })
+            )
+          ) || [];
+          setOccurrences(occs);
+
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setDataLoading(false);
+        }
+     }
+     loadData();
+  }, [params.id]);
+
   const columns = useMemo(
     () =>
       getOccurrenceColumns({
-        // ZMĚNA 5: 'user' zde již zaručeně existuje (není null)
         currentUser: user,
         onStudents: (occ) =>
           setSelectedStudents({
@@ -177,14 +199,28 @@ export default function SubjectDetailPage({
       }),
     [user]
   );
+  
+  // ZMĚNA 4: "Guard" (Hlídač)
+  // Pokud se data ještě načítají, NEBO pokud uživatel neexistuje,
+  // tak nic nevykreslíme a počkáme.
+  if (isLoading || !user) {
+    return null; // Můžete sem dát i spinner, např. <p>Načítám...</p>
+  }
+
+  // --- Konec úpravy "Auth Guard" ---
+
+  // OD TOHOTO BODU NÍŽE:
+  // Máme 100% jistotu, že 'isLoading' je 'false' A 'user' je 'objekt'.
+  
+  if (dataLoading) return <p>Načítám detaily předmětu...</p>;
 
   if (!subject) {
     // (Tato logika je v pořádku, protože je až po 'user' guardu)
     return <p>Předmět nenalezen.</p>; // Lepší než nic
   }
 
-  const createdByName = getUserName((subject as any).createdById);
-  const updatedByName = getUserName((subject as any).updatedById);
+  const createdByName = getUserName((subject as any).createdById, usersList);
+  const updatedByName = getUserName((subject as any).updatedById, usersList);
   const createdAt = formatDate((subject as any).createdAt);
   const updatedAt = formatDate((subject as any).updatedAt);
 

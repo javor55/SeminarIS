@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Block, User } from "@/lib/types";
 import {
@@ -23,7 +23,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { unenrollStudent, enrollStudent } from "@/lib/mock-db";
+import { unenrollStudent, enrollStudent } from "@/lib/data";
 
 export function OccurrencesStudentsDialog({
   occurrenceId,
@@ -45,7 +45,14 @@ export function OccurrencesStudentsDialog({
 
   if (!occurrence) return null;
 
-  const allUsers = getAllUsers();
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function load() {
+      setAllUsers(await getAllUsers());
+    }
+    load();
+  }, []);
   const isAdmin = currentUser.role === "ADMIN";
 
   const [localEnrollments, setLocalEnrollments] = useState(
@@ -103,13 +110,13 @@ export function OccurrencesStudentsDialog({
                     size="sm"
                     // 🔥 ZMĚNA: Tlačítko se přizpůsobí
                     className="w-full sm:w-auto"
-                    onClick={() => {
+                    onClick={async () => {
                       if (!selectedStudentId) return;
-                      const newEnr = enrollStudent(
+                      const newEnr = await enrollStudent(
                         selectedStudentId,
                         occurrenceId
                       );
-                      setLocalEnrollments((prev) => [...prev, { ...newEnr }]);
+                      setLocalEnrollments((prev) => [...prev, { ...newEnr } as any]);
                       
                       router.refresh();
 
@@ -190,14 +197,15 @@ export function OccurrencesStudentsDialog({
                 Zrušit
               </AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => {
-                  const ok = unenrollStudent(toUnenroll);
-                  if (ok) {
-                    setLocalEnrollments((prev) =>
-                      prev.filter((e) => e.id !== toUnenroll)
-                    );
-                    router.refresh();
-                  }
+                onClick={async () => {
+                  const enrToDelete = toUnenroll;
+                  if (!enrToDelete) return;
+                  await unenrollStudent(enrToDelete);
+                  
+                  setLocalEnrollments((prev) =>
+                    prev.filter((e) => e.id !== enrToDelete)
+                  );
+                  router.refresh();
                   setToUnenroll(null);
                 }}
               >

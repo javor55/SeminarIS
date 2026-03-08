@@ -1,6 +1,7 @@
 "use client";
 
 import { SubjectOccurrence } from "@/lib/types";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -36,8 +37,18 @@ export function EditSubjectOccurrenceDialog({
   onDelete?: (id: string) => void;
   onShowStudents?: (id: string) => void;
 }) {
-  const subjects = getSubjects();
-  const teachers = getAllUsers().filter((u) => u.role === "TEACHER");
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
+
+  useEffect(() => {
+     async function load() {
+       const [subjs, allU] = await Promise.all([getSubjects(), getAllUsers()]);
+       setSubjects(subjs);
+       setTeachers(allU.filter((u: any) => u.role === "TEACHER"));
+     }
+     load();
+  }, []);
+
   const isNew = occurrence.id === "";
 
   const enrolledCount = occurrence.enrollments

@@ -77,6 +77,7 @@ export type DataTableProps<T> = {
   initialPageSize?: number;
 
   // 🔥 NOVÉ PROPS
+  forceRefresh?: () => void;
   /** Skryje celý horní panel (hledání, filtry) */
   hideToolbar?: boolean;
   /** Skryje celý dolní panel (stránkování) */

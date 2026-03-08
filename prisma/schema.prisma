@@ -34,6 +34,8 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  cohort       String?  // Nástupní/Aktuální ročník, např. "2023/2024"
+
   // ====== zpětné relace ======
   // Subject
   subjectsCreated  Subject[] @relation("SubjectCreatedBy")
@@ -184,6 +186,11 @@ model StudentEnrollment {
 
   @@index([studentId])
   @@index([subjectOccurrenceId])
+}
+
+model SystemSetting {
+  key   String @id
+  value String
 }
 
 

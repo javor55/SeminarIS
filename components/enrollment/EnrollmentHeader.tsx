@@ -128,6 +128,20 @@ export function EnrollmentHeader({
         </div>
       </div>
 
+      {user.role === "GUEST" && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-md flex items-center gap-3">
+          <div className="flex-shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <p className="font-medium text-sm">Váš účet čeká na schválení administrátorem</p>
+            <p className="text-xs mt-1">Nyní máte pouze oprávnění k prohlížení aktuálních zápisů. Nemůžete se zapisovat na žádné předměty.</p>
+          </div>
+        </div>
+      )}
+
       {/* --- Sekce tlačítek --- */}
       {isAdmin && (
         <div className="flex justify-end gap-2">

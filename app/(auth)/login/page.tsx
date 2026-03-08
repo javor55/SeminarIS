@@ -1,17 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label"; // 🔥 Přidán import pro Label
+import { Label } from "@/components/ui/label"; 
+import { getAllUsers } from "@/lib/data";
+import { User } from "@/lib/types";
 
 export default function LoginPage() {
-  const { login, mockUsers } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState(""); // 🔥 Přidán stav pro heslo
+  const [password, setPassword] = useState(""); 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  const [mockUsers, setMockUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    async function fetchUsers() {
+      const dbUsers = await getAllUsers();
+      setMockUsers(dbUsers as User[]);
+    }
+    fetchUsers();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,8 +98,8 @@ export default function LoginPage() {
                 onClick={async () => {
                   setError(null);
                   try {
-                    // 🔥 Upraveno volání - posílá email a "falešné" heslo
-                    await login(u.email, "mockpass");
+                    // 🔥 Upraveno volání - posílá email a reálné hashované heslo ze seedu
+                    await login(u.email, "password123");
                   } catch (err: any) {
                     setError(err.message ?? "Nepodařilo se přihlásit.");
                   }

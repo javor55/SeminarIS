@@ -1,11 +1,10 @@
 "use client";
 
 // Importy zůstávají stejné
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
-import { getAllUsers } from "@/lib/data";
-import { getSubjectsFromMock } from "@/lib/mock-db";
+import { getAllUsers, getSubjects } from "@/lib/data";
 import { DataTable } from "@/components/ui/data-table";
 import {
   subjectsColumns,
@@ -15,28 +14,36 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 export default function SubjectsPage() {
-  // ZMĚNA 1: Načítáme 'user' a 'isLoading'
-  const { user, isLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const subjects = getSubjectsFromMock() as SubjectRow[];
-  const users = getAllUsers();
+
+  const [subjects, setSubjects] = useState<SubjectRow[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      if (!user) return;
+      setDataLoading(true);
+      const [dbSubj, dbUser] = await Promise.all([getSubjects(), getAllUsers()]);
+      setSubjects(dbSubj as unknown as SubjectRow[]);
+      setUsers(dbUser);
+      setDataLoading(false);
+    }
+    loadData();
+  }, [user]);
 
   // --- Začátek úpravy "Auth Guard" ---
 
   // ZMĚNA 2: "Auth Guard" (Hlídač přihlášení)
   // Reaguje na 'isLoading', aby se zabránilo chybnému přesměrování
   useEffect(() => {
-    // Přesměrujeme, POUZE POKUD:
-    // 1. Načítání skončilo (isLoading === false)
-    // 2. A ZÁROVEŇ uživatel neexistuje (user === null)
-    if (!isLoading && !user) {
+    if (!authLoading && !user) {
       router.push("/");
     }
-  }, [user, isLoading, router]); // Sledujeme obě proměnné
+  }, [user, authLoading, router]);
 
-  // ZMĚNA 3: "Loading Guard"
-  // Zobrazí "Načítám...", dokud probíhá ověření NEBO pokud není uživatel
-  if (isLoading || !user) {
+  if (authLoading || dataLoading || !user) {
     return <p className="text-sm text-muted-foreground">Načítám…</p>;
   }
 

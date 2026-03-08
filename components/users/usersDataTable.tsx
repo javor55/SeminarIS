@@ -27,9 +27,9 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Filter, Settings2 } from "lucide-react";
-import { updateUserRole, toggleUserActive } from "@/lib/mock-db";
+import { updateUserRole, toggleUserActive } from "@/lib/data";
 
-export function UsersDataTable({ data }: { data: UserRow[] }) {
+export function UsersDataTable({ data, forceRefresh }: { data: UserRow[], forceRefresh?: () => void }) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnFilters, setColumnFilters] = React.useState<any>([]);
   const [globalFilter, setGlobalFilter] = React.useState("");
@@ -96,23 +96,24 @@ export function UsersDataTable({ data }: { data: UserRow[] }) {
     safePageIndex * pageSize + pageSize
   );
 
-  function applyBulk() {
-    filteredRows.forEach((row) => {
+  async function applyBulk() {
+    await Promise.all(filteredRows.map(async (row) => {
       const u = row.original;
       if (bulkRole) {
-        updateUserRole(u.id, bulkRole);
+        await updateUserRole(u.id, bulkRole);
       }
       if (bulkStatus) {
         const desiredActive = bulkStatus === "ACTIVE";
         const currentActive = u.isActive !== false;
         if (currentActive !== desiredActive) {
-          toggleUserActive(u.id);
+          await toggleUserActive(u.id);
         }
       }
-    });
+    }));
     setBulkRole("");
     setBulkStatus("");
     table.resetRowSelection();
+    if (forceRefresh) forceRefresh();
   }
 
   return (

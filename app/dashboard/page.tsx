@@ -1,8 +1,7 @@
 // app/dashboard/page.tsx
 "use client";
 
-// 1. Přidáme importy pro useEffect a useRouter
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -21,7 +20,7 @@ function findDashboardEnrollment(
   // ... (vaše logika pro findDashboardEnrollment zůstává stejná)
   // 1. Předfiltrování podle role
   const windowsToSearch =
-    currentUser.role === "STUDENT"
+    currentUser.role === "STUDENT" || currentUser.role === "GUEST"
       ? allWindows.filter((ew) => ew.visibleToStudents)
       : allWindows;
 
@@ -55,38 +54,47 @@ function findDashboardEnrollment(
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth();
-  const router = useRouter(); // 2. Inicializujeme router
+  const { user, isLoading: authLoading } = useAuth();
+  const router = useRouter(); 
 
-  // --- Začátek úpravy ---
+  const [enrollmentToShow, setEnrollmentToShow] = useState<EnrollmentWindow | null>(null);
+  const [ew, setEw] = useState<any | null>(null); // Type any for simplified casting
+  const [dataLoading, setDataLoading] = useState(true);
 
-  // 3. Přidáme useEffect pro přesměrování
   useEffect(() => {
-    // Pokud 'user' není k dispozici, přesměrujeme
-    if (!user) {
+    if (!authLoading && !user) {
       router.push("/");
     }
-  }, [user, router]); // Sledujeme změny 'user'
+  }, [user, authLoading, router]);
 
-  // --- Konec úpravy ---
+  useEffect(() => {
+    async function loadDashboardData() {
+      if (!user) return;
+      setDataLoading(true);
+      try {
+        const visible = await getEnrollmentWindowsVisible();
+        const found = findDashboardEnrollment(visible as any[], user as any);
+        setEnrollmentToShow(found as any);
+        if (found) {
+           const detailed = await getEnrollmentWindowByIdWithBlocks(found.id);
+           setEw(detailed);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setDataLoading(false);
+      }
+    }
+    loadDashboardData();
+  }, [user]);
 
-  // Logika pro nalezení 'ew' musí jít až za 'user' guard
-  // (nebo musí být podmíněná jako zde)
-  const enrollmentToShow = user
-    ? findDashboardEnrollment(getEnrollmentWindowsVisible() ?? [], user)
-    : null;
-
-  const ew = enrollmentToShow
-    ? getEnrollmentWindowByIdWithBlocks(enrollmentToShow.id)
-    : null;
-
-  // 4. Tento "guard" je již na správném místě
-  // Zastaví vykreslení, dokud probíhá přesměrování
-  if (!user) {
-    return null; // Čekání na přihlášení / přesměrování
+  if (authLoading || dataLoading) {
+    return null; 
   }
 
-  // Od tohoto bodu níže máme jistotu, že 'user' existuje.
+  if (!user) {
+    return null;
+  }
 
   if (!ew) {
     return (
@@ -100,5 +108,5 @@ export default function DashboardPage() {
     );
   }
 
-  return <EnrollmentView enrollmentWindow={ew} currentUser={user} />;
+  return <EnrollmentView enrollmentWindow={ew} currentUser={user as any} />;
 }

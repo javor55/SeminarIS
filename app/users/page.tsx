@@ -1,16 +1,19 @@
 "use client";
 
-// ZMĚNA 1: Přidání 'useEffect'
-import * as React from "react"; // Potřeba pro useState, useEffect
-import { useRouter } from "next/navigation"; // ZMĚNA 2: Import routeru
-import { useAuth } from "@/components/auth/auth-provider"; // ZMĚNA 3: Import useAuth
-
-import { getAllUsers } from "@/lib/data";
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth/auth-provider";
+import { 
+  getAllUsers, 
+  updateUserRole, 
+  toggleUserActive, 
+  getGlobalCohort, 
+  setGlobalCohort,
+  updateUsersCohort
+} from "@/lib/data";
 import { DataTable } from "@/components/ui/data-table";
 import { usersColumns, UserRow } from "@/components/users/users-columns";
-import { updateUserRole, toggleUserActive } from "@/lib/mock-db";
 
-// ... (všechny ostatní importy UI komponent zůstávají stejné)
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -21,46 +24,64 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 export default function UsersPage() {
-  // ZMĚNA 4: Načtení 'user', 'isLoading' a inicializace 'router'
   const { user, isLoading } = useAuth();
   const router = useRouter();
 
-  // ZMĚNA 5: "Auth Guard" (Hlídač přihlášení)
+  const [users, setUsers] = React.useState<UserRow[]>([]);
+  const [dataLoading, setDataLoading] = React.useState(true);
+  const [globalCohort, setGlobalCohortState] = React.useState("");
+
+  const loadData = React.useCallback(async () => {
+    setDataLoading(true);
+    try {
+      const [dbUsers, cohort] = await Promise.all([
+        getAllUsers(),
+        getGlobalCohort()
+      ]);
+      setUsers(dbUsers as unknown as UserRow[]);
+      setGlobalCohortState(cohort);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDataLoading(false);
+    }
+  }, []);
+
   React.useEffect(() => {
-    // Pokud načítání skončilo A uživatel není přihlášen, přesměruj
     if (!isLoading && !user) {
       router.push("/");
     }
   }, [user, isLoading, router]);
 
-  // ZMĚNA 6: Zobrazení "Načítám..." dokud probíhá ověření
-  if (isLoading || !user) {
-    // Čekáme, dokud se 'isLoading' nevypne a 'user' nenačte
-    return null; // Nebo <p>Načítám...</p>
-  }
+  React.useEffect(() => {
+    if (user?.role === "ADMIN") {
+      loadData();
+    }
+  }, [user, loadData]);
 
-  // ZMĚNA 7: "Authorization Guard" (Hlídač oprávnění)
-  // V tomto bodě víme, že 'user' je přihlášen.
+  if (isLoading || !user) return null;
   if (user.role !== "ADMIN") {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold">Přístup odepřen</h1>
-        <p className="text-muted-foreground">
-          Pro přístup k této stránce nemáte dostatečné oprávnění.
-        </p>
+        <p className="text-muted-foreground">Pro přístup k této stránce nemáte dostatečné oprávnění.</p>
       </div>
     );
   }
-  
-  // --- Konec změn ---
-  // Zbytek kódu se vykoná POUZE pokud je uživatel ADMIN
 
-  // 1. Načtení dat
-  const users = (getAllUsers() ?? []) as UserRow[];
+  const handleUpdateGlobalCohort = async () => {
+    try {
+      await setGlobalCohort(globalCohort);
+      alert("Výchozí ročník byl uložen.");
+    } catch (e: any) {
+      alert("Chyba při ukládání: " + e.message);
+    }
+  };
 
-  // 2. Definice voleb pro filtry
   const roleFilterOptions = [
     { label: "Admin", value: "ADMIN" },
     { label: "Učitel", value: "TEACHER" },
@@ -73,7 +94,10 @@ export default function UsersPage() {
     { label: "Neaktivní", value: "inactive" },
   ];
 
-  // 3. 🔥 Funkce pro renderování hromadných akcí
+  const cohortOptions = Array.from(new Set(users.map(u => u.cohort).filter(Boolean)))
+    .sort()
+    .map(c => ({ label: String(c), value: String(c) }));
+
   const renderBulkActions = ({
     filteredRows,
     forceRefresh,
@@ -82,81 +106,80 @@ export default function UsersPage() {
     forceRefresh: () => void;
   }) => {
     const [selectedRole, setSelectedRole] = React.useState<string | null>(null);
+    const [selectedCohort, setSelectedCohort] = React.useState<string>("");
 
-    // Hromadně nastaví roli
-    const handleBulkSetRole = () => {
+    const handleBulkSetRole = async () => {
       if (!selectedRole) return;
-      filteredRows.forEach((user) => {
-        updateUserRole(user.id, selectedRole);
-      });
+      if (!window.confirm(`Opravdu chcete nastavit roli ${selectedRole} pro ${filteredRows.length} uživatelů?`)) return;
+      await Promise.all(filteredRows.map((u) => updateUserRole(u.id, selectedRole)));
       forceRefresh();
     };
 
-    // Hromadně nastaví stav
-    const handleBulkSetActive = (setActive: boolean) => {
-      filteredRows.forEach((user) => {
-        const currentState = user.isActive !== false;
-        if (currentState !== setActive) {
-          toggleUserActive(user.id);
-        }
-      });
+    const handleBulkSetCohort = async () => {
+      if (!selectedCohort) return;
+      if (!window.confirm(`Opravdu chcete nastavit ročník "${selectedCohort}" pro ${filteredRows.length} uživatelů?`)) return;
+      await updateUsersCohort(filteredRows.map(u => u.id), selectedCohort);
+      forceRefresh();
+    };
+
+    const handleBulkSetActive = async (setActive: boolean) => {
+      const action = setActive ? "aktivovat" : "deaktivovat";
+      if (!window.confirm(`Opravdu chcete ${action} ${filteredRows.length} uživatelů?`)) return;
+      await Promise.all(
+        filteredRows.map(async (u) => {
+          const currentState = u.isActive !== false;
+          if (currentState !== setActive) await toggleUserActive(u.id);
+        })
+      );
       forceRefresh();
     };
 
     return (
-      <div className="space-y-4">
-        <p className="text-sm font-medium text-muted-foreground">
-          Akce pro {filteredRows.length} vyfiltrovaných uživatelů
+      <div className="space-y-4 p-2 min-w-[200px]">
+        <p className="text-sm font-medium text-muted-foreground border-b pb-2">
+          Akce pro {filteredRows.length} uživatelů
         </p>
 
-        {/* --- Nastavení role --- */}
-        <div className="space-y-2">
-          <Label className="text-xs">Nastavit roli</Label>
-          <div className="flex gap-2">
-            <Select
-              value={selectedRole ?? ""}
-              onValueChange={setSelectedRole}
-            >
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Vyberte roli..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ADMIN">ADMIN</SelectItem>
-                <SelectItem value="TEACHER">TEACHER</SelectItem>
-                <SelectItem value="STUDENT">STUDENT</SelectItem>
-                <SelectItem value="GUEST">GUEST</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              size="sm"
-              onClick={handleBulkSetRole}
-              disabled={!selectedRole}
-            >
-              Nastavit
-            </Button>
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label className="text-xs">Hromadná změna role</Label>
+            <div className="flex gap-2">
+              <Select value={selectedRole ?? ""} onValueChange={setSelectedRole}>
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="Role..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ADMIN">ADMIN</SelectItem>
+                  <SelectItem value="TEACHER">TEACHER</SelectItem>
+                  <SelectItem value="STUDENT">STUDENT</SelectItem>
+                  <SelectItem value="GUEST">GUEST</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button size="sm" className="h-8 shadow-none" onClick={handleBulkSetRole} disabled={!selectedRole}>OK</Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">Hromadná změna ročníku</Label>
+            <div className="flex gap-2">
+              <Input 
+                className="h-8" 
+                placeholder="2024/25" 
+                value={selectedCohort} 
+                onChange={(e) => setSelectedCohort(e.target.value)} 
+              />
+              <Button size="sm" className="h-8 shadow-none" onClick={handleBulkSetCohort} disabled={!selectedCohort}>OK</Button>
+            </div>
           </div>
         </div>
 
         <Separator />
 
-        {/* --- Nastavení stavu --- */}
         <div className="space-y-2">
-          <Label className="text-xs">Nastavit stav</Label>
+          <Label className="text-xs">Změna aktivního stavu</Label>
           <div className="grid grid-cols-2 gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleBulkSetActive(true)}
-            >
-              Aktivovat
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleBulkSetActive(false)}
-            >
-              Deaktivovat
-            </Button>
+            <Button size="sm" variant="outline" className="h-8" onClick={() => handleBulkSetActive(true)}>Aktivovat</Button>
+            <Button size="sm" variant="outline" className="h-8" onClick={() => handleBulkSetActive(false)}>Deaktivovat</Button>
           </div>
         </div>
       </div>
@@ -164,18 +187,57 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="space-y-4">
-      {/* HLAVIČKA */}
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Uživatelé</h1>
-          <p className="text-sm text-muted-foreground">
-            Správa uživatelů v systému.
-          </p>
+          <h1 className="text-2xl font-semibold">Správa uživatelů</h1>
+          <p className="text-sm text-muted-foreground">Komplexní správa rolí, ročníků a stavů zápisů.</p>
         </div>
       </div>
 
-      {/* TABULKA */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="md:col-span-1 border-emerald-100 bg-emerald-50/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-md">Systémový ročník</CardTitle>
+            <CardDescription className="text-xs text-balance">Výchozí hodnota pro nově registrované uživatele.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Input 
+                id="cohort" 
+                placeholder="např. 2024/2025" 
+                value={globalCohort} 
+                onChange={(e) => setGlobalCohortState(e.target.value)} 
+                className="bg-white"
+              />
+            </div>
+            <Button className="w-full" size="sm" onClick={handleUpdateGlobalCohort}>Aktualizovat globálně</Button>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-md">Statistiky a přehled</CardTitle>
+          </CardHeader>
+          <CardContent>
+             <div className="flex gap-10 text-center items-center h-full pt-2">
+                <div>
+                  <p className="text-3xl font-bold">{users.filter(u => u.role === "STUDENT").length}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Studentů</p>
+                </div>
+                <div className="border-l pl-10">
+                  <p className="text-3xl font-bold text-emerald-600">{users.filter(u => u.cohort === globalCohort).length}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">V ročníku {globalCohort || "?"}</p>
+                </div>
+                <div className="border-l pl-10">
+                  <p className="text-3xl font-bold text-orange-600">{users.filter(u => u.role === "GUEST").length}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Čeká na schválení</p>
+                </div>
+             </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <DataTable<UserRow>
         data={users}
         columns={usersColumns}
@@ -189,24 +251,26 @@ export default function UsersPage() {
           },
           {
             columnId: "isActive",
-            label: "Stav",
+            label: "Stav účtu",
             options: activeFilterOptions,
           },
-        ]}
-        dateFilters={[
           {
-            id: "createdAt",
-            label: "Vytvořen",
-            getDate: (u) => (u.createdAt ? new Date(u.createdAt) : null),
+            columnId: "cohort",
+            label: "Ročník",
+            options: cohortOptions,
           },
           {
-            id: "lastLoginAt",
-            label: "Poslední přihlášení",
-            getDate: (u) => (u.lastLoginAt ? new Date(u.lastLoginAt) : null),
-          },
+            columnId: "enrollmentStatus",
+            label: "Stav zápisů",
+            options: [
+              { label: "S aktivním zápisem", value: "active" },
+              { label: "S naplánovaným zápisem", value: "scheduled" },
+              { label: "Pouze historie", value: "history" },
+              { label: "Bez zápisů", value: "none" },
+            ],
+          }
         ]}
-        
-        
+        forceRefresh={loadData}
         bulkPopoverRender={renderBulkActions}
       />
     </div>

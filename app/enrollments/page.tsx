@@ -16,7 +16,7 @@ import {
   getEnrollmentColumns,
   EnrollmentRow,
 } from "@/components/enrollment/enrollment-columns";
-import { EnrollmentWindow, EnrollmentStatus } from "@/lib/types";
+import { EnrollmentWindow, EnrollmentStatus, User } from "@/lib/types";
 
 // ... (Mock data 'newEnrollmentMock' zůstává stejná)
 const newEnrollmentMock = {
@@ -34,6 +34,9 @@ export default function EnrollmentsPage() {
   const { user, isLoading } = useAuth();
   const [editEnrollment, setEditEnrollment] = useState<any | null>(null);
 
+  const [enrollmentWithBlocks, setEnrollmentWithBlocks] = useState<any[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
   // --- Začátek úpravy "Auth Guard" ---
 
   // ZMĚNA 2: "Auth Guard" (Hlídač přihlášení)
@@ -47,37 +50,16 @@ export default function EnrollmentsPage() {
     }
   }, [user, isLoading, router]);
 
-  // ZMĚNA 3: "Loading Guard"
-  // Zobrazí "nic" (null), dokud probíhá ověření NEBO pokud není uživatel
-  if (isLoading || !user) {
-    return null; // Čekáme na načtení nebo přesměrování
-  }
+  useEffect(() => {
+    async function fetch() {
+      const visible = await getEnrollmentWindowsVisible();
+      const withB = await Promise.all(visible.map((ew: any) => getEnrollmentWindowByIdWithBlocks(ew.id)));
+      setEnrollmentWithBlocks(withB.filter(Boolean) as any[]);
+      setLoadingData(false);
+    }
+    fetch();
+  }, []);
 
-  // ZMĚNA 4: "Authorization Guard" (Hlídač oprávnění)
-  // V tomto bodě víme, že 'user' je přihlášen.
-  const isAllowed = user.role === "ADMIN" || user.role === "TEACHER";
-
-  if (!isAllowed) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Přístup odepřen</h1>
-        <p className="text-muted-foreground">
-          Pro přístup k této stránce nemáte dostatečné oprávnění.
-        </p>
-      </div>
-    );
-  }
-
-  // --- Konec úpravy ---
-
-  // Od tohoto bodu níže máme jistotu, že 'user' je ADMIN nebo TEACHER.
-
-  const visible = getEnrollmentWindowsVisible();
-  const enrollmentWithBlocks = visible
-    .map((ew) => getEnrollmentWindowByIdWithBlocks(ew.id))
-    .filter(Boolean) as any[];
-
-  // ... (Celá logika pro 'rows' zůstává stejná)
   const rows = useMemo(() => {
     return enrollmentWithBlocks.map((ew) => {
       // ... (vaše mapovací logika)
@@ -131,15 +113,41 @@ export default function EnrollmentsPage() {
     });
   }, [enrollmentWithBlocks]);
 
-  // 'user' zde již bezpečně existuje
   const columns = useMemo(
     () =>
       getEnrollmentColumns({
-        currentUser: user,
+        currentUser: user as User,
         onEdit: (row) => setEditEnrollment(row.fullData),
       }),
     [user]
   );
+
+  // ZMĚNA 3: "Loading Guard"
+  // Zobrazí "nic" (null), dokud probíhá ověření NEBO pokud není uživatel
+  if (isLoading || !user) {
+    return null; // Čekáme na načtení nebo přesměrování
+  }
+
+  // ZMĚNA 4: "Authorization Guard" (Hlídač oprávnění)
+  // V tomto bodě víme, že 'user' je přihlášen.
+  const isAllowed = user.role === "ADMIN" || user.role === "TEACHER";
+
+  if (!isAllowed) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-semibold">Přístup odepřen</h1>
+        <p className="text-muted-foreground">
+          Pro přístup k této stránce nemáte dostatečné oprávnění.
+        </p>
+      </div>
+    );
+  }
+
+  // --- Konec úpravy ---
+
+  if (loadingData) return <p className="mt-8 text-center text-muted-foreground">Načítám data zápisů...</p>;
+
+
 
   return (
     <>

@@ -3,90 +3,54 @@
 import React, {
   createContext,
   useContext,
-  useEffect,
-  useState,
   ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/lib/types";
-import { users } from "@/lib/mock-db";
+import { SessionProvider, useSession, signIn, signOut } from "next-auth/react";
 
-// ZMĚNA 1: Rozšíření typu o 'isLoading'
 type AuthContextValue = {
   user: User | null;
-  isLoading: boolean; // <-- Přidáno
+  isLoading: boolean;
   login: (email: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
-  mockUsers: User[];
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  return (
+    <SessionProvider>
+      <AuthContextWrapper>{children}</AuthContextWrapper>
+    </SessionProvider>
+  );
+}
+
+function AuthContextWrapper({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const { data: session, status } = useSession();
   
-  // ZMĚNA 2: Přidání 'isLoading' stavu, výchozí je 'true'
-  const [isLoading, setIsLoading] = useState(true);
+  const isLoading = status === "loading";
+  const user = session?.user as User | null;
 
-  // 🧭 při startu načteme usera z localStorage
-  useEffect(() => {
-    // Vaše logika byla v pořádku, jen musíme na konci
-    // nastavit 'isLoading' na 'false'
-    
-    // Okamžitě nastavíme 'true' na začátku (i když je to teď výchozí)
-    setIsLoading(true); 
-    
-    if (typeof window === "undefined") {
-      setIsLoading(false); // Jsme na serveru, nenačítáme
-      return;
-    }
-    
-    try {
-      const saved = window.localStorage.getItem("zapis_user");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setUser(parsed);
-      }
-    } catch {
-      // ignore error, user zůstane null
-    }
-    
-    // ZMĚNA 3: Klíčový krok. Až PO kontrole localStorage
-    // prohlásíme, že načítání skončilo.
-    setIsLoading(false);
-    
-  }, []); // Tento efekt se spustí jen jednou
-
-  // 💾 při změně usera uložíme do localStorage
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (user) {
-      window.localStorage.setItem("zapis_user", JSON.stringify(user));
-    } else {
-      window.localStorage.removeItem("zapis_user");
-    }
-  }, [user]);
-
-  // 🔐 Přihlášení – jen podle e-mailu
+  // 🔐 Přihlášení přes NextAuth credentials provider
   const login = async (email: string, password?: string) => {
-    const found = users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
-    if (!found) {
-      throw new Error("Uživatel s tímto e-mailem nebyl nalezen.");
+    const res = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+    
+    if (res?.error) {
+      throw new Error(res.error);
     }
-
-    setUser(found);
+    
     router.push("/dashboard");
   }
 
-  // 🚪 Odhlášení – smaže usera a přesměruje na úvod
+  // 🚪 Odhlášení
   async function logout() {
-    setUser(null);
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("zapis_user");
-    }
+    await signOut({ redirect: false });
     router.push("/");
   }
 
@@ -94,10 +58,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        isLoading, // ZMĚNA 4: Poskytnutí 'isLoading' stavu
+        isLoading,
         login,
         logout,
-        mockUsers: users,
       }}
     >
       {children}

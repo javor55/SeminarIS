@@ -1,6 +1,6 @@
 
 import { PrismaClient } from "@prisma/client";
-
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -11,6 +11,9 @@ async function main() {
   const student1Id = "usr_stud1";
   const student2Id = "usr_stud2";
 
+  const defaultPassword = "password123";
+  const hashedPw = await bcrypt.hash(defaultPassword, 10);
+
   // 1) Users
   await prisma.user.createMany({
     data: [
@@ -19,7 +22,7 @@ async function main() {
         firstName: "Admin",
         lastName: "Systému",
         email: "admin@skola.cz",
-        passwordHash: null,
+        passwordHash: hashedPw,
         role: "ADMIN",
         isActive: true,
       },
@@ -28,7 +31,7 @@ async function main() {
         firstName: "Petr",
         lastName: "Učitel",
         email: "teacher@skola.cz",
-        passwordHash: null,
+        passwordHash: hashedPw,
         role: "TEACHER",
         isActive: true,
       },
@@ -37,7 +40,7 @@ async function main() {
         firstName: "Jan",
         lastName: "Student",
         email: "jan.student@skola.cz",
-        passwordHash: null,
+        passwordHash: hashedPw,
         role: "STUDENT",
         isActive: true,
       },
@@ -46,7 +49,7 @@ async function main() {
         firstName: "Eva",
         lastName: "Studentová",
         email: "eva.studentova@skola.cz",
-        passwordHash: null,
+        passwordHash: hashedPw,
         role: "STUDENT",
         isActive: true,
       },
@@ -97,6 +100,7 @@ async function main() {
       description: "Zápis na semináře pro letní semestr 2025",
       status: "OPEN",
       startsAt: new Date(Date.now() - 1000 * 60 * 60), // hodinu zpět
+      endsAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // za týden
       visibleToStudents: true,
       createdById: adminId,
     },

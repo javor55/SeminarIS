@@ -23,11 +23,13 @@
     "@tiptap/extension-text-style": "^3.10.4",
     "@tiptap/react": "^3.10.4",
     "@tiptap/starter-kit": "^3.10.4",
+    "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.446.0",
     "next": "^14.2.33",
+    "next-auth": "^4.24.13",
     "react": "18.3.1",
     "react-day-picker": "^9.11.1",
     "react-dom": "18.3.1",
@@ -36,6 +38,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.7.4",
     "@types/react": "^18.3.10",
     "@types/react-dom": "^18.3.0",

@@ -4,9 +4,19 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Subject } from "@/lib/types";
 import Link from "next/link";
 import { getAllUsers } from "@/lib/data";
+import { useState, useEffect } from "react";
 
-const users = getAllUsers();
-const userMap = new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName}`]));
+const UserCell = ({ userId }: { userId?: string | null }) => {
+  const [name, setName] = useState<string>("—");
+  useEffect(() => {
+    if (!userId) return;
+    getAllUsers().then((users) => {
+      const u = users.find(x => x.id === userId);
+      if (u) setName(`${u.firstName} ${u.lastName}`);
+    }).catch(() => {});
+  }, [userId]);
+  return <span>{name}</span>;
+};
 
 export type SubjectRow = Subject & {
   createdAt?: string;
@@ -39,8 +49,7 @@ export const subjectsColumns: ColumnDef<SubjectRow>[] = [
   {
     accessorKey: "createdById",
     header: "Vytvořil",
-    //cell: ({ row }) => row.original.createdById ?? "—",
-    cell: ({ row }) => userMap.get(row.original.createdById) ?? row.original.createdById ?? "—",
+    cell: ({ row }) => <UserCell userId={row.original.createdById} />,
   },
   {
     accessorKey: "createdAt",
@@ -53,8 +62,7 @@ export const subjectsColumns: ColumnDef<SubjectRow>[] = [
     {
     accessorKey: "updatedById",
     header: "Upravil",
-    //cell: ({ row }) => row.original.updatedById ?? "—",
-    cell: ({ row }) => userMap.get(row.original.updatedById) ?? row.original.updatedById ?? "—",
+    cell: ({ row }) => <UserCell userId={row.original.updatedById} />,
 
   },
   {

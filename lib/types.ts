@@ -7,9 +7,10 @@ export type User = {
   email: string;
   role: Role;
   isActive: boolean;
-  lastLoginAt?: string;
-  createdAt: string;
-  updatedAt: string;
+  cohort?: string | null;
+  lastLoginAt?: string | Date | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
 };
 
 export type EnrollmentStatus = "DRAFT" | "SCHEDULED" | "OPEN" | "CLOSED";
@@ -44,7 +45,7 @@ export type Block = {
 export type Subject = {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   code?: string;
   syllabus: string;
   createdById: string;

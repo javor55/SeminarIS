@@ -1,7 +1,7 @@
 // app/enrollments/[id]/page.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { getEnrollmentWindowByIdWithBlocks } from "@/lib/data";
@@ -16,6 +16,9 @@ export default function EnrollmentDetailPage({
   const { user, isLoading } = useAuth();
   const router = useRouter();
 
+  const [ew, setEw] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
   // --- Začátek úpravy "Auth Guard" ---
 
   // ZMĚNA 2: "Auth Guard" (Hlídač přihlášení)
@@ -28,6 +31,14 @@ export default function EnrollmentDetailPage({
       router.push("/");
     }
   }, [user, isLoading, router]); // Sledujeme obě proměnné
+
+  useEffect(() => {
+    async function load() {
+       setEw(await getEnrollmentWindowByIdWithBlocks(params.id));
+       setLoading(false);
+    }
+    load();
+  }, [params.id]);
 
   // ZMĚNA 3: "Loading Guard"
   // Zobrazí "nic" (null), dokud probíhá ověření NEBO pokud není uživatel
@@ -53,8 +64,7 @@ export default function EnrollmentDetailPage({
 
   // --- Konec úpravy ---
 
-  // Kód níže se provede pouze v případě, že 'user' je ADMIN nebo TEACHER.
-  const ew = getEnrollmentWindowByIdWithBlocks(params.id);
+  if (loading) return <p className="mt-8 text-center text-muted-foreground">Načítám záznamy...</p>;
 
   if (!ew) {
     return (

@@ -5,7 +5,7 @@ import { Block, SubjectOccurrence } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { EditBlockDialog } from "@/components/blocks/EditBlockDialog";
 import { EditSubjectOccurrenceDialog } from "@/components/occurrences/EditSubjectOccurrenceDialog";
-import { moveBlock, deleteBlock } from "@/lib/mock-db";
+import { moveBlock, deleteBlock } from "@/lib/data";
 import { toast } from "sonner";
 
 export function BlockHeader({
@@ -77,8 +77,8 @@ export function BlockHeader({
               variant="outline"
               size="sm"
               disabled={blockIndex === 0}
-              onClick={() => {
-                const ok = moveBlock(block.id, "UP");
+              onClick={async () => {
+                const ok = await moveBlock(block.id, "UP");
                 if (ok) toast.success("Blok posunut nahoru");
                 else toast.error("Blok nelze posunout výš");
               }}
@@ -91,8 +91,8 @@ export function BlockHeader({
               variant="outline"
               size="sm"
               disabled={blockIndex === totalBlocks - 1}
-              onClick={() => {
-                const ok = moveBlock(block.id, "DOWN");
+              onClick={async () => {
+                const ok = await moveBlock(block.id, "DOWN");
                 if (ok) toast.success("Blok posunut dolů");
                 else toast.error("Blok nelze posunout níž");
               }}
@@ -105,13 +105,13 @@ export function BlockHeader({
               variant="destructive"
               size="sm"
               disabled={hasOccurrences}
-              onClick={() => {
+              onClick={async () => {
                 if (hasOccurrences) {
                   toast.error("Nelze smazat blok s předměty");
                   return;
                 }
-                const ok = deleteBlock(block.id);
-                if (ok) toast.success("Blok byl smazán");
+                const res = await deleteBlock(block.id);
+                if (res) toast.success("Blok byl smazán");
                 else toast.error("Blok se nepodařilo smazat");
               }}
             >
