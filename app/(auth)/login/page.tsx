@@ -5,7 +5,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label"; 
-import { getAllUsers } from "@/lib/data";
+import { getPublicTestUsers } from "@/lib/data";
 import { User } from "@/lib/types";
 
 export default function LoginPage() {
@@ -19,7 +19,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     async function fetchUsers() {
-      const dbUsers = await getAllUsers();
+      const dbUsers = await getPublicTestUsers();
       setMockUsers(dbUsers as User[]);
     }
     fetchUsers();

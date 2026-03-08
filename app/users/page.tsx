@@ -11,6 +11,7 @@ import {
   setGlobalCohort,
   updateUsersCohort
 } from "@/lib/data";
+import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
 import { usersColumns, UserRow } from "@/components/users/users-columns";
 
@@ -76,9 +77,10 @@ export default function UsersPage() {
   const handleUpdateGlobalCohort = async () => {
     try {
       await setGlobalCohort(globalCohort);
-      alert("Výchozí ročník byl uložen.");
+      toast.success("Výchozí ročník byl uložen.");
+      loadData(); // Refresh stats
     } catch (e: any) {
-      alert("Chyba při ukládání: " + e.message);
+      toast.error("Chyba při ukládání: " + e.message);
     }
   };
 
@@ -111,27 +113,54 @@ export default function UsersPage() {
     const handleBulkSetRole = async () => {
       if (!selectedRole) return;
       if (!window.confirm(`Opravdu chcete nastavit roli ${selectedRole} pro ${filteredRows.length} uživatelů?`)) return;
-      await Promise.all(filteredRows.map((u) => updateUserRole(u.id, selectedRole)));
-      forceRefresh();
+      setDataLoading(true);
+      try {
+        await Promise.all(filteredRows.map((u) => updateUserRole(u.id, selectedRole)));
+        toast.success(`Role byla nastavena pro ${filteredRows.length} uživatelů.`);
+        forceRefresh();
+      } catch (e: any) {
+        toast.error("Chyba při hromadné změně role: " + e.message);
+      } finally {
+        setDataLoading(false);
+      }
     };
 
     const handleBulkSetCohort = async () => {
       if (!selectedCohort) return;
       if (!window.confirm(`Opravdu chcete nastavit ročník "${selectedCohort}" pro ${filteredRows.length} uživatelů?`)) return;
-      await updateUsersCohort(filteredRows.map(u => u.id), selectedCohort);
-      forceRefresh();
+      setDataLoading(true);
+      try {
+        await updateUsersCohort(filteredRows.map(u => u.id), selectedCohort);
+        toast.success(`Ročník byl nastaven pro ${filteredRows.length} uživatelů.`);
+        forceRefresh();
+      } catch (e: any) {
+        toast.error("Chyba při hromadné změně ročníku: " + e.message);
+      } finally {
+        setDataLoading(false);
+      }
     };
 
     const handleBulkSetActive = async (setActive: boolean) => {
       const action = setActive ? "aktivovat" : "deaktivovat";
       if (!window.confirm(`Opravdu chcete ${action} ${filteredRows.length} uživatelů?`)) return;
-      await Promise.all(
-        filteredRows.map(async (u) => {
-          const currentState = u.isActive !== false;
-          if (currentState !== setActive) await toggleUserActive(u.id);
-        })
-      );
-      forceRefresh();
+      setDataLoading(true);
+      try {
+        await Promise.all(
+          filteredRows.map(async (u) => {
+            const currentState = u.isActive !== false;
+            // Prevent self-deactivation in bulk as well (server will catch it but UI should be clean)
+            const isSelf = u.id === user?.id || u.email === user?.email;
+            if (isSelf && !setActive) return; 
+            if (currentState !== setActive) await toggleUserActive(u.id);
+          })
+        );
+        toast.success(`Stav byl změněn pro ${filteredRows.length} uživatelů.`);
+        forceRefresh();
+      } catch (e: any) {
+        toast.error(`Chyba při hromadné akci (${action}): ` + e.message);
+      } finally {
+        setDataLoading(false);
+      }
     };
 
     return (
@@ -220,18 +249,30 @@ export default function UsersPage() {
             <CardTitle className="text-md">Statistiky a přehled</CardTitle>
           </CardHeader>
           <CardContent>
-             <div className="flex gap-10 text-center items-center h-full pt-2">
-                <div>
-                  <p className="text-3xl font-bold">{users.filter(u => u.role === "STUDENT").length}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Studentů</p>
+             <div className="flex gap-8 text-center items-center h-full pt-2 overflow-x-auto no-scrollbar">
+                <div className="flex-shrink-0">
+                  <p className="text-2xl font-bold">
+                    {users.filter(u => u.role === "STUDENT" && u.cohort === globalCohort && u.isActive !== false).length}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Studentů v ročníku</p>
                 </div>
-                <div className="border-l pl-10">
-                  <p className="text-3xl font-bold text-emerald-600">{users.filter(u => u.cohort === globalCohort).length}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">V ročníku {globalCohort || "?"}</p>
-                </div>
-                <div className="border-l pl-10">
-                  <p className="text-3xl font-bold text-orange-600">{users.filter(u => u.role === "GUEST").length}</p>
+                <div className="border-l pl-8 flex-shrink-0">
+                  <p className="text-2xl font-bold text-orange-600">
+                    {users.filter(u => u.role === "GUEST" && u.cohort === globalCohort && u.isActive !== false).length}
+                  </p>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Čeká na schválení</p>
+                </div>
+                <div className="border-l pl-8 flex-shrink-0">
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {users.filter(u => u.role === "STUDENT" && u.cohort === globalCohort && u.isActive !== false && (u.studentEnrollments?.length ?? 0) > 0).length}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Zapsaní v ročníku</p>
+                </div>
+                <div className="border-l pl-8 flex-shrink-0">
+                  <p className="text-2xl font-bold text-rose-600">
+                    {users.filter(u => u.role === "STUDENT" && u.cohort === globalCohort && u.isActive !== false && (u.studentEnrollments?.length ?? 0) === 0).length}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Nezapsaní v ročníku</p>
                 </div>
              </div>
           </CardContent>
@@ -269,6 +310,18 @@ export default function UsersPage() {
               { label: "Bez zápisů", value: "none" },
             ],
           }
+        ]}
+        dateFilters={[
+          {
+            id: "createdAt",
+            label: "Datum registrace",
+            getDate: (u) => u.createdAt ? new Date(u.createdAt) : null,
+          },
+          {
+            id: "lastLoginAt",
+            label: "Poslední přihlášení",
+            getDate: (u) => u.lastLoginAt ? new Date(u.lastLoginAt) : null,
+          },
         ]}
         forceRefresh={loadData}
         bulkPopoverRender={renderBulkActions}

@@ -95,6 +95,7 @@ export async function getAllUsers() {
           include: {
             subjectOccurrence: {
               include: {
+                subject: true,
                 block: {
                   include: {
                     enrollmentWindow: true,
@@ -113,6 +114,26 @@ export async function getAllUsers() {
   } catch (err: any) {
     console.error("ServerAction Error (getAllUsers):", err.message);
     throw err;
+  }
+}
+
+// Veřejná funkce pro přihlašovací stránku (demo/testování)
+export async function getPublicTestUsers() {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+      },
+      take: 20,
+    });
+    return JSON.parse(JSON.stringify(users));
+  } catch (err) {
+    console.error("Error fetching public test users:", err);
+    return [];
   }
 }
 
@@ -248,7 +269,16 @@ export async function updateSubject(subject: any) {
 }
 
 export async function updateUserRole(userId: string, role: string) {
-  await requireAdmin();
+  const admin = await requireAdmin();
+  // Zpřísnění kontroly: kontrolujeme ID i Email v session vs cílový uživatel
+  const target = await prisma.user.findUnique({ where: { id: userId } });
+  if (!target) throw new Error("Uživatel nenalezen.");
+
+  const isSelf = admin.id === userId || admin.email.toLowerCase() === target.email.toLowerCase();
+
+  if (isSelf) {
+    throw new Error("Nemůžete změnit roli sami sobě (prevence ztráty přístupu).");
+  }
   return await prisma.user.update({
     where: { id: userId },
     data: { role: role as any },
@@ -256,9 +286,15 @@ export async function updateUserRole(userId: string, role: string) {
 }
 
 export async function toggleUserActive(userId: string) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const targetUser = await prisma.user.findUnique({ where: { id: userId } });
   if (!targetUser) return;
+
+  const isSelf = admin.id === userId || admin.email.toLowerCase() === targetUser.email.toLowerCase();
+
+  if (isSelf) {
+    throw new Error("Nemůžete deaktivovat svůj vlastní účet.");
+  }
   return await prisma.user.update({
     where: { id: userId },
     data: { isActive: !targetUser.isActive },

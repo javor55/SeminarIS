@@ -96,6 +96,7 @@ export function DataTable<T>({
   // 🔥 NOVÉ PROPS
   hideToolbar = false,
   hideFooter = false,
+  forceRefresh: externalForceRefresh,
 }: DataTableProps<T>) {
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [columnFilters, setColumnFilters] = React.useState<any>([]);
@@ -116,6 +117,12 @@ export function DataTable<T>({
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    meta: {
+      forceRefresh: () => {
+        forceRefresh();
+        if (externalForceRefresh) externalForceRefresh();
+      },
+    },
     // getPaginationRowModel() NEpoužíváme – stránkujeme ručně
     globalFilterFn: (row, _columnId, filterValue) => {
       if (!filterValue) return true;
@@ -220,7 +227,7 @@ export function DataTable<T>({
                     Filtry
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 space-y-3" align="start">
+                <PopoverContent className="w-[500px] space-y-3" align="start">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-medium text-muted-foreground">
                       Filtry
@@ -235,90 +242,94 @@ export function DataTable<T>({
                     </Button>
                   </div>
 
-                  {/* SELECT filtry (faceted) */}
-                  {selectFilters.map((sf) => {
-                    const col = table.getColumn(sf.columnId);
-                    const current = (col?.getFilterValue() as string[]) ?? [];
-                    const currentVal = current[0] ?? "ALL";
-                    return (
-                      <div key={sf.columnId} className="space-y-1">
-                        <label className="text-xs text-muted-foreground">
-                          {sf.label}
-                        </label>
-                        <Select
-                          value={currentVal}
-                          onValueChange={(v) => {
-                            if (v === "ALL") col?.setFilterValue([]);
-                            else col?.setFilterValue([v]);
-                            setPageIndex(0);
-                          }}
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ALL">Vše</SelectItem>
-                            {sf.options.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>
-                                {o.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    );
-                  })}
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                    {/* SELECT filtry (faceted) */}
+                    {selectFilters.map((sf) => {
+                      const col = table.getColumn(sf.columnId);
+                      const current = (col?.getFilterValue() as string[]) ?? [];
+                      const currentVal = current[0] ?? "ALL";
+                      return (
+                        <div key={sf.columnId} className="space-y-1 text-left">
+                          <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                            {sf.label}
+                          </label>
+                          <Select
+                            value={currentVal}
+                            onValueChange={(v) => {
+                              if (v === "ALL") col?.setFilterValue([]);
+                              else col?.setFilterValue([v]);
+                              setPageIndex(0);
+                            }}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ALL">Vše</SelectItem>
+                              {sf.options.map((o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })}
 
-                  {/* DATE RANGE filtry */}
-                  {dateFilters.map((df) => {
-                    const st = dateState[df.id] ?? {};
-                    
-                    return (
-                      <div key={df.id} className="space-y-2">
-                        <p className="text-[11px] font-medium text-muted-foreground">
-                          {df.label}
-                        </p>
-                        
-                        {/* Vstup "OD" */}
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs min-w-[30px]">Od:</Label>
-                          <DateTimePicker
-                            className="w-full"
-                            value={st.from ? new Date(st.from) : null}
-                            onChange={(date) => {
-                              setDateState((p) => ({
-                                ...p,
-                                [df.id]: {
-                                  ...p[df.id],
-                                  from: date ? date.toISOString() : "",
-                                },
-                              }));
-                              setPageIndex(0);
-                            }}
-                          />
+                    {/* DATE RANGE filtry */}
+                    {dateFilters.map((df) => {
+                      const st = dateState[df.id] ?? {};
+                      
+                      return (
+                        <div key={df.id} className="space-y-2 col-span-2 border-t pt-2 mt-2">
+                          <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                            {df.label}
+                          </p>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* Vstup "OD" */}
+                            <div className="flex flex-col gap-1 text-left">
+                              <Label className="text-[10px] font-medium text-muted-foreground">Od:</Label>
+                              <DateTimePicker
+                                className="w-full h-8"
+                                value={st.from ? new Date(st.from) : null}
+                                onChange={(date) => {
+                                  setDateState((p) => ({
+                                    ...p,
+                                    [df.id]: {
+                                      ...p[df.id],
+                                      from: date ? date.toISOString() : "",
+                                    },
+                                  }));
+                                  setPageIndex(0);
+                                }}
+                              />
+                            </div>
+                            
+                            {/* Vstup "DO" */}
+                            <div className="flex flex-col gap-1 text-left">
+                              <Label className="text-[10px] font-medium text-muted-foreground">Do:</Label>
+                              <DateTimePicker
+                                className="w-full h-8"
+                                value={st.to ? new Date(st.to) : null}
+                                onChange={(date) => {
+                                  setDateState((p) => ({
+                                    ...p,
+                                    [df.id]: {
+                                      ...p[df.id],
+                                      to: date ? date.toISOString() : "",
+                                    },
+                                  }));
+                                  setPageIndex(0);
+                                }}
+                              />
+                            </div>
+                          </div>
                         </div>
-                        
-                        {/* Vstup "DO" */}
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs min-w-[30px]">Do:</Label>
-                          <DateTimePicker
-                            className="w-full"
-                            value={st.to ? new Date(st.to) : null}
-                            onChange={(date) => {
-                              setDateState((p) => ({
-                                ...p,
-                                [df.id]: {
-                                  ...p[df.id],
-                                  to: date ? date.toISOString() : "",
-                                },
-                              }));
-                              setPageIndex(0);
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </PopoverContent>
               </Popover>
 
