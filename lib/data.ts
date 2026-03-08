@@ -318,3 +318,52 @@ export async function updateUsersCohort(userIds: string[], cohort: string) {
   });
 }
 
+export async function importUsers(usersToImport: any[]) {
+  await requireAdmin();
+  
+  const results = {
+    created: 0,
+    updated: 0,
+    errors: 0,
+  };
+
+  for (const u of usersToImport) {
+    try {
+      const email = u.email?.trim().toLowerCase();
+      if (!email) {
+        results.errors++;
+        continue;
+      }
+
+      const userData = {
+        firstName: u.firstName || "",
+        lastName: u.lastName || "",
+        email: email,
+        cohort: u.cohort || null,
+        role: (u.role as any) || "STUDENT",
+        isActive: u.isActive !== undefined ? Boolean(u.isActive) : true,
+      } as any;
+
+      if (u.password) {
+        userData.passwordHash = await bcrypt.hash(u.password, 10);
+      }
+
+      await prisma.user.upsert({
+        where: { email },
+        update: userData,
+        create: {
+          ...userData,
+          passwordHash: userData.passwordHash || await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
+        },
+      });
+
+      results.created++; 
+    } catch (error) {
+      console.error("Error importing user:", error);
+      results.errors++;
+    }
+  }
+
+  return results;
+}
+

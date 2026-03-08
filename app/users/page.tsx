@@ -9,11 +9,14 @@ import {
   toggleUserActive, 
   getGlobalCohort, 
   setGlobalCohort,
-  updateUsersCohort
+  updateUsersCohort,
+  importUsers
 } from "@/lib/data";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
 import { usersColumns, UserRow } from "@/components/users/users-columns";
+import { ImportUsersDialog } from "@/components/users/ImportUsersDialog";
+import { Download, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +38,7 @@ export default function UsersPage() {
   const [users, setUsers] = React.useState<UserRow[]>([]);
   const [dataLoading, setDataLoading] = React.useState(true);
   const [globalCohort, setGlobalCohortState] = React.useState("");
+  const [showImport, setShowImport] = React.useState(false);
 
   const loadData = React.useCallback(async () => {
     setDataLoading(true);
@@ -51,6 +55,38 @@ export default function UsersPage() {
       setDataLoading(false);
     }
   }, []);
+
+  const handleExport = () => {
+    const headers = ["Jméno", "Příjmení", "Email", "Registrace", "Poslední přihlášení", "Aktivní", "Role", "Zápisy"];
+    const rows = users.map(u => {
+      const enrollments = u.studentEnrollments
+        ?.map((e: any) => e.subjectOccurrence?.subject?.name)
+        .filter(Boolean)
+        .join(", ") || "";
+
+      return [
+        u.firstName,
+        u.lastName,
+        u.email,
+        u.createdAt ? new Date(u.createdAt).toLocaleString("cs-CZ") : "",
+        u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("cs-CZ") : "nikdy",
+        u.isActive ? "ANO" : "NE",
+        u.role,
+        `"${enrollments}"`
+      ];
+    });
+
+    const csvContent = "\uFEFF" + [headers, ...rows].map(e => e.join(";")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `export_uzivatelu_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Export dokončen.");
+  };
 
   React.useEffect(() => {
     if (!isLoading && !user) {
@@ -278,6 +314,23 @@ export default function UsersPage() {
           </CardContent>
         </Card>
       </div>
+
+      <div className="flex gap-2 mb-4 justify-end">
+        <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="gap-2">
+          <Upload className="w-4 h-4" />
+          Import uživatelů
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
+          <Download className="w-4 h-4" />
+          Export do CSV
+        </Button>
+      </div>
+
+      <ImportUsersDialog 
+        open={showImport} 
+        onOpenChange={setShowImport} 
+        onSuccess={loadData} 
+      />
 
       <DataTable<UserRow>
         data={users}
