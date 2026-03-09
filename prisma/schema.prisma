@@ -68,6 +68,7 @@ model Subject {
   name        String
   code        String?
   syllabus    String
+  isActive    Boolean  @default(true)
 
   createdById String
   createdBy   User     @relation("SubjectCreatedBy", fields: [createdById], references: [id])

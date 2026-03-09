@@ -1,22 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
-import { getSubjects, updateSubject } from "@/lib/data";
+import { getSubjects, updateSubject, createSubject } from "@/lib/data";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea"; 
 import { Button } from "@/components/ui/button";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { Subject } from "@/lib/types";
 
-export default function EditSubjectPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+function EditSubjectForm({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [subject, setSubject] = useState<(Subject & { syllabus?: string }) | undefined>();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -26,28 +22,51 @@ export default function EditSubjectPage({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const searchParams = useSearchParams();
+  const duplicateId = searchParams.get("duplicate");
+
   useEffect(() => {
     async function loadData() {
        setDataLoading(true);
-       const subjects = await getSubjects();
-       const found = subjects.find((s) => s.id === params.id) as unknown as (Subject & { syllabus?: string }) | undefined;
-       if (found) {
-         setSubject(found);
-         setName(found.name ?? "");
-         setCode(found.code ?? "");
-         setDescription(found.description ?? "");
-         setSyllabus(found.syllabus ?? "");
+       try {
+         if (params.id === "new") {
+           // Tvorba nového nebo duplikace
+           if (duplicateId) {
+             const subjects = await getSubjects();
+             const found = subjects.find((s) => s.id === duplicateId) as any;
+             if (found) {
+               setName((found.name ?? "") + " (Kopie)");
+               setCode(found.code ?? "");
+               setDescription(found.description ?? ""); // Local descriptive UI property only
+               setSyllabus(found.syllabus ?? "");
+             }
+           }
+         } else {
+           // Úprava stávajícího
+           const subjects = await getSubjects();
+           const found = subjects.find((s) => s.id === params.id) as any;
+           if (found) {
+             setSubject(found);
+             setName(found.name ?? "");
+             setCode(found.code ?? "");
+             setDescription(found.description ?? "");
+             setSyllabus(found.syllabus ?? "");
+           }
+         }
+       } catch (err) {
+         console.error(err);
+       } finally {
+         setDataLoading(false);
        }
-       setDataLoading(false);
     }
     loadData();
-  }, [params.id]);
+  }, [params.id, duplicateId]);
 
-  if (dataLoading) {
+  if (authLoading || dataLoading) {
     return <p>Načítám...</p>;
   }
 
-  if (!subject) {
+  if (!subject && params.id !== "new") {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold">Předmět nenalezen</h1>
@@ -67,20 +86,32 @@ export default function EditSubjectPage({
     setError(null);
 
     try {
-      const ok = await updateSubject({
-        ...subject,
-        name,
-        code,
-        syllabus,
-        description,
-        updatedAt: new Date().toISOString(),
-        updatedById: user.id,
-      } as any);
+      const isNew = params.id === "new";
+      let ok: any;
+      if (isNew) {
+        ok = await createSubject({
+          name,
+          code,
+          syllabus,
+          description,
+        } as any);
+      } else {
+        ok = await updateSubject({
+          ...subject,
+          name,
+          code,
+          syllabus,
+          description,
+          updatedAt: new Date().toISOString(),
+          updatedById: user.id,
+        } as any);
+      }
 
       if (!ok) {
         setError("Nepodařilo se uložit předmět.");
       } else {
-        router.push(`/subjects/${subject.id}`);
+        const redirectId = isNew ? ok.id : subject?.id;
+        router.push(`/subjects/${redirectId}`);
       }
     } catch (e: any) {
       setError(e.message ?? "Chyba při ukládání.");
@@ -92,8 +123,8 @@ export default function EditSubjectPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Upravit předmět</h1>
-        <p className="text-sm text-muted-foreground">{subject.name}</p>
+        <h1 className="text-2xl font-semibold">{params.id === "new" ? "Nový předmět" : "Upravit předmět"}</h1>
+        {subject && <p className="text-sm text-muted-foreground">{subject.name}</p>}
       </div>
 
       <div className="grid gap-4">
@@ -121,7 +152,7 @@ export default function EditSubjectPage({
           />
         </div>
 
-        {/* Popis */}
+        {/* Popis (Pozn. pro autora: UI ho vykresluje, ale databáze ho nepodporuje, slouží jako local stash) */}
         <div className="space-y-1">
           <label className="text-sm font-medium" htmlFor="description">
             Popis
@@ -131,7 +162,7 @@ export default function EditSubjectPage({
             rows={4}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Krátký popis předmětu..."
+            placeholder="Krátký hlavičkový popis předmětu před sylabem..."
           />
         </div>
 
@@ -150,12 +181,20 @@ export default function EditSubjectPage({
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push(`/subjects/${subject.id}`)}
+            onClick={() => params.id === "new" ? router.push(`/subjects`) : router.push(`/subjects/${subject?.id}`)}
           >
             Zrušit
           </Button>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function EditSubjectPage({ params }: { params: { id: string } }) {
+  return (
+    <Suspense fallback={<p>Načítám formulář...</p>}>
+      <EditSubjectForm params={params} />
+    </Suspense>
   );
 }

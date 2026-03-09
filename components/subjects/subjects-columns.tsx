@@ -1,28 +1,23 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { Subject } from "@/lib/types";
 import Link from "next/link";
-import { getAllUsers } from "@/lib/data";
-import { useState, useEffect } from "react";
 
-const UserCell = ({ userId }: { userId?: string | null }) => {
-  const [name, setName] = useState<string>("—");
-  useEffect(() => {
-    if (!userId) return;
-    getAllUsers().then((users) => {
-      const u = users.find(x => x.id === userId);
-      if (u) setName(`${u.firstName} ${u.lastName}`);
-    }).catch(() => {});
-  }, [userId]);
-  return <span>{name}</span>;
-};
-
-export type SubjectRow = Subject & {
-  createdAt?: string;
-  updatedAt?: string;
-  createdById?: string;
-  updatedById?: string;
+export type SubjectRow = {
+  id: string;
+  name: string;
+  code: string | null;
+  syllabus: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdById: string;
+  updatedById: string | null;
+  createdBy: { firstName: string; lastName: string; email: string };
+  updatedBy: { firstName: string; lastName: string; email: string } | null;
+  subjectOccurrences: {
+    teacher: { id: string; firstName: string; lastName: string; email: string };
+  }[];
 };
 
 export const subjectsColumns: ColumnDef<SubjectRow>[] = [
@@ -32,45 +27,84 @@ export const subjectsColumns: ColumnDef<SubjectRow>[] = [
     cell: ({ row }) => {
       const s = row.original;
       return (
-        <Link
-          href={`/subjects/${s.id}`}
-          className="text-blue-600 hover:underline"
-        >
-          {s.name}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/subjects/${s.id}`}
+            className="text-blue-600 hover:underline font-medium"
+          >
+            {s.name}
+          </Link>
+          {!s.isActive && (
+            <span className="bg-red-100 text-red-800 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-sm">
+              Archiv
+            </span>
+          )}
+        </div>
       );
     },
   },
   {
     accessorKey: "code",
     header: "Kód",
-    cell: ({ row }) => row.original.code ?? "—",
+    cell: ({ row }) => <span className="text-slate-500">{row.original.code ?? "—"}</span>,
+  },
+  {
+    id: "teachers",
+    header: "Garant / Učitelé",
+    cell: ({ row }) => {
+      const occs = row.original.subjectOccurrences || [];
+      const teachersMap = new Map();
+      occs.forEach(occ => {
+        if (occ.teacher) {
+          teachersMap.set(occ.teacher.id, `${occ.teacher.firstName} ${occ.teacher.lastName}`);
+        }
+      });
+      
+      const uniqueTeachers = Array.from(teachersMap.values());
+      
+      if (uniqueTeachers.length === 0) return <span className="text-muted-foreground">—</span>;
+      
+      return (
+        <div className="flex flex-wrap gap-1">
+          {uniqueTeachers.map((t, idx) => (
+             <span key={idx} className="bg-slate-100 text-slate-800 text-xs px-2 py-0.5 rounded-full border">
+                {t}
+             </span>
+          ))}
+        </div>
+      );
+    }
   },
   {
     accessorKey: "createdById",
     header: "Vytvořil",
-    cell: ({ row }) => <UserCell userId={row.original.createdById} />,
+    cell: ({ row }) => {
+      const user = row.original.createdBy;
+      return user ? <span className="text-sm">{user.firstName} {user.lastName}</span> : "—";
+    },
   },
   {
     accessorKey: "createdAt",
     header: "Vytvořen",
     cell: ({ row }) =>
       row.original.createdAt
-        ? new Date(row.original.createdAt).toLocaleString()
+        ? new Date(row.original.createdAt).toLocaleDateString("cs-CZ")
         : "—",
   },
-    {
+  {
     accessorKey: "updatedById",
     header: "Upravil",
-    cell: ({ row }) => <UserCell userId={row.original.updatedById} />,
-
+    cell: ({ row }) => {
+       const user = row.original.updatedBy;
+       return user ? <span className="text-sm">{user.firstName} {user.lastName}</span> : "—";
+    },
   },
   {
     accessorKey: "updatedAt",
     header: "Aktualizován",
     cell: ({ row }) =>
       row.original.updatedAt
-        ? new Date(row.original.updatedAt).toLocaleString()
+        ? new Date(row.original.updatedAt).toLocaleDateString("cs-CZ")
         : "—",
   },
 ];

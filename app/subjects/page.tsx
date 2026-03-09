@@ -4,8 +4,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
-import { getAllUsers, getSubjects } from "@/lib/data";
+import { getUsersForFilters, getSubjects } from "@/lib/data";
 import { DataTable } from "@/components/ui/data-table";
+import { toast } from "sonner";
+import { Download } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   subjectsColumns,
   SubjectRow,
@@ -25,13 +28,48 @@ export default function SubjectsPage() {
     async function loadData() {
       if (!user) return;
       setDataLoading(true);
-      const [dbSubj, dbUser] = await Promise.all([getSubjects(), getAllUsers()]);
-      setSubjects(dbSubj as unknown as SubjectRow[]);
-      setUsers(dbUser);
-      setDataLoading(false);
+      try {
+        const [dbSubj, dbUser] = await Promise.all([getSubjects(), getUsersForFilters()]);
+        setSubjects(dbSubj as unknown as SubjectRow[]);
+        setUsers(dbUser);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setDataLoading(false);
+      }
     }
     loadData();
   }, [user]);
+
+  const handleExport = () => {
+    const headers = ["Předmět", "Kód", "Garanti", "Vytvořil", "Vytvořeno", "Upraveno", "Má aktivní zápisy", "Stav"];
+    const rows = subjects.map(s => {
+      const teachers = Array.from(new Set((s.subjectOccurrences || []).map(o => o.teacher ? `${o.teacher.firstName} ${o.teacher.lastName}` : null).filter(Boolean))).join(", ");
+      const hasActive = (s.subjectOccurrences || []).length > 0 ? "ANO" : "NE";
+      
+      return [
+        `"${s.name}"`,
+        s.code || "",
+        `"${teachers}"`,
+        `${s.createdBy?.firstName || ""} ${s.createdBy?.lastName || ""}`,
+        s.createdAt ? new Date(s.createdAt).toLocaleDateString("cs-CZ") : "",
+        s.updatedAt ? new Date(s.updatedAt).toLocaleDateString("cs-CZ") : "",
+        hasActive,
+        s.isActive !== false ? "Aktivní" : "Archivováno"
+      ];
+    });
+
+    const csvContent = "\uFEFF" + [headers, ...rows].map(e => e.join(";")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `export_predmetu_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Export dokončen.");
+  };
 
   // --- Začátek úpravy "Auth Guard" ---
 
@@ -81,10 +119,48 @@ export default function SubjectsPage() {
           </p>
         </div>
 
-        {/* 🔥 TLAČÍTKO NOVÝ PŘEDMĚT */}
-        <Button asChild>
-          <Link href="/subjects/new/edit">Nový předmět</Link>
-        </Button>
+        {/* 🔥 TLAČÍTKA */}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
+            <Download className="w-4 h-4" />
+            Export CSV
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/subjects/new/edit">Nový předmět</Link>
+          </Button>
+        </div>
+      </div>
+
+      {/* STATISTIKY */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-md">Celkem předmětů</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{subjects.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-md">Aktivní katalog</CardTitle>
+          </CardHeader>
+          <CardContent>
+             <p className="text-3xl font-bold text-emerald-600">
+               {subjects.filter(s => s.isActive !== false).length}
+             </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-md">Archivováno</CardTitle>
+          </CardHeader>
+          <CardContent>
+             <p className="text-3xl font-bold text-red-500">
+               {subjects.filter((s) => s.isActive === false).length}
+             </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* TABULKA */}

@@ -24,7 +24,30 @@ async function requireAdmin() {
 // === ČTENÍ DAT ===
 
 export async function getSubjects() {
-  return await prisma.subject.findMany();
+  const subjects = await prisma.subject.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      createdBy: { select: { firstName: true, lastName: true, email: true } },
+      updatedBy: { select: { firstName: true, lastName: true, email: true } },
+      subjectOccurrences: {
+        where: { deletedAt: null },
+        include: {
+          teacher: { select: { id: true, firstName: true, lastName: true, email: true } }
+        }
+      }
+    }
+  });
+
+  return JSON.parse(JSON.stringify(subjects));
+}
+
+// Slouží k naplnění combo box filters v Data table, nezatíží systém na rozdíl od getAllUsers
+export async function getUsersForFilters() {
+  const users = await prisma.user.findMany({
+    select: { id: true, firstName: true, lastName: true, email: true },
+    orderBy: { lastName: 'asc' }
+  });
+  return users;
 }
 
 export async function getSubjectById(id: string) {
@@ -256,14 +279,39 @@ export async function updateBlock(block: any) {
   });
 }
 
-export async function updateSubject(subject: any) {
+export async function createSubject(subject: any) {
+  const admin = await requireAdmin();
+  return await prisma.subject.create({
+    data: {
+      name: subject.name,
+      code: subject.code,
+      syllabus: subject.syllabus,
+      createdById: admin.id,
+    },
+  });
+}
+
+export async function toggleSubjectActive(subjectId: string) {
   await requireAdmin();
+  const targetSubject = await prisma.subject.findUnique({ where: { id: subjectId } });
+  if (!targetSubject) return;
+
+  return await prisma.subject.update({
+    where: { id: subjectId },
+    data: { isActive: !targetSubject.isActive },
+  });
+}
+
+export async function updateSubject(subject: any) {
+  const admin = await requireAdmin();
   return await prisma.subject.update({
     where: { id: subject.id },
     data: {
       name: subject.name,
       code: subject.code,
       syllabus: subject.syllabus,
+      updatedById: admin.id,
+      updatedAt: new Date(),
     },
   });
 }
@@ -335,26 +383,28 @@ export async function importUsers(usersToImport: any[]) {
         continue;
       }
 
-      const userData = {
+      const updateData: any = {
         firstName: u.firstName || "",
         lastName: u.lastName || "",
-        email: email,
         cohort: u.cohort || null,
+      };
+
+      if (u.role) updateData.role = u.role as any;
+      if (u.isActive !== undefined) updateData.isActive = Boolean(u.isActive);
+      if (u.password) updateData.passwordHash = await bcrypt.hash(u.password, 10);
+
+      const createData: any = {
+        ...updateData,
+        email: email,
         role: (u.role as any) || "STUDENT",
         isActive: u.isActive !== undefined ? Boolean(u.isActive) : true,
-      } as any;
-
-      if (u.password) {
-        userData.passwordHash = await bcrypt.hash(u.password, 10);
-      }
+        passwordHash: updateData.passwordHash || await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
+      };
 
       await prisma.user.upsert({
         where: { email },
-        update: userData,
-        create: {
-          ...userData,
-          passwordHash: userData.passwordHash || await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
-        },
+        update: updateData,
+        create: createData,
       });
 
       results.created++; 

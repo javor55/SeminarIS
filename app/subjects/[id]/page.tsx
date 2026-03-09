@@ -8,7 +8,8 @@ import {
   getSubjects,
   getEnrollmentWindowsVisible,
   getEnrollmentWindowByIdWithBlocks,
-  getAllUsers,
+  getUsersForFilters,
+  toggleSubjectActive,
 } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { OccurrencesStudentsDialog } from "@/components/occurrences/OccurrencesStudentsDialog";
@@ -96,7 +97,7 @@ export default function SubjectDetailPage({
         try {
           // 1. Uživatelé a Předměty
           const [u, allSubjs, ewVisible] = await Promise.all([
-            getAllUsers(),
+            getUsersForFilters(),
             getSubjects(),
             getEnrollmentWindowsVisible()
           ]);
@@ -224,8 +225,18 @@ export default function SubjectDetailPage({
   const createdAt = formatDate((subject as any).createdAt);
   const updatedAt = formatDate((subject as any).updatedAt);
 
-  // ZMĚNA 6: Kontrola role (už nepotřebuje 'user?.')
   const isPrivilegedUser = user.role === "ADMIN" || user.role === "TEACHER";
+
+  const handleToggleActive = async () => {
+    if (!window.confirm(`Opravdu chcete ${subject.isActive ? "archivovat" : "Aktivovat"} tento předmět?`)) return;
+    try {
+      await toggleSubjectActive(subject.id);
+      window.location.reload(); // Hard reload pro fetch nových dat a překreslení UI
+    } catch (err) {
+      console.error(err);
+      alert("Něco se pokazilo při archivaci předmětu.");
+    }
+  };
 
   return (
     <>
@@ -237,6 +248,9 @@ export default function SubjectDetailPage({
               {/* ... (zobrazení názvu, popisu, atd.) ... */}
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-2xl font-semibold">{subject.name}</h1>
+                <span className={subject.isActive ? "bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs" : "bg-red-100 text-red-800 px-2 py-1 rounded text-xs"}>
+                    {subject.isActive ? "Aktivní" : "Archivováno"}
+                </span>
                 {subject.code ? (
                   <span className="text-xs bg-slate-100 px-2 py-1 rounded-md">
                     {subject.code}
@@ -255,14 +269,31 @@ export default function SubjectDetailPage({
               </p>
             </div>
 
-            {/* Tlačítko Upravit (už nepotřebuje 'user?.') */}
+            {/* Tlačítka (už nepotřebuje 'user?.') */}
             {(user.role === "ADMIN" || user.role === "TEACHER") && (
-              <Button
-                size="sm"
-                onClick={() => router.push(`/subjects/${subject.id}/edit`)}
-              >
-                Upravit předmět
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => router.push(`/subjects/${subject.id}/edit`)}
+                >
+                  Upravit předmět
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => router.push(`/subjects/new/edit?duplicate=${subject.id}`)}
+                >
+                  Duplikovat
+                </Button>
+                <Button
+                  size="sm"
+                  variant={subject.isActive ? "destructive" : "default"}
+                  onClick={handleToggleActive}
+                >
+                  {subject.isActive ? "Archivovat" : "Obnovit"}
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -273,7 +304,7 @@ export default function SubjectDetailPage({
           <h2 className="text-base font-semibold">Sylabus</h2>
           {subject.syllabus ? (
             <div
-              className="prose prose-sm max-w-none"
+              className="prose prose-sm max-w-none max-h-96 overflow-y-auto pr-2"
               dangerouslySetInnerHTML={{
                 __html: (subject as any).syllabus ?? "",
               }}
