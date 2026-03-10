@@ -13,6 +13,8 @@ import {
 } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { OccurrencesStudentsDialog } from "@/components/occurrences/OccurrencesStudentsDialog";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import {
   Block,
   EnrollmentWindowWithBlocks,
@@ -185,6 +187,7 @@ export default function SubjectDetailPage({
     () =>
       getOccurrenceColumns({
         currentUser: user,
+        showSubjectName: false,
         onStudents: (occ) =>
           setSelectedStudents({
             occurrenceId: occ.id,
@@ -241,6 +244,13 @@ export default function SubjectDetailPage({
   return (
     <>
       <div className="space-y-6">
+        <div>
+          <Link href="/subjects" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4 transition-colors">
+            <ArrowLeft className="w-4 h-4 mr-1" />
+            Zpět na přehled předmětů
+          </Link>
+        </div>
+
         {/* Karta: název + popis + audit (viditelná pro všechny) */}
         <div className="rounded-lg border bg-white p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-3">

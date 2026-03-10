@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { Subject } from "@/lib/types";
+import { toast } from "sonner";
 
 function EditSubjectForm({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -110,6 +111,7 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
       if (!ok) {
         setError("Nepodařilo se uložit předmět.");
       } else {
+        toast.success(isNew ? "Předmět byl úspěšně vytvořen." : "Předmět byl úspěšně uložen.");
         const redirectId = isNew ? ok.id : subject?.id;
         router.push(`/subjects/${redirectId}`);
       }
@@ -152,7 +154,7 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
           />
         </div>
 
-        {/* Popis (Pozn. pro autora: UI ho vykresluje, ale databáze ho nepodporuje, slouží jako local stash) */}
+        {/* Popis */}
         <div className="space-y-1">
           <label className="text-sm font-medium" htmlFor="description">
             Popis

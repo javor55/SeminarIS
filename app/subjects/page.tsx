@@ -47,10 +47,13 @@ export default function SubjectsPage() {
       const teachers = Array.from(new Set((s.subjectOccurrences || []).map(o => o.teacher ? `${o.teacher.firstName} ${o.teacher.lastName}` : null).filter(Boolean))).join(", ");
       const hasActive = (s.subjectOccurrences || []).length > 0 ? "ANO" : "NE";
       
+      const safeName = s.name ? s.name.replace(/"/g, '""') : "";
+      const safeTeachers = teachers.replace(/"/g, '""');
+
       return [
-        `"${s.name}"`,
+        `"${safeName}"`,
         s.code || "",
-        `"${teachers}"`,
+        `"${safeTeachers}"`,
         `${s.createdBy?.firstName || ""} ${s.createdBy?.lastName || ""}`,
         s.createdAt ? new Date(s.createdAt).toLocaleDateString("cs-CZ") : "",
         s.updatedAt ? new Date(s.updatedAt).toLocaleDateString("cs-CZ") : "",

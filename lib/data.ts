@@ -285,6 +285,7 @@ export async function createSubject(subject: any) {
     data: {
       name: subject.name,
       code: subject.code,
+      description: subject.description,
       syllabus: subject.syllabus,
       createdById: admin.id,
     },
@@ -309,6 +310,7 @@ export async function updateSubject(subject: any) {
     data: {
       name: subject.name,
       code: subject.code,
+      description: subject.description,
       syllabus: subject.syllabus,
       updatedById: admin.id,
       updatedAt: new Date(),

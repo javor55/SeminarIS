@@ -1,0 +1,10 @@
+Starting query...
+Prisma error: 
+Invalid `prisma.user.findMany()` invocation in
+C:\Projekty\zapis\SeminarIS\test-db3.ts:8:37
+
+  5 async function main() {
+  6   console.log("Starting query...");
+  7   try {
+→ 8     const users = await prisma.user.findMany(
+The column `Subject.isActive` does not exist in the current database.

@@ -42,6 +42,7 @@ export function getOccurrenceColumns(opts: {
   onEnroll?: (row: OccurrenceRow) => void;
   onUnenroll?: (row: OccurrenceRow) => void;
   /** možnost skrýt některé sloupce podle kontextu */
+  showSubjectName?: boolean;
   showEnrollmentName?: boolean;
   showStatus?: boolean;
   showBlockName?: boolean;
@@ -53,6 +54,7 @@ export function getOccurrenceColumns(opts: {
     onDelete,
     onEnroll,
     onUnenroll,
+    showSubjectName = true,
     showEnrollmentName = true,
     showStatus = true,
     showBlockName = true,
@@ -61,7 +63,8 @@ export function getOccurrenceColumns(opts: {
   const cols: ColumnDef<OccurrenceRow>[] = [];
 
   // PŘEDMĚT
-  cols.push({
+  if (showSubjectName) {
+    cols.push({
     id: "subject",
     header: "Předmět",
     cell: ({ row }) => {
@@ -77,6 +80,7 @@ export function getOccurrenceColumns(opts: {
       );
     },
   });
+  }
 
   // ZÁPIS
   if (showEnrollmentName) {

@@ -49,8 +49,9 @@ export default function UsersPage() {
       ]);
       setUsers(dbUsers as unknown as UserRow[]);
       setGlobalCohortState(cohort);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      toast.error("Nastala chyba při načítání uživatelů: " + (e?.message || String(e)));
     } finally {
       setDataLoading(false);
     }
@@ -258,6 +259,17 @@ export default function UsersPage() {
           <h1 className="text-2xl font-semibold">Správa uživatelů</h1>
           <p className="text-sm text-muted-foreground">Komplexní správa rolí, ročníků a stavů zápisů.</p>
         </div>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="gap-2">
+            <Upload className="w-4 h-4" />
+            Import uživatelů
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
+            <Download className="w-4 h-4" />
+            Export do CSV
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -315,16 +327,7 @@ export default function UsersPage() {
         </Card>
       </div>
 
-      <div className="flex gap-2 mb-4 justify-end">
-        <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="gap-2">
-          <Upload className="w-4 h-4" />
-          Import uživatelů
-        </Button>
-        <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
-          <Download className="w-4 h-4" />
-          Export do CSV
-        </Button>
-      </div>
+
 
       <ImportUsersDialog 
         open={showImport} 
