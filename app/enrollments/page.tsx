@@ -1,15 +1,15 @@
 // app/enrollments/page.tsx
 "use client";
 
-// Importy zůstávají stejné
+// Importy
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import {
-  getEnrollmentWindowsVisible,
-  getEnrollmentWindowByIdWithBlocks,
+  getEnrollmentWindowsWithDetails,
 } from "@/lib/data";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "lucide-react";
 import { EditEnrollmentDialog } from "@/components/enrollment/EditEnrollmentDialog";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -20,6 +20,7 @@ import { EnrollmentWindow, EnrollmentStatus, User } from "@/lib/types";
 
 // ... (Mock data 'newEnrollmentMock' zůstává stejná)
 const newEnrollmentMock = {
+  id: "", // prázdné ID signalizuje nový zápis
   name: "Nový zápis",
   description: "",
   status: "DRAFT",
@@ -52,9 +53,9 @@ export default function EnrollmentsPage() {
 
   useEffect(() => {
     async function fetch() {
-      const visible = await getEnrollmentWindowsVisible();
-      const withB = await Promise.all(visible.map((ew: any) => getEnrollmentWindowByIdWithBlocks(ew.id)));
-      setEnrollmentWithBlocks(withB.filter(Boolean) as any[]);
+      // Rešení N+1: Jedno efektivni volani
+      const withB = await getEnrollmentWindowsWithDetails(false); // chceme vidět i ty invisible pro tabulku administrátorů
+      setEnrollmentWithBlocks(withB);
       setLoadingData(false);
     }
     fetch();
@@ -168,45 +169,64 @@ export default function EnrollmentsPage() {
           )}
         </div>
 
-        {/* ... (DataTable) */}
-        <DataTable<EnrollmentRow>
-          data={rows}
-          columns={columns}
-          searchKeys={["name"]}
-          searchPlaceholder="Hledat podle názvu..."
-          selectFilters={[
-            {
-              columnId: "status",
-              label: "Stav",
-              options: [
-                { label: "Koncept", value: "DRAFT" },
-                { label: "Naplánováno", value: "SCHEDULED" },
-                { label: "Otevřeno", value: "OPEN" },
-                { label: "Uzavřeno", value: "CLOSED" },
-              ],
-            },
-            {
-              columnId: "visibleToStudents",
-              label: "Viditelnost",
-              options: [
-                { label: "Viditelné studentům", value: "yes" },
-                { label: "Skryté studentům", value: "no" },
-              ],
-            },
-          ]}
-          dateFilters={[
-            {
-              id: "startsAt",
-              label: "Začátek",
-              getDate: (row) => new Date(row.startsAt),
-            },
-            {
-              id: "endsAt",
-              label: "Konec",
-              getDate: (row) => new Date(row.endsAt),
-            },
-          ]}
-        />
+        {rows.length === 0 ? (
+          <div className="rounded-lg border border-dashed bg-card p-12 flex flex-col items-center justify-center text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-slate-400" />
+            </div>
+            <div className="max-w-[400px]">
+              <h3 className="text-lg font-semibold">Žádná zápisová období</h3>
+              <p className="text-sm text-muted-foreground">
+                Zatím jste nevytvořili žádné zápisové období. Začněte vytvořením prvního, 
+                definujte časové rozmezí a přidejte do něj bloky se semináři.
+              </p>
+            </div>
+            {user.role === "ADMIN" && (
+              <Button onClick={() => setEditEnrollment(newEnrollmentMock)}>
+                Vytvořit první zápis
+              </Button>
+            )}
+          </div>
+        ) : (
+          <DataTable<EnrollmentRow>
+            data={rows}
+            columns={columns}
+            searchKeys={["name"]}
+            searchPlaceholder="Hledat podle názvu..."
+            selectFilters={[
+              {
+                columnId: "status",
+                label: "Stav",
+                options: [
+                  { label: "Koncept", value: "DRAFT" },
+                  { label: "Naplánováno", value: "SCHEDULED" },
+                  { label: "Otevřeno", value: "OPEN" },
+                  { label: "Uzavřeno", value: "CLOSED" },
+                ],
+              },
+              {
+                columnId: "visibleToStudents",
+                label: "Viditelnost",
+                options: [
+                  { label: "Viditelné studentům", value: "yes" },
+                  { label: "Skryté studentům", value: "no" },
+                ],
+              },
+            ]}
+            dateFilters={[
+              {
+                id: "startsAt",
+                label: "Začátek",
+                getDate: (row) => new Date(row.startsAt),
+              },
+              {
+                id: "endsAt",
+                label: "Konec",
+                getDate: (row) => new Date(row.endsAt),
+              },
+            ]}
+          />
+        )}
       </div>
 
       {/* ... (Dialog) ... */}

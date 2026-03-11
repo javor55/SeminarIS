@@ -335,53 +335,74 @@ export default function UsersPage() {
         onSuccess={loadData} 
       />
 
-      <DataTable<UserRow>
-        data={users}
-        columns={usersColumns}
-        searchPlaceholder="Hledat podle jména nebo e-mailu…"
-        searchKeys={["firstName", "lastName", "email"]}
-        selectFilters={[
-          {
-            columnId: "role",
-            label: "Role",
-            options: roleFilterOptions,
-          },
-          {
-            columnId: "isActive",
-            label: "Stav účtu",
-            options: activeFilterOptions,
-          },
-          {
-            columnId: "cohort",
-            label: "Ročník",
-            options: cohortOptions,
-          },
-          {
-            columnId: "enrollmentStatus",
-            label: "Stav zápisů",
-            options: [
-              { label: "S aktivním zápisem", value: "active" },
-              { label: "S naplánovaným zápisem", value: "scheduled" },
-              { label: "Pouze historie", value: "history" },
-              { label: "Bez zápisů", value: "none" },
-            ],
-          }
-        ]}
-        dateFilters={[
-          {
-            id: "createdAt",
-            label: "Datum registrace",
-            getDate: (u) => u.createdAt ? new Date(u.createdAt) : null,
-          },
-          {
-            id: "lastLoginAt",
-            label: "Poslední přihlášení",
-            getDate: (u) => u.lastLoginAt ? new Date(u.lastLoginAt) : null,
-          },
-        ]}
-        forceRefresh={loadData}
-        bulkPopoverRender={renderBulkActions}
-      />
+      {users.length <= 1 ? (
+        <Card className="border-dashed py-12">
+          <CardContent className="flex flex-col items-center justify-center text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+              <Upload className="w-6 h-6 text-slate-400" />
+            </div>
+            <div className="max-w-[400px]">
+              <h3 className="text-lg font-semibold">Zatím žádní další uživatelé</h3>
+              <p className="text-sm text-muted-foreground">
+                V systému jste zatím jen vy. Chcete-li pokračovat, importujte seznam studentů 
+                ze souboru CSV nebo nechte studenty, aby se registrovali sami.
+              </p>
+            </div>
+            <Button onClick={() => setShowImport(true)} className="gap-2">
+              <Upload className="w-4 h-4" />
+              Importovat první studenty
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable<UserRow>
+          data={users}
+          columns={usersColumns}
+          searchPlaceholder="Hledat podle jména nebo e-mailu…"
+          searchKeys={["firstName", "lastName", "email"]}
+          selectFilters={[
+            {
+              columnId: "role",
+              label: "Role",
+              options: roleFilterOptions,
+            },
+            {
+              columnId: "isActive",
+              label: "Stav účtu",
+              options: activeFilterOptions,
+            },
+            {
+              columnId: "cohort",
+              label: "Ročník",
+              options: cohortOptions,
+            },
+            {
+              columnId: "enrollmentStatus",
+              label: "Stav zápisů",
+              options: [
+                { label: "S aktivním zápisem", value: "active" },
+                { label: "S naplánovaným zápisem", value: "scheduled" },
+                { label: "Pouze historie", value: "history" },
+                { label: "Bez zápisů", value: "none" },
+              ],
+            }
+          ]}
+          dateFilters={[
+            {
+              id: "createdAt",
+              label: "Datum registrace",
+              getDate: (u) => u.createdAt ? new Date(u.createdAt) : null,
+            },
+            {
+              id: "lastLoginAt",
+              label: "Poslední přihlášení",
+              getDate: (u) => u.lastLoginAt ? new Date(u.lastLoginAt) : null,
+            },
+          ]}
+          forceRefresh={loadData}
+          bulkPopoverRender={renderBulkActions}
+        />
+      )}
     </div>
   );
 }

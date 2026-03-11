@@ -58,8 +58,12 @@ export function EditBlockDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Upravit blok</DialogTitle> 
-          <DialogDescription>Mock formulář – zatím se neukládá.</DialogDescription>
+          <DialogTitle>{block?.id ? "Upravit blok" : "Přidat blok"}</DialogTitle> 
+          <DialogDescription>
+            {block?.id
+              ? "Změňte název nebo popis tohoto bloku."
+              : "Vytvořte nový blok pro toto zápisové okno."}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-2">

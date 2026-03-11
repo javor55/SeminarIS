@@ -112,7 +112,7 @@ model Block {
   description        String?
 
   enrollmentWindowId String
-  enrollmentWindow   EnrollmentWindow @relation(fields: [enrollmentWindowId], references: [id])
+  enrollmentWindow   EnrollmentWindow @relation(fields: [enrollmentWindowId], references: [id], onDelete: Cascade)
 
   createdById        String
   createdBy          User     @relation("BlockCreatedBy", fields: [createdById], references: [id])
@@ -136,13 +136,13 @@ model SubjectOccurrence {
   id          String   @id @default(cuid())
 
   subjectId   String
-  subject     Subject  @relation(fields: [subjectId], references: [id])
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
   blockId     String
-  block       Block    @relation(fields: [blockId], references: [id])
+  block       Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
 
-  teacherId   String
-  teacher     User     @relation("SubjectOccurrenceTeacher", fields: [teacherId], references: [id])
+  teacherId   String?
+  teacher     User?    @relation("SubjectOccurrenceTeacher", fields: [teacherId], references: [id])
 
   subCode     String?
   capacity    Int?     // null = neomezená kapacita
@@ -172,7 +172,7 @@ model StudentEnrollment {
   student             User     @relation("EnrollmentStudent", fields: [studentId], references: [id])
 
   subjectOccurrenceId String
-  subjectOccurrence   SubjectOccurrence @relation(fields: [subjectOccurrenceId], references: [id])
+  subjectOccurrence   SubjectOccurrence @relation(fields: [subjectOccurrenceId], references: [id], onDelete: Cascade)
 
   createdById         String
   createdBy           User     @relation("EnrollmentCreatedBy", fields: [createdById], references: [id])

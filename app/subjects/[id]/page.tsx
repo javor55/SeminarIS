@@ -6,10 +6,11 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import {
   getSubjects,
-  getEnrollmentWindowsVisible,
-  getEnrollmentWindowByIdWithBlocks,
+  getEnrollmentWindowsWithDetails,
   getUsersForFilters,
   toggleSubjectActive,
+  updateSubjectOccurrence,
+  deleteSubjectOccurrence
 } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { OccurrencesStudentsDialog } from "@/components/occurrences/OccurrencesStudentsDialog";
@@ -25,18 +26,15 @@ import {
   OccurrenceRow,
   getOccurrenceColumns,
 } from "@/components/occurrences/occurrence-columns";
+import { computeEnrollmentStatus } from "@/lib/utils";
 // Mock users are no longer imported directly
 
-// ... (funkce getWindowStatusLabel, getUserName, formatDate zůstávají stejné)
+// Status funkce nyní používá centralizovanou utilitu
 function getWindowStatusLabel(
   ew: EnrollmentWindowWithBlocks,
   now = new Date()
 ) {
-  const start = new Date(ew.startsAt);
-  const end = new Date(ew.endsAt);
-  if (now < start) return "Naplánováno";
-  if (now >= start && now <= end) return "Otevřeno";
-  return "Uzavřeno";
+  return computeEnrollmentStatus(ew.status as any, ew.startsAt, ew.endsAt, now).label;
 }
 
 function getUserName(userId?: string, usersList: any[] = []) {
@@ -97,11 +95,11 @@ export default function SubjectDetailPage({
      async function loadData() {
         setDataLoading(true);
         try {
-          // 1. Uživatelé a Předměty
-          const [u, allSubjs, ewVisible] = await Promise.all([
+          // 1. Získáme najednou vše
+          const [u, allSubjs, ewWithDetails] = await Promise.all([
             getUsersForFilters(),
             getSubjects(),
-            getEnrollmentWindowsVisible()
+            getEnrollmentWindowsWithDetails(true) // Viditelné zápisy strukturovaně - REPREZENTUJE N+1 FIX
           ]);
           setUsersList(u);
           
@@ -113,15 +111,10 @@ export default function SubjectDetailPage({
              return;
           }
 
-          // 2. Enrollment windows
-          const windowsDetails = await Promise.all(
-            ewVisible.map(async (w: any) => await getEnrollmentWindowByIdWithBlocks(w.id))
-          );
-          const validWindows = windowsDetails.filter(Boolean);
-          setEnrollmentWindows(validWindows);
+          setEnrollmentWindows(ewWithDetails);
 
           // 3. Occurrences
-          const occs: OccurrenceRow[] = validWindows.flatMap((ew: any) =>
+          const occs: OccurrenceRow[] = ewWithDetails.flatMap((ew: any) =>
             ew.blocks.flatMap((block: any) =>
               block.occurrences
                 .filter((occ: any) => occ.subject.id === params.id)
@@ -234,7 +227,7 @@ export default function SubjectDetailPage({
     if (!window.confirm(`Opravdu chcete ${subject.isActive ? "archivovat" : "Aktivovat"} tento předmět?`)) return;
     try {
       await toggleSubjectActive(subject.id);
-      window.location.reload(); // Hard reload pro fetch nových dat a překreslení UI
+      window.location.reload(); // Musí být tvrdé protože používáme useEffect state
     } catch (err) {
       console.error(err);
       alert("Něco se pokazilo při archivaci předmětu.");
@@ -355,7 +348,6 @@ export default function SubjectDetailPage({
         )}
       </div>
 
-      {/* Dialogy jsou také podmíněné 'isPrivilegedUser' */}
       {isPrivilegedUser && (
         <>
           {/* Dialog se studenty */}
@@ -373,8 +365,16 @@ export default function SubjectDetailPage({
           {/* Dialog pro editaci výskytu */}
           {editOccurrence && (
             <EditSubjectOccurrenceDialog
-              occurrence={editOccurrence}
+              occurrence={editOccurrence as any}
               onOpenChange={(open) => !open && setEditOccurrence(null)}
+              onSubmit={async (data) => {
+                await updateSubjectOccurrence(data.id, data);
+                window.location.reload();
+              }}
+              onDelete={async (id) => {
+                await deleteSubjectOccurrence(id);
+                window.location.reload();
+              }}
             />
           )}
         </>

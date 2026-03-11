@@ -103,6 +103,26 @@ export default function SubjectsPage() {
     );
   }
 
+  const handleExportSyllabus = () => {
+    const headers = ["Předmět", "Kód", "Sylabus / Popis"];
+    const rows = subjects.map(s => [
+      `"${(s.name || "").replace(/"/g, '""')}"`,
+      `"${(s.code || "").replace(/"/g, '""')}"`,
+      `"${(s.syllabus || "").replace(/<[^>]*>/g, '').replace(/"/g, '""')}"` // Odstranění HTML tagů pro CSV
+    ]);
+
+    const csvContent = "\uFEFF" + [headers, ...rows].map(e => e.join(";")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `katalog_sylabu_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Katalog sylabů byl exportován.");
+  };
+
   // --- Konec úpravy ---
 
   // Zbytek komponenty se vykoná, jen pokud je 'user' ADMIN nebo TEACHER
@@ -110,6 +130,8 @@ export default function SubjectsPage() {
     label: `${u.firstName} ${u.lastName}`,
     value: u.id,
   }));
+
+  const isEmpty = subjects.length === 0;
 
   return (
     <div className="space-y-4">
@@ -124,6 +146,12 @@ export default function SubjectsPage() {
 
         {/* 🔥 TLAČÍTKA */}
         <div className="flex items-center gap-2">
+          {!isEmpty && (
+            <Button variant="outline" size="sm" onClick={handleExportSyllabus} className="gap-2">
+              <Download className="w-4 h-4" />
+              Katalog sylabů
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
             <Download className="w-4 h-4" />
             Export CSV
@@ -134,37 +162,59 @@ export default function SubjectsPage() {
         </div>
       </div>
 
-      {/* STATISTIKY */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-md">Celkem předmětů</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{subjects.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-md">Aktivní katalog</CardTitle>
-          </CardHeader>
-          <CardContent>
-             <p className="text-3xl font-bold text-emerald-600">
-               {subjects.filter(s => s.isActive !== false).length}
-             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-md">Archivováno</CardTitle>
-          </CardHeader>
-          <CardContent>
-             <p className="text-3xl font-bold text-red-500">
-               {subjects.filter((s) => s.isActive === false).length}
-             </p>
-          </CardContent>
-        </Card>
-      </div>
+      {isEmpty ? (
+         <Card className="border-dashed py-12">
+            <CardContent className="flex flex-col items-center justify-center text-center space-y-4">
+               <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                  <Download className="w-6 h-6 text-slate-400 rotate-180" />
+               </div>
+               <div className="max-w-[400px]">
+                  <h3 className="text-lg font-semibold">Zatím žádné předměty</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Katalog předmětů je prázdný. Začněte vytvořením prvního předmětu, 
+                    ke kterému pak budete moci přidávat semináře.
+                  </p>
+               </div>
+               <Button asChild>
+                  <Link href="/subjects/new/edit">Vytvořit první předmět</Link>
+               </Button>
+            </CardContent>
+         </Card>
+      ) : (
+        <>
+          {/* STATISTIKY */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-md">Celkem předmětů</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{subjects.length}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-md">Aktivní katalog</CardTitle>
+              </CardHeader>
+              <CardContent>
+                 <p className="text-3xl font-bold text-emerald-600">
+                   {subjects.filter(s => s.isActive !== false).length}
+                 </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-md">Archivováno</CardTitle>
+              </CardHeader>
+              <CardContent>
+                 <p className="text-3xl font-bold text-red-500">
+                   {subjects.filter((s) => s.isActive === false).length}
+                 </p>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
 
       {/* TABULKA */}
       <DataTable<SubjectRow>

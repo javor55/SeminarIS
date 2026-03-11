@@ -40,6 +40,22 @@ export function EditSubjectOccurrenceDialog({
   const [subjects, setSubjects] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
 
+  // Lokální stavy pro formulář
+  const [subjectId, setSubjectId] = useState(occurrence.subjectId ?? "");
+  const [teacherId, setTeacherId] = useState(occurrence.teacherId ?? "");
+  const [subCode, setSubCode] = useState(occurrence.subCode ?? "");
+  const [capacity, setCapacity] = useState<string | number>(occurrence.capacity ?? "");
+
+  // Sync prop -> state
+  useEffect(() => {
+    if (open) {
+      setSubjectId(occurrence.subjectId ?? "");
+      setTeacherId(occurrence.teacherId ?? "");
+      setSubCode(occurrence.subCode ?? "");
+      setCapacity(occurrence.capacity ?? "");
+    }
+  }, [open, occurrence]);
+
   useEffect(() => {
      async function load() {
        const [subjs, allU] = await Promise.all([getSubjects(), getAllUsers()]);
@@ -63,13 +79,12 @@ export function EditSubjectOccurrenceDialog({
           <DialogTitle>
             {isNew ? "Přidat výskyt předmětu" : "Upravit výskyt předmětu"}
           </DialogTitle>
-          <DialogDescription>zatím se neukládá.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-2">
           <div className="space-y-1">
             <label className="text-sm font-medium">Předmět</label>
-            <Select defaultValue={occurrence.subjectId ?? ""}>
+            <Select value={subjectId} onValueChange={setSubjectId}>
               <SelectTrigger>
                 <SelectValue placeholder="Vyber předmět" />
               </SelectTrigger>
@@ -85,7 +100,7 @@ export function EditSubjectOccurrenceDialog({
 
           <div className="space-y-1">
             <label className="text-sm font-medium">Učitel</label>
-            <Select defaultValue={occurrence.teacherId ?? ""}>
+            <Select value={teacherId} onValueChange={setTeacherId}>
               <SelectTrigger>
                 <SelectValue placeholder="Vyber učitele" />
               </SelectTrigger>
@@ -103,7 +118,8 @@ export function EditSubjectOccurrenceDialog({
             <div className="space-y-1 flex-1">
               <label className="text-sm font-medium">Kód skupiny</label>
               <Input
-                defaultValue={occurrence.subCode ?? ""}
+                value={subCode}
+                onChange={(e) => setSubCode(e.target.value)}
                 placeholder="např. A"
               />
             </div>
@@ -111,8 +127,10 @@ export function EditSubjectOccurrenceDialog({
               <label className="text-sm font-medium">Kapacita</label>
               <Input
                 type="number"
-                defaultValue={occurrence.capacity ?? ""}
-                placeholder="0 = bez kapacity"
+                min="0"
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                placeholder="0 = neomezeno"
               />
             </div>
           </div>
@@ -132,9 +150,9 @@ export function EditSubjectOccurrenceDialog({
                     ? "Nelze smazat – jsou zapsaní studenti"
                     : "Smazat výskyt"
                 }
-                onClick={() => {
+                onClick={async () => {
                   if (hasStudents) return;
-                  onDelete?.(occurrence.id);
+                  if (onDelete) await onDelete(occurrence.id);
                   onOpenChange(false);
                 }}
               >                
@@ -148,7 +166,31 @@ export function EditSubjectOccurrenceDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Zrušit
             </Button>
-            <Button onClick={() => onSubmit?.(occurrence)}>
+            <Button 
+                onClick={async () => {
+                  if (!subjectId) {
+                    alert("Vyberte vyučovaný předmět.");
+                    return;
+                  }
+                  
+                  const capNum = capacity ? Number(capacity) : 0;
+                  if (capNum < 0) {
+                    alert("Kapacita nesmí být záporná.");
+                    return;
+                  }
+
+                  if (onSubmit) {
+                    await onSubmit({
+                      ...occurrence,
+                      subjectId,
+                      teacherId: teacherId || null,
+                      subCode: subCode || null,
+                      capacity: capNum,
+                    } as any);
+                  }
+                  onOpenChange(false);
+                }}
+            >
               Uložit
             </Button>
           </DialogFooter>

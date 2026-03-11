@@ -33,7 +33,7 @@ function findDashboardEnrollment(
   // 3. Priorita: "SCHEDULED"
   const scheduledWindows = windowsToSearch
     .filter((ew) => ew.status === "SCHEDULED")
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(a.startsAt).getTime());
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   if (scheduledWindows.length > 0) return scheduledWindows[0];
 
   // 4. Priorita: "DRAFT"

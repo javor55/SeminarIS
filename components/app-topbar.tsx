@@ -25,14 +25,19 @@ const linksByRole: Record<string, Array<{ label: string; href: string }>> = {
     { label: "Zápisy", href: "/enrollments" },
     { label: "Předměty", href: "/subjects" },
     { label: "Uživatelé", href: "/users" },
-    { label: "Nastavení", href: "/settings" },
+    { label: "Administrace", href: "/admin" },
+    { label: "Můj Profil", href: "/profile" },
   ],
   TEACHER: [
     { label: "Dashboard", href: "/" },
     { label: "Zápisy", href: "/enrollments" },
     { label: "Předměty", href: "/subjects" },
+    { label: "Můj Profil", href: "/profile" },
   ],
-  STUDENT: [{ label: "Dashboard", href: "/" }],
+  STUDENT: [
+    { label: "Dashboard", href: "/" },
+    { label: "Můj Profil", href: "/profile" },
+  ],
   GUEST: [],
 };
 

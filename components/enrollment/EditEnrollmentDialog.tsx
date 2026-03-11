@@ -35,7 +35,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-// import { updateEnrollmentWindow, createEnrollmentWindow, deleteEnrollmentWindow } from "@/lib/mock-db";
+import { updateEnrollmentWindow, createEnrollmentWindow, deleteEnrollmentWindow } from "@/lib/data";
 
 type EditEnrollmentDialogProps = {
   enrollment: any;
@@ -88,27 +88,23 @@ export function EditEnrollmentDialog({
         visibleToStudents,
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
-        updatedAt: new Date().toISOString(),
       };
 
       if (isExisting) {
         // --- LOGIKA PRO UPDATE ---
-        const updated = { ...enrollment, ...data };
-        // const ok = updateEnrollmentWindow(updated);
-        console.log("Uloženo (Update - Mock):", updated);
-        onOpenChange(false); // Jen zavřeme dialog
+        const ok = await updateEnrollmentWindow(enrollment.id, data);
+        onOpenChange(false); // Zavřeme dialog po updatu
       } else {
         // --- LOGIKA PRO CREATE ---
-        const created = { ...data, id: `new-id-${Date.now()}` }; // Mock ID
-        // const newRecord = createEnrollmentWindow(data);
-        console.log("Uloženo (Create - Mock):", created);
+        const newRecord = await createEnrollmentWindow(data);
         onOpenChange(false); // Zavřeme dialog
-        router.push(`/enrollments/${created.id}`); // 🔥 4. Přesměrování!
-        router.refresh(); // Obnoví data na stránce
+        router.push(`/enrollments/${newRecord.id}`); // Přesměrování na detail existujícího záznamu
       }
 
+      window.location.reload(); // Tvrdý reload pro bezpečné obnovení dat
     } catch (e) {
       console.error(e);
+      alert("Došlo k chybě při ukládání okna.");
     } finally {
       setSaving(false);
     }
@@ -116,10 +112,15 @@ export function EditEnrollmentDialog({
   
   async function handleDelete() {
     if (!isExisting) return;
-    console.log("Mazání (Mock):", enrollment.id);
-    // deleteEnrollmentWindow(enrollment.id);
-    onOpenChange(false); // Zavřeme dialog
-    router.refresh(); // Obnoví data
+    try {
+      await deleteEnrollmentWindow(enrollment.id);
+      onOpenChange(false); // Zavřeme dialog
+      router.push("/enrollments");
+      router.refresh(); // Obnoví data
+    } catch(err) {
+      console.error(err);
+      alert("Tento záznam se nepodařilo smazat. Může obsahovat existující bloky, které musíte smazat nejdříve.");
+    }
   }
 
   return (

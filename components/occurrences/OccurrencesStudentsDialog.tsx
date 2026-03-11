@@ -12,6 +12,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { getAllUsers } from "@/lib/data";
 import {
   AlertDialog,
@@ -59,6 +60,7 @@ export function OccurrencesStudentsDialog({
     () => occurrence.enrollments
   );
   const [toUnenroll, setToUnenroll] = useState<string | null>(null);
+  const [hasChanged, setHasChanged] = useState(false);
 
   const alreadyEnrolledIds = new Set(localEnrollments.map((e) => e.studentId));
   const enrollableStudents = allUsers.filter(
@@ -108,22 +110,25 @@ export function OccurrencesStudentsDialog({
                   </select>
                   <Button
                     size="sm"
-                    // 🔥 ZMĚNA: Tlačítko se přizpůsobí
                     className="w-full sm:w-auto"
                     onClick={async () => {
                       if (!selectedStudentId) return;
-                      const newEnr = await enrollStudent(
-                        selectedStudentId,
-                        occurrenceId
-                      );
-                      setLocalEnrollments((prev) => [...prev, { ...newEnr } as any]);
-                      
-                      router.refresh();
+                      try {
+                        const newEnr = await enrollStudent(
+                          selectedStudentId,
+                          occurrenceId
+                        );
+                        setLocalEnrollments((prev) => [...prev, { ...newEnr } as any]);
+                        setHasChanged(true);
+                        toast.success("Student byl úspěšně zapsán.");
 
-                      const nextStudents = enrollableStudents.filter(
-                        (s) => s.id !== selectedStudentId
-                      );
-                      setSelectedStudentId(nextStudents[0]?.id ?? "");
+                        const nextStudents = enrollableStudents.filter(
+                          (s) => s.id !== selectedStudentId
+                        );
+                        setSelectedStudentId(nextStudents[0]?.id ?? "");
+                      } catch (err: any) {
+                        toast.error(err.message || "Nepodařilo se zapsat studenta.");
+                      }
                     }}
                   >
                     Zapsat
@@ -176,7 +181,16 @@ export function OccurrencesStudentsDialog({
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (hasChanged) {
+                  window.location.reload();
+                } else {
+                  onOpenChange(false);
+                }
+              }}
+            >
               Zavřít
             </Button>
           </DialogFooter>
@@ -189,7 +203,7 @@ export function OccurrencesStudentsDialog({
             <AlertDialogHeader>
               <AlertDialogTitle>Odepsat studenta?</AlertDialogTitle>
               <AlertDialogDescription>
-                Tato akce v mock režimu skutečně odstraní zápis z paměti.
+                Tato akce odebere studenta ze seznamu zapsaných v tomto termínu.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -200,13 +214,18 @@ export function OccurrencesStudentsDialog({
                 onClick={async () => {
                   const enrToDelete = toUnenroll;
                   if (!enrToDelete) return;
-                  await unenrollStudent(enrToDelete);
-                  
-                  setLocalEnrollments((prev) =>
-                    prev.filter((e) => e.id !== enrToDelete)
-                  );
-                  router.refresh();
-                  setToUnenroll(null);
+                  try {
+                    await unenrollStudent(enrToDelete);
+                    toast.success("Student byl úspěšně odepsán.");
+                    setLocalEnrollments((prev) =>
+                      prev.filter((e) => e.id !== enrToDelete)
+                    );
+                    setHasChanged(true);
+                  } catch (err: any) {
+                    toast.error(err.message || "Nepodařilo se odepsat studenta.");
+                  } finally {
+                    setToUnenroll(null);
+                  }
                 }}
               >
                 Odepsat

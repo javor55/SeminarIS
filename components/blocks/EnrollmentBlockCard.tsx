@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 import { BlockHeader } from "@/components/blocks/BlockHeader";
 import { DataTable } from "@/components/ui/data-table";
+import { toast } from "sonner";
 import {
   getOccurrenceColumns,
   OccurrenceRow,
@@ -26,7 +27,7 @@ import {
 import { EditSubjectOccurrenceDialog } from "@/components/occurrences/EditSubjectOccurrenceDialog";
 import { OccurrencesStudentsDialog } from "@/components/occurrences/OccurrencesStudentsDialog";
 
-import { enrollStudent, unenrollStudent } from "@/lib/data";
+import { enrollStudent, unenrollStudent, updateSubjectOccurrence, deleteSubjectOccurrence } from "@/lib/data";
 
 export function EnrollmentBlockCard({
   block,
@@ -138,8 +139,13 @@ export function EnrollmentBlockCard({
     }
 
     // 3. normální zápis
-    await enrollStudent(currentUser.id, occId);
-    router.refresh();
+    try {
+      await enrollStudent(currentUser.id, occId);
+      toast.success("Zápis byl úspěšně proveden.");
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err.message || "Nepodařilo se provést zápis.");
+    }
   }
 
   //
@@ -152,8 +158,13 @@ export function EnrollmentBlockCard({
       (e: any) => e.studentId === currentUser.id && !e.deletedAt
     );
     if (!enr) return;
-    await unenrollStudent(enr.id);
-    router.refresh();
+    try {
+      await unenrollStudent(enr.id);
+      toast.success("Odhlášení bylo úspěšně provedeno.");
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err.message || "Nepodařilo se zrušit zápis.");
+    }
   }
 
   //
@@ -276,8 +287,16 @@ export function EnrollmentBlockCard({
       {/* dialog Editace výskytu */}
       {editOccurrence && (
         <EditSubjectOccurrenceDialog
-          occurrence={editOccurrence}
+          occurrence={editOccurrence as any}
           onOpenChange={(open) => !open && setEditOccurrence(null)}
+          onSubmit={async (data) => {
+              await updateSubjectOccurrence(data.id, data);
+              window.location.reload();
+          }}
+          onDelete={async (id) => {
+              await deleteSubjectOccurrence(id);
+              window.location.reload();
+          }}
         />
       )}
 
@@ -366,11 +385,17 @@ export function EnrollmentBlockCard({
               <AlertDialogCancel>Zrušit</AlertDialogCancel>
               <AlertDialogAction
                 onClick={async () => {
-                  const my = findMyOccurrenceInThisBlock();
-                  if (my) await unenrollStudent(my.enrollmentId);
-                  await enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
-                  router.refresh();
-                  setSwitchEnroll(null);
+                  try {
+                    const my = findMyOccurrenceInThisBlock();
+                    if (my) await unenrollStudent(my.enrollmentId);
+                    await enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
+                    toast.success("Zápis byl úspěšně přepsán.");
+                    window.location.reload();
+                  } catch (err: any) {
+                    toast.error(err.message || "Nepodařilo se přepsat zápis.");
+                  } finally {
+                    setSwitchEnroll(null);
+                  }
                 }}
               >
                 Přepsat

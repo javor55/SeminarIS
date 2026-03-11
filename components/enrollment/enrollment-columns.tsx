@@ -3,7 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { User, EnrollmentWindow, EnrollmentStatus } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, computeEnrollmentStatus } from "@/lib/utils";
 import Link from "next/link"; // Pro proklik z názvu
 import { Badge } from "@/components/ui/badge"; // Pro badge stavu
 // 🔥 Ikony Check a X již nejsou potřeba
@@ -21,21 +21,7 @@ export type EnrollmentRow = EnrollmentWindow & {
   fullData: any;
 };
 
-// Funkce pro barvu badge stavu
-function getStatusBadgeVariant(status: EnrollmentStatus): { label: string, variant: "default" | "secondary" | "outline" | "destructive", className: string } {
-  switch (status) {
-    case "OPEN":
-      return { label: "Otevřeno", variant: "default", className: "bg-emerald-600 hover:bg-emerald-600 text-white" };
-    case "SCHEDULED":
-      return { label: "Naplánováno", variant: "default", className: "bg-blue-600 hover:bg-blue-600 text-white" };
-    case "DRAFT":
-      return { label: "Koncept", variant: "secondary", className: "" };
-    case "CLOSED":
-      return { label: "Uzavřeno", variant: "outline", className: "" };
-    default:
-      return { label: status, variant: "outline", className: "" };
-  }
-}
+// Odstraněno: getStatusBadgeVariant se logikou přesunul do computeEnrollmentStatus a renderování do buňky
 
 // Funkce pro generování sloupců
 export function getEnrollmentColumns(opts: {
@@ -71,9 +57,16 @@ export function getEnrollmentColumns(opts: {
       accessorKey: "status",
       header: "Stav",
       cell: ({ row }) => {
-        const status = row.original.status as EnrollmentStatus;
-        const { label, variant, className } = getStatusBadgeVariant(status);
-        return <Badge variant={variant} className={cn(className)}>{label}</Badge>;
+        const ew = row.original;
+        const statusMeta = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
+        // Vybereme variantu badge podle interního 'is' klíče z utilits
+        let variant: "default" | "secondary" | "outline" | "destructive" = "outline";
+        let xtraClass = "";
+        if (statusMeta.is === "open" && ew.status !== "DRAFT") { variant = "default"; xtraClass = "bg-emerald-600 hover:bg-emerald-600 text-white"; }
+        if (statusMeta.is === "planned" && ew.status !== "DRAFT") { variant = "default"; xtraClass = "bg-blue-600 hover:bg-blue-600 text-white"; }
+        if (ew.status === "DRAFT") { variant = "secondary"; }
+
+        return <Badge variant={variant} className={cn(xtraClass)}>{statusMeta.label}</Badge>;
       },
       filterFn: (row, id, value) => {
         if (!value || value.length === 0) return true;

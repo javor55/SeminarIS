@@ -5,7 +5,7 @@ import { Block, SubjectOccurrence } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { EditBlockDialog } from "@/components/blocks/EditBlockDialog";
 import { EditSubjectOccurrenceDialog } from "@/components/occurrences/EditSubjectOccurrenceDialog";
-import { moveBlock, deleteBlock } from "@/lib/data";
+import { moveBlock, deleteBlock, updateBlock, createSubjectOccurrence, updateSubjectOccurrence, deleteSubjectOccurrence } from "@/lib/data";
 import { toast } from "sonner";
 
 export function BlockHeader({
@@ -79,8 +79,10 @@ export function BlockHeader({
               disabled={blockIndex === 0}
               onClick={async () => {
                 const ok = await moveBlock(block.id, "UP");
-                if (ok) toast.success("Blok posunut nahoru");
-                else toast.error("Blok nelze posunout výš");
+                if (ok) {
+                  toast.success("Blok posunut nahoru");
+                  window.location.reload();
+                } else toast.error("Blok nelze posunout výš");
               }}
             >
               ↑
@@ -93,8 +95,10 @@ export function BlockHeader({
               disabled={blockIndex === totalBlocks - 1}
               onClick={async () => {
                 const ok = await moveBlock(block.id, "DOWN");
-                if (ok) toast.success("Blok posunut dolů");
-                else toast.error("Blok nelze posunout níž");
+                if (ok) {
+                  toast.success("Blok posunut dolů");
+                  window.location.reload();
+                } else toast.error("Blok nelze posunout níž");
               }}
             >
               ↓
@@ -111,8 +115,10 @@ export function BlockHeader({
                   return;
                 }
                 const res = await deleteBlock(block.id);
-                if (res) toast.success("Blok byl smazán");
-                else toast.error("Blok se nepodařilo smazat");
+                if (res) {
+                  toast.success("Blok byl smazán");
+                  window.location.reload();
+                } else toast.error("Blok se nepodařilo smazat");
               }}
             >
               Smazat
@@ -129,13 +135,34 @@ export function BlockHeader({
               // když se dialog zavře, smažeme vybraný blok
               if (!open) setEditBlock(null);
             }}
+            onSubmit={async (data) => {
+              try {
+                await updateBlock(data);
+                toast.success("Blok byl upraven");
+                window.location.reload(); // Vrácen hard reload
+              } catch (e) {
+                toast.error("Blok se nepodařilo upravit");
+              }
+            }}
           />
       )}
 
       {editOccurrence && (
         <EditSubjectOccurrenceDialog
-          occurrence={editOccurrence}
+          occurrence={editOccurrence as any}
           onOpenChange={(open) => !open && setEditOccurrence(null)}
+          onSubmit={async (data) => {
+              if (data.id) {
+                await updateSubjectOccurrence(data.id, data);
+              } else {
+                await createSubjectOccurrence(data);
+              }
+              window.location.reload();
+          }}
+          onDelete={async (id) => {
+              await deleteSubjectOccurrence(id);
+              window.location.reload();
+          }}
         />
       )}
     </>
