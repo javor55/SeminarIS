@@ -1,12 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+
 import { Block, SubjectOccurrence } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { EditBlockDialog } from "@/components/blocks/EditBlockDialog";
 import { EditSubjectOccurrenceDialog } from "@/components/occurrences/EditSubjectOccurrenceDialog";
 import { moveBlock, deleteBlock, updateBlock, createSubjectOccurrence, updateSubjectOccurrence, deleteSubjectOccurrence } from "@/lib/data";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 export function BlockHeader({
   block,
@@ -19,11 +32,14 @@ export function BlockHeader({
   totalBlocks: number;
   isAdmin: boolean;
 }) {
+  const router = useRouter();
   const hasOccurrences = (block.occurrences?.length ?? 0) > 0;
+
 
   // lokální stavy pro dialogy
   const [editBlock, setEditBlock] = useState<Block | null>(null);
   const [editOccurrence, setEditOccurrence] = useState<SubjectOccurrence | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   return (
     <>
@@ -81,8 +97,9 @@ export function BlockHeader({
                 const ok = await moveBlock(block.id, "UP");
                 if (ok) {
                   toast.success("Blok posunut nahoru");
-                  window.location.reload();
+                  router.refresh();
                 } else toast.error("Blok nelze posunout výš");
+
               }}
             >
               ↑
@@ -97,8 +114,9 @@ export function BlockHeader({
                 const ok = await moveBlock(block.id, "DOWN");
                 if (ok) {
                   toast.success("Blok posunut dolů");
-                  window.location.reload();
+                  router.refresh();
                 } else toast.error("Blok nelze posunout níž");
+
               }}
             >
               ↓
@@ -109,23 +127,49 @@ export function BlockHeader({
               variant="destructive"
               size="sm"
               disabled={hasOccurrences}
-              onClick={async () => {
-                if (hasOccurrences) {
-                  toast.error("Nelze smazat blok s předměty");
-                  return;
-                }
-                const res = await deleteBlock(block.id);
-                if (res) {
-                  toast.success("Blok byl smazán");
-                  window.location.reload();
-                } else toast.error("Blok se nepodařilo smazat");
-              }}
+              onClick={() => setShowDeleteConfirm(true)}
             >
               Smazat
             </Button>
           </div>
         )}
       </div>
+
+      {/* ALERT: Potvrzení smazání bloku */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Opravdu smazat tento blok?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tato akce trvale odstraní blok <strong>{block.name}</strong>. Tato akce je nevratná.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Zrušit</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                try {
+                  const res = await deleteBlock(block.id);
+                  if (res) {
+                    toast.success("Blok byl smazán");
+                    router.refresh();
+                  } else {
+
+                    toast.error("Blok se nepodařilo smazat");
+                  }
+                } catch (e: any) {
+                  toast.error(e.message || "Nastala chyba při mazání bloku");
+                } finally {
+                  setShowDeleteConfirm(false);
+                }
+              }}
+            >
+              Smazat
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {editBlock && (
           <EditBlockDialog
@@ -139,7 +183,8 @@ export function BlockHeader({
               try {
                 await updateBlock(data);
                 toast.success("Blok byl upraven");
-                window.location.reload(); // Vrácen hard reload
+                router.refresh();
+
               } catch (e) {
                 toast.error("Blok se nepodařilo upravit");
               }
@@ -157,12 +202,14 @@ export function BlockHeader({
               } else {
                 await createSubjectOccurrence(data);
               }
-              window.location.reload();
+              router.refresh();
           }}
+
           onDelete={async (id) => {
               await deleteSubjectOccurrence(id);
-              window.location.reload();
+              router.refresh();
           }}
+
         />
       )}
     </>

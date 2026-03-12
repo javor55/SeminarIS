@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getAllUsers } from "@/lib/data";
+import { getUsersForFilters } from "@/lib/data";
+
 import {
   AlertDialog,
   AlertDialogContent,
@@ -50,11 +51,12 @@ export function OccurrencesStudentsDialog({
 
   useEffect(() => {
     async function load() {
-      setAllUsers(await getAllUsers());
+      setAllUsers(await getUsersForFilters());
     }
     load();
   }, []);
-  const isAdmin = currentUser.role === "ADMIN";
+  const isPrivileged = currentUser.role === "ADMIN" || currentUser.role === "TEACHER";
+
 
   const [localEnrollments, setLocalEnrollments] = useState(
     () => occurrence.enrollments
@@ -87,7 +89,8 @@ export function OccurrencesStudentsDialog({
             </DialogDescription>
           </DialogHeader>
 
-          {isAdmin && (
+          {isPrivileged && (
+
             <div className="mb-3 rounded-md border p-3 space-y-2">
               <p className="text-sm font-medium">Ruční zapsání studenta</p>
               {enrollableStudents.length === 0 ? (
@@ -163,7 +166,8 @@ export function OccurrencesStudentsDialog({
                         zapsán: {new Date(enr.createdAt).toLocaleString()}
                       </p>
                     </div>
-                    {isAdmin && (
+                    {isPrivileged && (
+
                       <Button
                         variant="destructive"
                         size="sm"
@@ -185,14 +189,14 @@ export function OccurrencesStudentsDialog({
               variant="outline"
               onClick={() => {
                 if (hasChanged) {
-                  window.location.reload();
-                } else {
-                  onOpenChange(false);
+                  router.refresh();
                 }
+                onOpenChange(false);
               }}
             >
               Zavřít
             </Button>
+
           </DialogFooter>
         </DialogContent>
       </Dialog>

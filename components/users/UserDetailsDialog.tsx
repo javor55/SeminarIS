@@ -12,6 +12,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Calendar, User, Mail, GraduationCap, History } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { cn, computeEnrollmentStatus } from "@/lib/utils";
+
 
 interface UserDetailsDialogProps {
   user: UserRow | null;
@@ -96,6 +98,8 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
                   const subject = en.subjectOccurrence?.subject;
                   const block = en.subjectOccurrence?.block;
                   
+                  const statusMeta = computeEnrollmentStatus(window?.status ?? "CLOSED", window?.startsAt, window?.endsAt);
+                  
                   return (
                     <div key={en.id} className="p-3 text-sm hover:bg-white transition-colors">
                       <div className="flex justify-between items-start gap-4">
@@ -109,16 +113,14 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
                           </p>
                         </div>
                         <Badge 
-                          variant="outline" 
+                          variant={statusMeta.is === "open" ? "default" : "outline"} 
                           className={cn(
                             "text-[10px] uppercase font-bold px-1.5 h-5",
-                            window?.status === "OPEN" ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
-                            window?.status === "SCHEDULED" ? "bg-blue-100 text-blue-700 border-blue-200" :
-                            "bg-slate-100 text-slate-600 border-slate-200"
+                            statusMeta.is === "open" && "bg-emerald-600 hover:bg-emerald-600 text-white",
+                            statusMeta.is === "planned" && "bg-blue-100 text-blue-700 border-blue-200"
                           )}
                         >
-                          {window?.status === "OPEN" ? "Aktivní" : 
-                           window?.status === "SCHEDULED" ? "Plánováno" : "Uzavřeno"}
+                          {statusMeta.label}
                         </Badge>
                       </div>
                     </div>
@@ -137,5 +139,4 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
   );
 }
 
-// Pomocná funkce pro styling Badge (protože nemám přístup k cn globálně v tomto toolu snadno, ale raději použiju standardní Tailwind nebo import)
-import { cn } from "@/lib/utils";
+

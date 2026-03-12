@@ -5,6 +5,8 @@ import { EnrollmentWindowWithBlocks, User, Subject, EnrollmentWindow } from "./t
 import { getServerSession } from "next-auth";
 import { authOptions } from "./auth";
 import bcrypt from "bcryptjs";
+import { revalidatePath } from "next/cache";
+
 
 // === Pomocné funkce pro autorizaci ===
 async function requireAuth(): Promise<any> {
@@ -21,34 +23,71 @@ async function requireAdmin() {
   return user;
 }
 
+async function requirePrivileged() {
+  const user = await requireAuth();
+  if (user.role !== "ADMIN" && user.role !== "TEACHER") {
+    throw new Error("Unauthorized: Access denied");
+  }
+  return user;
+}
+
+
 // === ČTENÍ DAT ===
 
 export async function getSubjects() {
+  const user = await requireAuth();
+  const isPrivileged = user.role === "ADMIN" || user.role === "TEACHER";
+
   const subjects = await prisma.subject.findMany({
     orderBy: { createdAt: "desc" },
     include: {
       createdBy: { select: { firstName: true, lastName: true, email: true } },
       updatedBy: { select: { firstName: true, lastName: true, email: true } },
       subjectOccurrences: {
-        where: { deletedAt: null },
+        where: { 
+          deletedAt: null,
+          ...( !isPrivileged ? {
+            block: {
+              enrollmentWindow: {
+                visibleToStudents: true,
+                status: { not: "DRAFT" }
+              }
+            }
+          } : {})
+        },
         include: {
-          teacher: { select: { id: true, firstName: true, lastName: true, email: true } }
+          teacher: { select: { id: true, firstName: true, lastName: true, email: true } },
+          block: {
+             include: {
+                enrollmentWindow: true
+             }
+          }
         }
       }
     }
   });
 
-  return JSON.parse(JSON.stringify(subjects));
+  // Pokud je to student/host, vyfiltrujeme předměty, které nemají žádný viditelný výskyt
+  // (Učitelé/Admini vidí všechny předměty vždy)
+  const filtered = !isPrivileged
+    ? subjects.filter(s => s.subjectOccurrences.length > 0)
+    : subjects;
+
+  return JSON.parse(JSON.stringify(filtered));
 }
+
 
 // Slouží k naplnění combo box filters v Data table, nezatíží systém na rozdíl od getAllUsers
 export async function getUsersForFilters() {
+  await requireAuth(); // Dříve requirePrivileged, ale potřebujeme i pro studenty v detailu předmětu
   const users = await prisma.user.findMany({
-    select: { id: true, firstName: true, lastName: true, email: true },
+    select: { id: true, firstName: true, lastName: true, email: true, role: true },
     orderBy: { lastName: 'asc' }
   });
   return users;
 }
+
+
 
 export async function getSubjectById(id: string) {
   return await prisma.subject.findUnique({
@@ -149,8 +188,9 @@ export async function getEnrollmentWindowByIdWithBlocks(id: string) {
 // Rozšířené získání uživatelů vcetne historie zapisů
 export async function getAllUsers() {
   try {
-    const adminUser = await requireAdmin();
-    console.log(`ServerAction: getAllUsers voláno uživatelem ${adminUser.email}`);
+    const user = await requirePrivileged();
+    console.log(`ServerAction: getAllUsers voláno uživatelem ${user.email}`);
+
     
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
@@ -182,25 +222,6 @@ export async function getAllUsers() {
   }
 }
 
-// Veřejná funkce pro přihlašovací stránku (demo/testování)
-export async function getPublicTestUsers() {
-  try {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        firstName: true,
-        lastName: true,
-      },
-      take: 20,
-    });
-    return JSON.parse(JSON.stringify(users));
-  } catch (err) {
-    console.error("Error fetching public test users:", err);
-    return [];
-  }
-}
 
 export async function getUserByEmail(email: string) {
   return await prisma.user.findUnique({
@@ -407,10 +428,17 @@ export async function getEnrollmentDetails(windowId: string) {
 // === MUTACE (zapis) ===
 export async function enrollStudent(studentId: string, subjectOccurrenceId: string) {
   const user = await requireAuth();
-  // Zamezit komukoliv jinému než sobě, Ledaže je to ADMIN
-  if (user.id !== studentId && user.role !== "ADMIN") {
+  // Zamezit studentům zápis jiných studentů
+  if (user.role === "STUDENT" && user.id !== studentId) {
     throw new Error("Unauthorized mapping");
   }
+  // Hosté nemohou zapisovat
+  if (user.role === "GUEST") {
+    throw new Error("Guests cannot enroll");
+  }
+
+
+
 
   // Načteme cílový výskyt s kontextem
   const targetOcc = await prisma.subjectOccurrence.findUnique({
@@ -482,14 +510,17 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
     }
   }
 
-  return await prisma.studentEnrollment.create({
+  const res = await prisma.studentEnrollment.create({
     data: {
       studentId,
       subjectOccurrenceId,
       createdById: user.id as string,
     },
   });
+  revalidatePath("/", "layout");
+  return res;
 }
+
 
 export async function unenrollStudent(enrollmentId: string) {
   const user = await requireAuth();
@@ -498,21 +529,37 @@ export async function unenrollStudent(enrollmentId: string) {
   });
 
   if (!enrollment) return;
-  if (enrollment.studentId !== user.id && user.role !== "ADMIN") {
+  // Student může odepsat jen sebe, ADMIN/TEACHER kohokoliv
+  if (user.role === "STUDENT" && enrollment.studentId !== user.id) {
     throw new Error("Unauthorized mapping");
   }
+  // Hosté nemohou odepisovat
+  if (user.role === "GUEST") {
+    throw new Error("Guests cannot unenroll");
+  }
 
-  return await prisma.studentEnrollment.delete({
+
+
+
+  const res = await prisma.studentEnrollment.delete({
     where: { id: enrollmentId },
   });
+  revalidatePath("/", "layout");
+  return res;
 }
+
+
 
 export async function deleteBlock(blockId: string) {
   await requireAdmin();
-  return await prisma.block.delete({
+  const res = await prisma.block.delete({
     where: { id: blockId },
   });
+  revalidatePath("/", "layout");
+  return res;
 }
+
+
 
 export async function moveBlock(blockId: string, direction: "UP" | "DOWN") {
   await requireAdmin();
@@ -537,19 +584,25 @@ export async function moveBlock(blockId: string, direction: "UP" | "DOWN") {
     // Nyní ten první (dočasně na -1) dosadíme na cílovou pozici
     prisma.block.update({ where: { id: block.id }, data: { order: targetBlock.order } }),
   ]);
+  revalidatePath("/", "layout");
   return true;
 }
 
+
 export async function updateBlock(block: any) {
   await requireAdmin();
-  return await prisma.block.update({
+  const res = await prisma.block.update({
     where: { id: block.id },
     data: {
       name: block.name,
-      description: block.description,
+      description: block.description || null,
     },
   });
+  revalidatePath("/", "layout");
+  return res;
 }
+
+
 
 export async function createBlock(enrollmentWindowId: string, name: string, description?: string | null) {
   const admin = await requireAdmin();
@@ -573,8 +626,10 @@ export async function createBlock(enrollmentWindowId: string, name: string, desc
     }
   });
   
+  revalidatePath("/", "layout");
   return JSON.parse(JSON.stringify(block));
 }
+
 
 // === ZÁPISOVÁ OKNA (EnrollmentWindow) ===
 export async function createEnrollmentWindow(data: any) {
@@ -590,8 +645,10 @@ export async function createEnrollmentWindow(data: any) {
       createdById: admin.id,
     },
   });
+  revalidatePath("/", "layout");
   return JSON.parse(JSON.stringify(created));
 }
+
 
 export async function updateEnrollmentWindow(windowId: string, data: any) {
   const admin = await requireAdmin();
@@ -607,18 +664,23 @@ export async function updateEnrollmentWindow(windowId: string, data: any) {
       updatedById: admin.id,
     },
   });
+  revalidatePath("/", "layout");
   return JSON.parse(JSON.stringify(updated));
 }
 
+
 export async function deleteEnrollmentWindow(windowId: string) {
   await requireAdmin();
-  // Kaskádovite smazání není nastaveno explicitně v Prismě on cascade delete,
-  // takže bezpečně smažeme jen okno. Modely by ideálně měly mít onDelete: Cascade
-  // v schema.prisma, pro tuto chvíli necháváme jen Prisma smazání.
-  return await prisma.enrollmentWindow.delete({
+  // V schema.prisma je nastaveno onDelete: Cascade, takže Prisma automaticky
+  // smaže i všechny bloky a výskyty předmětů spojené s tímto oknem.
+  const res = await prisma.enrollmentWindow.delete({
     where: { id: windowId },
   });
+  revalidatePath("/", "layout");
+  return res;
 }
+
+
 
 // === VÝSKYTY PŘEDMĚTŮ (SubjectOccurrence) ===
 export async function createSubjectOccurrence(data: any) {
@@ -633,8 +695,10 @@ export async function createSubjectOccurrence(data: any) {
       createdById: admin.id,
     },
   });
+  revalidatePath("/", "layout");
   return JSON.parse(JSON.stringify(occ));
 }
+
 
 export async function updateSubjectOccurrence(occurrenceId: string, data: any) {
   const admin = await requireAdmin();
@@ -648,21 +712,40 @@ export async function updateSubjectOccurrence(occurrenceId: string, data: any) {
       updatedById: admin.id,
     },
   });
+  revalidatePath("/", "layout");
   return JSON.parse(JSON.stringify(occ));
 }
+
 
 export async function deleteSubjectOccurrence(occurrenceId: string) {
   await requireAdmin();
-  const occ = await prisma.subjectOccurrence.update({
-    where: { id: occurrenceId },
-    data: { deletedAt: new Date() },
+  
+  // Provádíme kaskádové soft-smazání v rámci transakce
+  return await prisma.$transaction(async (tx) => {
+    // 1. Soft-smazání samotného výskytu
+    const occ = await tx.subjectOccurrence.update({
+      where: { id: occurrenceId },
+      data: { deletedAt: new Date() },
+    });
+
+    // 2. Soft-smazání všech aktivních zápisů pro tento výskyt
+    await tx.studentEnrollment.updateMany({
+      where: { 
+        subjectOccurrenceId: occurrenceId,
+        deletedAt: null 
+      },
+      data: { deletedAt: new Date() },
+    });
+
+    revalidatePath("/", "layout");
+    return JSON.parse(JSON.stringify(occ));
   });
-  return JSON.parse(JSON.stringify(occ));
 }
+
 
 export async function createSubject(subject: any) {
   const admin = await requireAdmin();
-  return await prisma.subject.create({
+  const res = await prisma.subject.create({
     data: {
       name: subject.name,
       code: subject.code,
@@ -671,18 +754,26 @@ export async function createSubject(subject: any) {
       createdById: admin.id,
     },
   });
+  revalidatePath("/", "layout");
+  return res;
 }
+
+
 
 export async function toggleSubjectActive(subjectId: string) {
   await requireAdmin();
   const targetSubject = await prisma.subject.findUnique({ where: { id: subjectId } });
   if (!targetSubject) return;
 
-  return await prisma.subject.update({
+  const res = await prisma.subject.update({
     where: { id: subjectId },
     data: { isActive: !targetSubject.isActive },
   });
+  revalidatePath("/", "layout");
+  return res;
 }
+
+
 
 export async function updateSubject(subject: any) {
   const admin = await requireAdmin();

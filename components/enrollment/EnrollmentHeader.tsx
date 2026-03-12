@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
 import { EditEnrollmentDialog } from "@/components/enrollment/EditEnrollmentDialog";
 import { User, EnrollmentWindowWithBlocks } from "@/lib/types";
@@ -43,6 +45,8 @@ export function EnrollmentHeader({
   enrollmentWindow: ew,
   currentUser: user,
 }: EnrollmentHeaderProps) {
+  const router = useRouter();
+
   const [now, setNow] = useState(new Date());
   const [editEnrollment, setEditEnrollment] = useState<any | null>(null);
   const [isCreatingBlock, setIsCreatingBlock] = useState(false);
@@ -380,7 +384,9 @@ export function EnrollmentHeader({
         onSubmit={async (data) => {
           try {
             await createBlock(ew.id, data.name, data.description);
-            window.location.reload();
+            router.refresh();
+            setIsCreatingBlock(false);
+
           } catch (e) {
             console.error(e);
             alert("Nepodařilo se vytvořit blok.");

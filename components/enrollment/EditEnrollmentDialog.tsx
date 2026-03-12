@@ -101,7 +101,8 @@ export function EditEnrollmentDialog({
         router.push(`/enrollments/${newRecord.id}`); // Přesměrování na detail existujícího záznamu
       }
 
-      window.location.reload(); // Tvrdý reload pro bezpečné obnovení dat
+      router.refresh();
+
     } catch (e) {
       console.error(e);
       alert("Došlo k chybě při ukládání okna.");
@@ -176,11 +177,14 @@ export function EditEnrollmentDialog({
               <SelectContent>
                 <SelectItem value="DRAFT">Koncept (Draft)</SelectItem>
                 <SelectItem value="SCHEDULED">Naplánováno (Scheduled)</SelectItem>
+                <SelectItem value="OPEN">Otevřeno (Open)</SelectItem>
+                <SelectItem value="CLOSED">Uzavřeno (Closed)</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-slate-400">
-              Stavy "Otevřeno" a "Uzavřeno" se nastavují automaticky podle času.
+              Tip: Stavy "Otevřeno" a "Uzavřeno" lze nastavit i ručně pro vynucení stavu bez ohledu na čas (např. předčasné uzavření).
             </p>
+
           </div>
           {/* Switch viditelnosti */}
           <div className="flex items-center space-x-2 pt-2">

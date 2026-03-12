@@ -49,6 +49,7 @@ export function EnrollmentBlockCard({
   /** Dialogy */
   const [editOccurrence, setEditOccurrence] = useState<any | null>(null);
   const [studentsOccurrenceId, setStudentsOccurrenceId] = useState<string | null>(null);
+  const [deleteOccurrence, setDeleteOccurrence] = useState<any | null>(null);
 
   /** Alert: Stejný subject.code v jiném bloku */
   const [sameSubjectAlert, setSameSubjectAlert] = useState<{
@@ -142,7 +143,8 @@ export function EnrollmentBlockCard({
     try {
       await enrollStudent(currentUser.id, occId);
       toast.success("Zápis byl úspěšně proveden.");
-      window.location.reload();
+      router.refresh();
+
     } catch (err: any) {
       toast.error(err.message || "Nepodařilo se provést zápis.");
     }
@@ -161,7 +163,8 @@ export function EnrollmentBlockCard({
     try {
       await unenrollStudent(enr.id);
       toast.success("Odhlášení bylo úspěšně provedeno.");
-      window.location.reload();
+      router.refresh();
+
     } catch (err: any) {
       toast.error(err.message || "Nepodařilo se zrušit zápis.");
     }
@@ -230,9 +233,7 @@ export function EnrollmentBlockCard({
         currentUser,
         onStudents: (row) => setStudentsOccurrenceId(row.id),
         onEdit: (row) => setEditOccurrence(row),
-        onDelete: () => {
-          // zatím žádná akce – stejně jako v původní verzi (tlačítko Smazat bylo bez onClick)
-        },
+        onDelete: (row) => setDeleteOccurrence(row),
         onEnroll: (row) => handleEnroll(row.id),
         onUnenroll: (row) => handleUnenroll(row.id),
         // v rámci karty bloku nepotřebujeme tyhle sloupce:
@@ -291,11 +292,13 @@ export function EnrollmentBlockCard({
           onOpenChange={(open) => !open && setEditOccurrence(null)}
           onSubmit={async (data) => {
               await updateSubjectOccurrence(data.id, data);
-              window.location.reload();
+              router.refresh();
+
           }}
           onDelete={async (id) => {
               await deleteSubjectOccurrence(id);
-              window.location.reload();
+              router.refresh();
+
           }}
         />
       )}
@@ -390,7 +393,8 @@ export function EnrollmentBlockCard({
                     if (my) await unenrollStudent(my.enrollmentId);
                     await enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
                     toast.success("Zápis byl úspěšně přepsán.");
-                    window.location.reload();
+                    router.refresh();
+
                   } catch (err: any) {
                     toast.error(err.message || "Nepodařilo se přepsat zápis.");
                   } finally {
@@ -399,6 +403,42 @@ export function EnrollmentBlockCard({
                 }}
               >
                 Přepsat
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* ALERT: Potvrzení smazání výskytu */}
+      {deleteOccurrence && (
+        <AlertDialog open onOpenChange={() => setDeleteOccurrence(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Opravdu smazat předmět z bloku?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tato akce trvale odstraní výskyt předmětu{" "}
+                <strong>{deleteOccurrence.subject?.name}</strong>{" "}
+                ({deleteOccurrence.fullCode}) z bloku <strong>{block.name}</strong>.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Zrušit</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => {
+                  try {
+                    await deleteSubjectOccurrence(deleteOccurrence.id);
+                    toast.success("Předmět byl z bloku smazán.");
+                    router.refresh();
+
+                  } catch (err: any) {
+                    toast.error(err.message || "Nepodařilo se smazat předmět.");
+                  } finally {
+                    setDeleteOccurrence(null);
+                  }
+                }}
+              >
+                Smazat
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

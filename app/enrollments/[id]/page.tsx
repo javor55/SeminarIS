@@ -1,54 +1,22 @@
-// app/enrollments/[id]/page.tsx
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/auth/auth-provider";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { getEnrollmentWindowByIdWithBlocks } from "@/lib/data";
 import { EnrollmentView } from "@/components/enrollment/EnrollmentView";
+import { User } from "@/lib/types";
 
-export default function EnrollmentDetailPage({
+export default async function EnrollmentDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
-  // ZMĚNA 1: Načítáme 'user' a 'isLoading'
-  const { user, isLoading } = useAuth();
-  const router = useRouter();
+  const session = await getServerSession(authOptions);
 
-  const [ew, setEw] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  // --- Začátek úpravy "Auth Guard" ---
-
-  // ZMĚNA 2: "Auth Guard" (Hlídač přihlášení)
-  // Reaguje na 'isLoading', aby se zabránilo chybnému přesměrování
-  useEffect(() => {
-    // Přesměrujeme, POUZE POKUD:
-    // 1. Načítání skončilo (isLoading === false)
-    // 2. A ZÁROVEŇ uživatel neexistuje (user === null)
-    if (!isLoading && !user) {
-      router.push("/");
-    }
-  }, [user, isLoading, router]); // Sledujeme obě proměnné
-
-  useEffect(() => {
-    async function load() {
-       setEw(await getEnrollmentWindowByIdWithBlocks(params.id));
-       setLoading(false);
-    }
-    load();
-  }, [params.id]);
-
-  // ZMĚNA 3: "Loading Guard"
-  // Zobrazí "nic" (null), dokud probíhá ověření NEBO pokud není uživatel
-  if (isLoading || !user) {
-    return null; // Čekáme na načtení nebo přesměrování
+  if (!session?.user) {
+    redirect("/");
   }
 
-  // ZMĚNA 4: "Authorization Guard" (Hlídač oprávnění)
-  // V tomto bodě víme, že 'user' je přihlášen.
-  // Povolíme přístup jen ADMINovi a TEACHERovi
+  const user = session.user as User;
   const isAllowed = user.role === "ADMIN" || user.role === "TEACHER";
 
   if (!isAllowed) {
@@ -62,9 +30,7 @@ export default function EnrollmentDetailPage({
     );
   }
 
-  // --- Konec úpravy ---
-
-  if (loading) return <p className="mt-8 text-center text-muted-foreground">Načítám záznamy...</p>;
+  const ew = await getEnrollmentWindowByIdWithBlocks(params.id);
 
   if (!ew) {
     return (
@@ -77,6 +43,5 @@ export default function EnrollmentDetailPage({
     );
   }
 
-  // 'user' je zde již 100% přihlášen a má oprávnění
   return <EnrollmentView enrollmentWindow={ew} currentUser={user} />;
 }

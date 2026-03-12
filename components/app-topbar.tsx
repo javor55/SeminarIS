@@ -36,8 +36,10 @@ const linksByRole: Record<string, Array<{ label: string; href: string }>> = {
   ],
   STUDENT: [
     { label: "Dashboard", href: "/" },
+    { label: "Předměty", href: "/subjects" },
     { label: "Můj Profil", href: "/profile" },
   ],
+
   GUEST: [],
 };
 

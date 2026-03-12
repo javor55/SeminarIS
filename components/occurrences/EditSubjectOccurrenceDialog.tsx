@@ -21,6 +21,17 @@ import {
 } from "@/components/ui/select";
 import { getAllUsers, getSubjects } from "@/lib/data";
 import { Trash } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 export function EditSubjectOccurrenceDialog({
   open = true,
@@ -45,6 +56,7 @@ export function EditSubjectOccurrenceDialog({
   const [teacherId, setTeacherId] = useState(occurrence.teacherId ?? "");
   const [subCode, setSubCode] = useState(occurrence.subCode ?? "");
   const [capacity, setCapacity] = useState<string | number>(occurrence.capacity ?? "");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Sync prop -> state
   useEffect(() => {
@@ -150,16 +162,37 @@ export function EditSubjectOccurrenceDialog({
                     ? "Nelze smazat – jsou zapsaní studenti"
                     : "Smazat výskyt"
                 }
-                onClick={async () => {
-                  if (hasStudents) return;
-                  if (onDelete) await onDelete(occurrence.id);
-                  onOpenChange(false);
-                }}
+                onClick={() => setShowDeleteConfirm(true)}
               >                
                 Smazat
               </Button>
             </div>
           )}
+
+          {/* ALERT: Potvrzení smazání z dialogu */}
+          <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Zrušit tento výskyt předmětu?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Opravdu chcete odstranit tento výskyt předmětu z bloku? Tato akce je nevratná.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setShowDeleteConfirm(false)}>Zrušit</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={async () => {
+                    if (onDelete) await onDelete(occurrence.id);
+                    setShowDeleteConfirm(false);
+                    onOpenChange(false);
+                  }}
+                >
+                  Smazat
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* PRAVÁ strana */}
           <DialogFooter className="ml-auto flex gap-2">
