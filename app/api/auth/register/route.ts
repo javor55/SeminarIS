@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { getGlobalCohort } from "@/lib/data";
+import { getGlobalCohort, isRegistrationEnabled } from "@/lib/data";
 
 export async function POST(req: Request) {
   try {
+    // Kontrola, zda je registrace povolena
+    const regEnabled = await isRegistrationEnabled();
+    if (!regEnabled) {
+      return NextResponse.json(
+        { message: "Registrace je momentálně zakázána. Kontaktujte administrátora." },
+        { status: 403 }
+      );
+    }
+
     const { email, password, firstName, lastName } = await req.json();
 
     if (!email || !password || !firstName || !lastName) {

@@ -382,6 +382,36 @@ export async function setGlobalCohort(cohort: string) {
   }
 }
 
+export async function isRegistrationEnabled(): Promise<boolean> {
+  try {
+    // @ts-ignore
+    if (!prisma.systemSetting) return true;
+    // @ts-ignore
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: "registration_enabled" },
+    });
+    // Pokud klíč neexistuje, registrace je povolena (výchozí stav)
+    return setting ? setting.value === "true" : true;
+  } catch {
+    return true;
+  }
+}
+
+export async function setRegistrationEnabled(enabled: boolean) {
+  await requireAdmin();
+  // @ts-ignore
+  if (!prisma.systemSetting) {
+    throw new Error("Model SystemSetting není dostupný.");
+  }
+  // @ts-ignore
+  return await prisma.systemSetting.upsert({
+    where: { key: "registration_enabled" },
+    update: { value: enabled ? "true" : "false" },
+    create: { key: "registration_enabled", value: enabled ? "true" : "false" },
+  });
+}
+
+
 export async function changeOwnPassword(currentPasswordRaw: string, newPasswordRaw: string) {
   const userFromSession = await requireAuth();
   

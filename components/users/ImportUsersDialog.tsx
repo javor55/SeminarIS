@@ -120,7 +120,7 @@ export function ImportUsersDialog({ open, onOpenChange, onSuccess }: ImportUsers
 
         <div className="space-y-6 pt-4">
           {/* Šablona */}
-          <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+          <div className="bg-muted/50 p-4 rounded-lg border border-border">
             <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
               <Download className="w-4 h-4 text-slate-500" />
               1. Stáhnout šablonu
@@ -163,7 +163,7 @@ export function ImportUsersDialog({ open, onOpenChange, onSuccess }: ImportUsers
           </div>
 
           {importResult && (
-            <Alert className={importResult.errors > 0 ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"}>
+            <Alert className={importResult.errors > 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-emerald-500/10 border-emerald-500/20"}>
               <div className="flex items-center gap-2 mb-1">
                 {importResult.errors > 0 ? <AlertCircle className="w-4 h-4 text-amber-600" /> : <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
                 <AlertTitle className="mb-0">Výsledek importu</AlertTitle>

@@ -209,12 +209,12 @@ export function SubjectDetailClientView({
         </Link>
       </div>
 
-      <div className="rounded-lg border bg-white p-4 shadow-sm space-y-3">
+      <div className="rounded-lg border bg-card p-4 shadow-sm space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-semibold">{subject.name}</h1>
-              <span className={subject.isActive ? "bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs" : "bg-red-100 text-red-800 px-2 py-1 rounded text-xs"}>
+              <span className={subject.isActive ? "bg-emerald-500/15 text-emerald-600 px-2 py-1 rounded text-xs font-medium" : "bg-red-500/15 text-red-600 px-2 py-1 rounded text-xs font-medium"}>
                   {subject.isActive ? "Aktivní" : "Archivováno"}
               </span>
               {subject.code ? (
@@ -380,7 +380,7 @@ export function SubjectDetailClientView({
         </AlertDialog>
       )}
 
-      <div className="rounded-lg border bg-white p-4 shadow-sm space-y-2">
+      <div className="rounded-lg border bg-card p-4 shadow-sm space-y-2">
         <h2 className="text-base font-semibold">Sylabus</h2>
         {subject.syllabus ? (
           <div

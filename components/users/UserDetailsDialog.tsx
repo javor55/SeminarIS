@@ -101,7 +101,7 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
                   const statusMeta = computeEnrollmentStatus(window?.status ?? "CLOSED", window?.startsAt, window?.endsAt);
                   
                   return (
-                    <div key={en.id} className="p-3 text-sm hover:bg-white transition-colors">
+                    <div key={en.id} className="p-3 text-sm hover:bg-accent transition-colors">
                       <div className="flex justify-between items-start gap-4">
                         <div className="space-y-1">
                           <p className="font-semibold text-slate-900">
@@ -128,7 +128,7 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
                 })}
               </div>
             ) : (
-              <div className="text-center py-8 border border-dashed rounded-md bg-white">
+              <div className="text-center py-8 border border-dashed rounded-md bg-muted/50">
                 <p className="text-sm text-muted-foreground italic">Uživatel zatím nemá žádné zápisy.</p>
               </div>
             )}

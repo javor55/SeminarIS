@@ -99,7 +99,7 @@ export const usersColumns: ColumnDef<UserRow>[] = [
       };
       
       return (
-        <span className="text-xs text-slate-600 leading-tight">
+        <span className="text-xs text-muted-foreground leading-tight">
           Zapsán na <strong>{latest.count}</strong> {getSubjectCountLabel(latest.count)} v{" "}
           <span className="text-blue-600 font-medium">{latest.name}</span>
         </span>

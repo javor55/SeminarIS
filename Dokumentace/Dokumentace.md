@@ -56,10 +56,11 @@ Teoreticky by SEO dávalo smysl v případě, že bychom chtěli aby ji byly stu
 
 #### Teacher (`TEACHER`)
 
-- Má přístup k sekci **Předměty**.
+- Má přístup k sekcím **Předměty** a **Uživatelé** (v režimu jen pro čtení).
 - Může vytvářet a upravovat **předměty** (`Subject`).
 - Vidí zápisy (`EnrollmentWindow`) a jejich bloky, ale **nemůže se zapisovat**.
 - Vidí obsazenost výskytů (např. `7/30`) a může otevřít dialog se seznamem zapsaných studentů.
+- Na stránce `/users` vidí seznam uživatelů, ale **nemůže měnit role, stav účtů ani resetovat hesla**.
 
 #### Admin (`ADMIN`)
 
@@ -135,6 +136,8 @@ Reprezentuje uživatele systému (student, učitel, admin nebo guest).
 | `SCHEDULED`  | naplánovaný zápis, čeká na začátek |
 | `OPEN`       | zápis je aktivní, studenti se mohou zapisovat |
 | `CLOSED`     | zápis je uzavřený, pouze k nahlédnutí |
+
+> **Automatická synchronizace stavu:** Systém při každém načtení zápisového okna porovná nastavený stav s aktuálním serverovým časem. Pokud je stav `SCHEDULED` ale aktuální čas je po `startsAt`, systém automaticky přepne stav na `OPEN`. Analogicky, pokud je stav `OPEN` ale čas je po `endsAt`, systém přepne na `CLOSED`. Stav `DRAFT` se nikdy nepřepíná automaticky – vyžaduje manuální změnu administrátorem.
 
 #### Bloky (`Block`)
 
@@ -227,6 +230,8 @@ představuje konkrétní instanci předmětu v určitém bloku:
 1. Student může mít v rámci jednoho **bloku** pouze **jeden aktivní zápis**.
 2. Student se **nemůže zapsat na stejný předmět ve více blocích jednoho zápisu**.
 3. Odhlášení nebo přepsání je možné pouze ve stavu `OPEN`.
+4. Všechny kontroly při zápisu (kapacita, duplicita, stav okna) probíhají v rámci **serializovatelné databázové transakce**, která zamezuje race conditions.
+5. Validace stavu zápisového okna probíhá striktně na základě **serverového času** – klientský čas nemá vliv.
 
 #### Shrnutí vztahů
 
@@ -355,6 +360,16 @@ Nepřihlášený uživatel vidí pouze veřejnou úvodní stránku a formuláře
 │   └── register/
 │       └── page.tsx         # Registrační formulář
 │
+├── api/
+│   └── auth/
+│       ├── [...nextauth]/
+│       │   └── route.ts     # NextAuth.js API handler
+│       └── register/
+│           └── route.ts     # Registrační API endpoint
+│
+├── admin/
+│   └── page.tsx             # Administrační centrum (pouze ADMIN)
+│
 ├── dashboard/
 │   └── page.tsx             # Hlavní stránka pro přihlášené (výběr zápisu)
 │
@@ -368,18 +383,22 @@ Nepřihlášený uživatel vidí pouze veřejnou úvodní stránku a formuláře
 ├── enrollments/
 │   ├── page.tsx             # Přehled všech zápisů
 │   └── [id]/
-│       └── page.tsx         # Detail zápisu (používá EnrollmentView stejně jako dashboard)
+│       └── page.tsx         # Detail zápisu
 │
 ├── users/
-│   └── page.tsx             # Přehled uživatelů (přístup omezen dle role přes UI)
+│   └── page.tsx             # Přehled uživatelů (ADMIN: správa, TEACHER: jen čtení)
+│
+├── profile/
+│   └── page.tsx             # Profil a změna hesla
 │
 ├── settings/
-│   └── page.tsx             # Základní informace o uživateli a placeholder pro nastavení
+│   └── page.tsx             # Nastavení systému (pouze ADMIN)
 │
 ├── layout.tsx               # Klientský layout (AuthProvider + AppShell + AppTopbar)
 ├── globals.css              # Globální styly
 └── page.tsx                 # Veřejná úvodní stránka (Landing page)
 
+/middleware.ts               # Serverová ochrana rout (autentizace + autorizace)
 ```
 
 ### 3. Navigace (Top Bar Layout)
@@ -409,6 +428,7 @@ Komponenta Top Baru zobrazí následující odkazy v závislosti na roli uživat
   - `Dashboard` → `/dashboard`
   - `Zápisy` → `/enrollments`
   - `Předměty` → `/subjects`
+  - `Uživatelé` → `/users`
 
 - **Role: `STUDENT`**
   - `Dashboard` → `/dashboard`
@@ -422,8 +442,8 @@ Komponenta Top Baru zobrazí následující odkazy v závislosti na roli uživat
 
 Tato stránka je hlavní vstupní stránkou po přihlášení.  
 
-- `/dashboard/page.tsx` je **client komponenta**
-- získá přihlášeného uživatele pomocí `useAuth()`
+- `/dashboard/page.tsx` je **Server Component**
+- ověří session na serveru pomocí `getServerSession(authOptions)`
 - vybere **jeden** vhodný zápis pomocí funkce `findDashboardEnrollment(...)`
 - zobrazí obsah pomocí sdílené komponenty `EnrollmentView`
 - Dashboard vždy zobrazí **jeden vybraný zápis**, nikoliv selektor zápisů.
@@ -686,6 +706,7 @@ Je dostupná pro role, které mají odkaz v navigaci ( **ADMIN** a **TEACHER**).
 #### /users
 
 Stránka **/users** slouží k přehledu a správě uživatelů.  
+Je přístupná pro role **ADMIN** (plný přístup) a **TEACHER** (jen čtení).
 
 ##### Obsah stránky users
 
@@ -695,6 +716,11 @@ Stránka `/users` obsahuje:
 - komponentu `DataTable` se seznamem uživatelů,
 - nástroje pro vyhledávání, filtrování a hromadné akce,
 - akční menu pro úpravu jednoho konkrétního uživatele.
+
+##### Přístupová práva
+
+- **ADMIN**: Plný přístup – může měnit role, aktivaci, resetovat hesla, importovat uživatele, provádět hromadné akce.
+- **TEACHER**: Pouze čtení – vidí seznam uživatelů a jejich zápisy, ale **nemůže měnit role, resetovat hesla, importovat ani provádět hromadné akce**. Tlačítka pro import, karta systémového ročníku a hromadné akce jsou automaticky skryté.
 
 ##### Načítání dat
 
@@ -765,6 +791,129 @@ Stránka je dostupná **pouze pro ADMINA**. Na začátku `page.tsx` je nutné ov
       - `CardContent`: Obsahuje `Textarea` pro úpravu textu, který vidí přihlášený uživatel, pokud není aktivní žádný `EnrollmentWindow`.
       - `CardFooter`: `Button` ("Uložit").
   - **Tab 3: "Pokročilé" (Prázdná pro budoucí použití)**
+
+## Technická architektura
+
+### Technologický stack
+
+| Technologie | Verze | Účel |
+|---|---|---|
+| **Next.js** | 14.x | Fullstack framework (App Router, Server Components, Server Actions) |
+| **React** | 18.3 | UI knihovna |
+| **TypeScript** | 5.6 | Typový systém |
+| **Prisma** | 6.19 | ORM pro práci s PostgreSQL |
+| **PostgreSQL** | — | Relační databáze |
+| **NextAuth.js** | 4.x | Autentizace (JWT, Credentials provider) |
+| **TailwindCSS** | 3.4 | Utility-first CSS framework |
+| **shadcn/ui** | — | Komponentová knihovna (Radix UI primitiva) |
+| **TanStack Table** | 8.x | Headless tabulková knihovna |
+| **Tiptap** | 3.x | Rich text editor (pro sylabus) |
+| **bcryptjs** | 3.x | Hashování hesel |
+| **Sonner** | 2.x | Toast notifikace |
+| **Lucide React** | — | Ikonová knihovna |
+| **date-fns** | 4.x | Práce s datumy |
+
+### Architektura aplikace
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    Klient (Browser)                  │
+│  ┌─────────────┐  ┌──────────────┐  ┌────────────┐  │
+│  │ React Pages │  │  shadcn/ui   │  │  useAuth() │  │
+│  │  (App Router│  │  Components  │  │  Context   │  │
+│  └──────┬──────┘  └──────────────┘  └────────────┘  │
+└─────────┼───────────────────────────────────────────┘
+          │ Server Actions / fetch
+┌─────────┼───────────────────────────────────────────┐
+│         ▼          Server (Next.js)                  │
+│  ┌─────────────┐  ┌──────────────┐  ┌────────────┐  │
+│  │ middleware  │  │  lib/data.ts │  │ lib/auth.ts│  │
+│  │   .ts       │→ │ Server       │  │ NextAuth   │  │
+│  │ (Auth guard)│  │ Actions      │  │ Config     │  │
+│  └─────────────┘  └──────┬───────┘  └────────────┘  │
+│                          │ Prisma Client             │
+│                   ┌──────▼───────┐                   │
+│                   │  PostgreSQL  │                   │
+│                   │  (Prisma)    │                   │
+│                   └──────────────┘                   │
+└─────────────────────────────────────────────────────┘
+```
+
+### Bezpečnostní architektura
+
+Aplikace implementuje bezpečnost ve **třech vrstvách**:
+
+1. **Middleware (`middleware.ts`)**  
+   - Běží na edge serveru před každým požadavkem.
+   - Ověřuje JWT token – nepřihlášení uživatelé jsou přesměrováni na `/login`.
+   - Role-based routing: `/admin` je přístupné pouze pro `ADMIN`, `/users` pouze pro `ADMIN` a `TEACHER`.
+
+2. **Server Actions (`lib/data.ts`)**  
+   - Každá mutace i čtení dat ověřuje session pomocí `requireAuth()`, `requireAdmin()` nebo `requirePrivileged()`.
+   - Studenti mohou operovat pouze se svým vlastním účtem.
+   - Hosté (`GUEST`) nemohou provádět žádné mutace zápisů.
+
+3. **UI vrstva (React komponenty)**  
+   - Tlačítka a akce jsou podmíněně skrytá/deaktivovaná dle role.
+   - Slouží jako UX vrstva – bezpečnost je vždy ověřována na serveru.
+
+### Autentizace a autorizace
+
+- **Provider:** NextAuth.js s `CredentialsProvider` (email + heslo).
+- **Strategie:** JWT (bezstavové tokeny), bez serverové session.
+- **Hashování hesel:** bcryptjs se salt factor 10.
+- **Login flow:** Uživatel zadá email/heslo → server ověří hash → vygeneruje JWT token → uložen do httpOnly cookie.
+- **Session data v tokenu:** `id`, `role`, `firstName`, `lastName`, `isActive`.
+- **Poslední přihlášení:** Automaticky aktualizováno v `User.lastLoginAt` při každém přihlášení.
+
+### Datová vrstva
+
+- **ORM:** Prisma s PostgreSQL.
+- **Singleton pattern:** Prisma Client je sdílen přes `lib/prisma.ts` (zamezení connection pool exhaustion).
+- **Serializace:** Výsledky Prisma dotazů jsou serializovány pomocí `JSON.parse(JSON.stringify(...))` pro kompatibilitu s Server Actions.
+- **Soft delete:** Entity `Block`, `SubjectOccurrence` a `StudentEnrollment` podporují soft delete (`deletedAt` + `deletedById`).
+- **Audit trail:** Všechny entity mají `createdById`, `updatedById` a případně `deletedById`.
+
+### Synchronizace stavu zápisových oken
+
+Systém implementuje **lazy synchronizaci** stavu zápisových oken s aktuálním serverovým časem:
+
+1. Při každém načtení dat (`getEnrollmentWindowsWithDetails`, `getEnrollmentWindowByIdWithBlocks`, `getEnrollmentWindowsVisible`) se volá funkce `syncEnrollmentWindowStatus()`.
+2. Tato funkce porovná DB stav s výsledkem `computeEnrollmentStatus()` (který počítá stav na základě `startsAt`, `endsAt` a aktuálního času).
+3. Pokud je nesoulad:
+   - `SCHEDULED` + čas je po `startsAt` → přepne na `OPEN`
+   - `OPEN` + čas je po `endsAt` → přepne na `CLOSED`
+   - `DRAFT` se nikdy nepřepíná automaticky
+4. Stav se aktualizuje přímo v databázi — všechny následné načtení vrátí korektní stav.
+
+### Transakční integrita zápisů
+
+Funkce `enrollStudent()` provádí všechny kontroly a samotný zápis v rámci **serializovatelné Prisma transakce** (`isolationLevel: 'Serializable'`):
+
+- Kontrola kapacity semináře
+- Kontrola duplicity v bloku (max 1 zápis na blok)
+- Kontrola duplicity předmětu v rámci okna
+- Validace stavu zápisového okna (serverový čas)
+- Vytvoření zápisu
+
+Toto zamezuje race conditions, kdy by dva studenti mohli současně obsadit poslední místo.
+
+### Struktura klíčových souborů
+
+| Soubor | Účel |
+|---|---|
+| `middleware.ts` | Serverová ochrana rout (JWT ověření, role-based routing) |
+| `lib/auth.ts` | Konfigurace NextAuth.js (providers, callbacks, events) |
+| `lib/data.ts` | Všechny Server Actions – CRUD operace, autorizace, validace |
+| `lib/prisma.ts` | Singleton instance Prisma Client |
+| `lib/utils.ts` | Utility funkce (`cn`, `computeEnrollmentStatus`) |
+| `lib/types.ts` | TypeScript typy (`User`, `Subject`, `EnrollmentWindow`, atd.) |
+| `components/auth/auth-provider.tsx` | React context pro autentizaci (`useAuth()`) |
+| `components/app-topbar.tsx` | Navigační lišta s role-based odkazy |
+| `components/app-shell.tsx` | Layout wrapper (topbar + obsah) |
+| `prisma/schema.prisma` | Definice databázového schématu |
+
+---
 
 ## Lighthouse Report
 

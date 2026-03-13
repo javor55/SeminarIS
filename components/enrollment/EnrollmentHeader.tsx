@@ -284,8 +284,8 @@ export function EnrollmentHeader({
               </div>
             </div>
 
-            {/* Sloupec 2: Stav */}
-            <div className="space-y-4 pl-6 border-l border-slate-200">
+            {/* Sloupec 2: Stav + Countdown */}
+            <div className="space-y-2 pl-6 border-l border-border">
               {/* Stav */}
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Stav</div>
@@ -298,6 +298,34 @@ export function EnrollmentHeader({
                   {absoluteStatus.label}
                 </div>
               </div>
+
+              {/* Countdown */}
+              {absoluteStatus.is === "planned" && (() => {
+                const diff = new Date(ew.startsAt).getTime() - now.getTime();
+                if (diff <= 0) return null;
+                const d = Math.floor(diff / 86400000);
+                const h = Math.floor((diff % 86400000) / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                const s = Math.floor((diff % 60000) / 1000);
+                return (
+                  <div className="text-xs text-blue-600 dark:text-blue-400 font-medium animate-pulse">
+                    Otevře se za {d > 0 ? `${d}d ` : ""}{h}h {m}m {s}s
+                  </div>
+                );
+              })()}
+              {absoluteStatus.is === "open" && (() => {
+                const diff = new Date(ew.endsAt).getTime() - now.getTime();
+                if (diff <= 0) return null;
+                const d = Math.floor(diff / 86400000);
+                const h = Math.floor((diff % 86400000) / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                const s = Math.floor((diff % 60000) / 1000);
+                return (
+                  <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                    Uzavře se za {d > 0 ? `${d}d ` : ""}{h}h {m}m {s}s
+                  </div>
+                );
+              })()}
             </div>
 
           </div>

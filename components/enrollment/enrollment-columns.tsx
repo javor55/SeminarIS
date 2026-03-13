@@ -45,7 +45,7 @@ export function getEnrollmentColumns(opts: {
               {name}
             </Link>
             {description && (
-              <p className="text-xs text-slate-500 overflow-hidden text-ellipsis line-clamp-2">
+              <p className="text-xs text-muted-foreground overflow-hidden text-ellipsis line-clamp-2">
                 {description}
               </p>
             )}
@@ -115,15 +115,15 @@ export function getEnrollmentColumns(opts: {
         return (
           <div className="flex flex-col gap-1">
             {blocksWithCounts.length === 0 && (
-              <span className="text-xs text-slate-400">Žádné bloky</span>
+              <span className="text-xs text-muted-foreground">Žádné bloky</span>
             )}
             {blocksWithCounts.map((b: any) => (
               <span
                 key={b.id}
-                className="inline-flex items-center gap-1 text-xs text-slate-700"
+                className="inline-flex items-center gap-1 text-xs text-foreground"
               >
                 <span>{b.name}</span>
-                <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
+                <span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                   {b.count}
                 </span>
               </span>
@@ -136,7 +136,7 @@ export function getEnrollmentColumns(opts: {
       accessorKey: "uniqueStudentCount",
       header: "Zapsaní studenti",
       cell: ({ row }) => (
-        <span className="text-center block font-medium text-slate-700">
+        <span className="text-center block font-medium text-foreground">
           {row.original.uniqueStudentCount}
         </span>
       ),
@@ -145,7 +145,7 @@ export function getEnrollmentColumns(opts: {
       accessorKey: "fullyEnrolledCount",
       header: "Kompletně zapsaní",
       cell: ({ row }) => (
-        <span className="text-center block font-medium text-slate-700">
+        <span className="text-center block font-medium text-foreground">
           {row.original.fullyEnrolledCount}
         </span>
       ),

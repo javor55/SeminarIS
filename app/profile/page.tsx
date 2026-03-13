@@ -41,12 +41,33 @@ export default function ProfilePage() {
     }
   }
 
-  if (isLoading || !user) return null;
+  if (isLoading || !user) return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div>
+        <div className="h-9 w-48 bg-muted animate-pulse rounded" />
+        <div className="h-4 w-72 bg-muted animate-pulse rounded mt-2" />
+      </div>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="rounded-lg border bg-card p-6 space-y-4">
+          <div className="h-5 w-32 bg-muted animate-pulse rounded" />
+          <div className="h-4 w-full bg-muted animate-pulse rounded" />
+          <div className="h-4 w-3/4 bg-muted animate-pulse rounded" />
+          <div className="h-4 w-1/2 bg-muted animate-pulse rounded" />
+        </div>
+        <div className="rounded-lg border bg-card p-6 space-y-4">
+          <div className="h-5 w-32 bg-muted animate-pulse rounded" />
+          <div className="h-10 w-full bg-muted animate-pulse rounded" />
+          <div className="h-10 w-full bg-muted animate-pulse rounded" />
+          <div className="h-10 w-full bg-muted animate-pulse rounded" />
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 font-outfit">Můj profil</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground font-outfit">Můj profil</h1>
         <p className="text-muted-foreground mt-1">
           Správa osobních údajů a zabezpečení účtu.
         </p>

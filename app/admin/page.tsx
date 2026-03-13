@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useRouter } from "next/navigation";
-import { getSystemStats, getGlobalCohort, setGlobalCohort } from "@/lib/data";
+import { getSystemStats, getGlobalCohort, setGlobalCohort, isRegistrationEnabled, setRegistrationEnabled } from "@/lib/data";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Users, BookOpen, Calendar, Save, Trash2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,6 +19,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<any>(null);
   const [cohort, setCohort] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [regEnabled, setRegEnabled] = useState(true);
 
 
   useEffect(() => {
@@ -28,9 +30,10 @@ export default function AdminPage() {
 
   async function loadData() {
     try {
-      const [s, c] = await Promise.all([getSystemStats(), getGlobalCohort()]);
+      const [s, c, r] = await Promise.all([getSystemStats(), getGlobalCohort(), isRegistrationEnabled()]);
       setStats(s);
       setCohort(c);
+      setRegEnabled(r);
     } catch (e) {
       console.error(e);
       toast.error("Nepodařilo se načíst data administrace.");
@@ -49,12 +52,27 @@ export default function AdminPage() {
     }
   }
 
-  if (isLoading || !user || user.role !== "ADMIN") return null;
+  if (isLoading || !user || user.role !== "ADMIN") return (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <div>
+        <div className="h-9 w-64 bg-muted animate-pulse rounded" />
+        <div className="h-4 w-96 bg-muted animate-pulse rounded mt-2" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="rounded-lg border bg-card p-6 space-y-3">
+            <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+            <div className="h-8 w-16 bg-muted animate-pulse rounded" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 font-outfit">Administrační centrum</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground font-outfit">Administrační centrum</h1>
         <p className="text-muted-foreground mt-1">
           Správa globálního nastavení systému a přehled statistik.
         </p>
@@ -62,7 +80,7 @@ export default function AdminPage() {
 
       {/* STATISTIKY */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Uživatelé celkem</CardTitle>
             <Users className="h-4 w-4 text-slate-500" />
@@ -72,7 +90,7 @@ export default function AdminPage() {
             <p className="text-xs text-muted-foreground">Včetně studentů a učitelů</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Aktivní předměty</CardTitle>
             <BookOpen className="h-4 w-4 text-slate-500" />
@@ -82,7 +100,7 @@ export default function AdminPage() {
             <p className="text-xs text-muted-foreground">Nabízené v aktuálním katalogu</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Otevřené zápisy</CardTitle>
             <Calendar className="h-4 w-4 text-emerald-500" />
@@ -121,32 +139,31 @@ export default function AdminPage() {
                 Tato hodnota se používá jako výchozí filtr při importu studentů a v přehledech.
               </p>
             </div>
+
+            <div className="flex items-center justify-between pt-2 border-t">
+              <div>
+                <Label htmlFor="registration">Registrace nových uživatelů</Label>
+                <p className="text-xs text-muted-foreground">
+                  Pokud je vypnuta, nikdo se nemůže registrovat.
+                </p>
+              </div>
+              <Switch
+                id="registration"
+                checked={regEnabled}
+                onCheckedChange={async (checked) => {
+                  try {
+                    await setRegistrationEnabled(checked);
+                    setRegEnabled(checked);
+                    toast.success(checked ? "Registrace povolena." : "Registrace zakázána.");
+                  } catch (err: any) {
+                    toast.error(err.message || "Nepodařilo se změnit nastavení.");
+                  }
+                }}
+              />
+            </div>
           </CardContent>
         </Card>
 
-        {/* HROMADNÉ AKCE */}
-        <Card className="shadow-sm border-amber-100 bg-amber-50/10">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-amber-500" />
-              Rychlé systémové akce
-            </CardTitle>
-            <CardDescription>
-              Destruktivní nebo hromadné operace nad databází.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button variant="outline" className="w-full justify-start text-amber-700" onClick={() => toast.info("Tato funkce bude dostupná v příští aktualizaci.")}>
-              <Trash2 className="w-4 h-4 mr-2" /> Deaktivovat neaktivní uživatele
-            </Button>
-            <Button variant="outline" className="w-full justify-start" onClick={() => router.push("/users")}>
-              <Users className="w-4 h-4 mr-2" /> Hromadná změna rolí
-            </Button>
-          </CardContent>
-          <CardFooter className="text-[10px] text-muted-foreground uppercase tracking-wider">
-            Používejte s opatrností
-          </CardFooter>
-        </Card>
       </div>
     </div>
   );

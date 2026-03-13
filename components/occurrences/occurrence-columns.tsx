@@ -98,7 +98,7 @@ export function getOccurrenceColumns(opts: {
       header: "Stav",
       cell: ({ row }) =>
         row.original.statusLabel ? (
-          <span className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+          <span className="inline-flex rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
             {row.original.statusLabel}
           </span>
         ) : null,
@@ -119,7 +119,7 @@ export function getOccurrenceColumns(opts: {
     accessorKey: "fullCode",
     header: "Kód výskytu",
     cell: ({ row }) => (
-      <span className="font-mono text-xs text-slate-700">
+      <span className="font-mono text-xs text-muted-foreground">
         {row.original.fullCode ?? ""}
       </span>
     ),
@@ -137,7 +137,7 @@ export function getOccurrenceColumns(opts: {
     accessorKey: "capacityText",
     header: "Obsaz.",
     cell: ({ row }) => (
-      <span className="text-slate-600 text-center block">
+      <span className="text-muted-foreground text-center block">
         {row.original.capacityText ?? ""}
       </span>
     ),

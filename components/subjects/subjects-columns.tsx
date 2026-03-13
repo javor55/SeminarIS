@@ -46,7 +46,7 @@ export const subjectsColumns: ColumnDef<SubjectRow>[] = [
   {
     accessorKey: "code",
     header: "Kód",
-    cell: ({ row }) => <span className="text-slate-500">{row.original.code ?? "—"}</span>,
+    cell: ({ row }) => <span className="text-muted-foreground">{row.original.code ?? "—"}</span>,
   },
   {
     id: "teachers",
@@ -67,7 +67,7 @@ export const subjectsColumns: ColumnDef<SubjectRow>[] = [
       return (
         <div className="flex flex-wrap gap-1">
           {uniqueTeachers.map((t, idx) => (
-             <span key={idx} className="bg-slate-100 text-slate-800 text-xs px-2 py-0.5 rounded-full border">
+             <span key={idx} className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded-full border">
                 {t}
              </span>
           ))}

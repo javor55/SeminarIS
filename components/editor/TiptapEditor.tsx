@@ -24,11 +24,11 @@ import {
 function MenuBar({ editor }: { editor: any }) {
   if (!editor) return null;
 
-  const btnClass = "p-1.5 rounded-md text-sm text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50";
-  const activeClass = "bg-slate-200 text-slate-900";
+  const btnClass = "p-1.5 rounded-md text-sm text-muted-foreground hover:bg-accent transition-colors disabled:opacity-50";
+  const activeClass = "bg-accent text-foreground";
 
   return (
-    <div className="flex flex-wrap items-center gap-1 p-2 border-b bg-slate-50/80 rounded-t-md">
+    <div className="flex flex-wrap items-center gap-1 p-2 border-b bg-muted/50 rounded-t-md">
       <button
         onClick={() => editor.chain().focus().toggleBold().run()}
         disabled={!editor.can().chain().focus().toggleBold().run()}
@@ -66,7 +66,7 @@ function MenuBar({ editor }: { editor: any }) {
         <Code size={18} />
       </button>
       
-      <div className="w-px h-6 bg-slate-300 mx-1" />
+      <div className="w-px h-6 bg-border mx-1" />
 
       <button
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
@@ -93,7 +93,7 @@ function MenuBar({ editor }: { editor: any }) {
         <Heading3 size={18} />
       </button>
 
-      <div className="w-px h-6 bg-slate-300 mx-1" />
+      <div className="w-px h-6 bg-border mx-1" />
 
       <button
         onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -199,7 +199,7 @@ export function TiptapEditor({
   }
 
   return (
-    <div className="tiptap-wrapper border rounded-md bg-white">
+    <div className="tiptap-wrapper border rounded-md bg-background">
       <MenuBar editor={editor} />
       <EditorContent
         editor={editor}

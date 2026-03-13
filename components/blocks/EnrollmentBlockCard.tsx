@@ -50,6 +50,7 @@ export function EnrollmentBlockCard({
   const [editOccurrence, setEditOccurrence] = useState<any | null>(null);
   const [studentsOccurrenceId, setStudentsOccurrenceId] = useState<string | null>(null);
   const [deleteOccurrence, setDeleteOccurrence] = useState<any | null>(null);
+  const [unenrollConfirm, setUnenrollConfirm] = useState<{ occId: string; subjectName: string } | null>(null);
 
   /** Alert: Stejný subject.code v jiném bloku */
   const [sameSubjectAlert, setSameSubjectAlert] = useState<{
@@ -156,6 +157,14 @@ export function EnrollmentBlockCard({
   async function handleUnenroll(occId: string) {
     const occ = block.occurrences.find((o) => o.id === occId);
     if (!occ) return;
+    // Zobrazit potvrzovací dialog
+    setUnenrollConfirm({ occId, subjectName: occ.subject?.name || "seminář" });
+  }
+
+  async function confirmUnenroll() {
+    if (!unenrollConfirm) return;
+    const occ = block.occurrences.find((o) => o.id === unenrollConfirm.occId);
+    if (!occ) return;
     const enr = occ.enrollments?.find(
       (e: any) => e.studentId === currentUser.id && !e.deletedAt
     );
@@ -164,9 +173,10 @@ export function EnrollmentBlockCard({
       await unenrollStudent(enr.id);
       toast.success("Odhlášení bylo úspěšně provedeno.");
       router.refresh();
-
     } catch (err: any) {
       toast.error(err.message || "Nepodařilo se zrušit zápis.");
+    } finally {
+      setUnenrollConfirm(null);
     }
   }
 
@@ -444,6 +454,31 @@ export function EnrollmentBlockCard({
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* ALERT: Potvrzení odepsání */}
+      {unenrollConfirm && (
+        <AlertDialog open onOpenChange={() => setUnenrollConfirm(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Opravdu se chcete odhlásit?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Budete odhlášeni ze semináře{" "}
+                <strong>{unenrollConfirm.subjectName}</strong> v bloku{" "}
+                <strong>{block.name}</strong>.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Zrušit</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={confirmUnenroll}
+              >
+                Odhlásit se
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
-}
+}

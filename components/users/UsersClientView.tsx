@@ -240,7 +240,7 @@ export function UsersClientView({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {currentUser.role === "ADMIN" && (
-          <Card className="md:col-span-1 border-emerald-100 bg-emerald-50/20">
+          <Card className="md:col-span-1 border-emerald-500/20 bg-emerald-500/5">
             <CardHeader className="pb-2">
               <CardTitle className="text-md">Systémový ročník</CardTitle>
               <CardDescription className="text-xs text-balance">Výchozí hodnota pro nově registrované uživatele.</CardDescription>
@@ -252,7 +252,7 @@ export function UsersClientView({
                   placeholder="např. 2024/2025"
                   value={globalCohort}
                   onChange={(e) => setGlobalCohortState(e.target.value)}
-                  className="bg-white"
+                  className="bg-background"
                 />
               </div>
               <Button className="w-full" size="sm" onClick={handleUpdateGlobalCohort} disabled={loading}>Aktualizovat globálně</Button>
@@ -304,7 +304,7 @@ export function UsersClientView({
       {users.length <= 1 ? (
         <Card className="border-dashed py-12">
           <CardContent className="flex flex-col items-center justify-center text-center space-y-4">
-            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
               <Upload className="w-6 h-6 text-slate-400" />
             </div>
             <div className="max-w-[400px]">

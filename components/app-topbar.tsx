@@ -5,6 +5,7 @@ import { User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 // 🔥 Importy pro responzivní menu
 import { Menu } from "lucide-react";
@@ -51,7 +52,7 @@ export function AppTopbar({ user }: { user?: User }) {
   const links = linksByRole[role] ?? [];
 
   return (
-    <header className="border-b bg-white">
+    <header className="border-b bg-background">
       <div className="container mx-auto flex h-14 items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           {/* Logo/Název - Vždy viditelné */}
@@ -72,8 +73,8 @@ export function AppTopbar({ user }: { user?: User }) {
                   key={link.href}
                   href={link.href}
                   className={cn(
-                    "text-sm px-3 py-1 rounded-md hover:bg-slate-100",
-                    isActive && "bg-slate-100 font-medium"
+                    "text-sm px-3 py-1 rounded-md hover:bg-accent",
+                    isActive && "bg-accent font-medium"
                   )}
                 >
                   {link.label}
@@ -87,18 +88,19 @@ export function AppTopbar({ user }: { user?: User }) {
         <div className="hidden md:flex items-center gap-2">
           {user ? (
             <>
-              <span className="text-sm text-slate-700">{user.email}</span>
+              <span className="text-sm text-muted-foreground">{user.email}</span>
               <button
                 onClick={logout}
-                className="text-sm px-3 py-1 rounded-md bg-slate-100 hover:bg-slate-200"
+                className="text-sm px-3 py-1 rounded-md bg-muted hover:bg-accent"
               >
                 Odhlásit
               </button>
+              <ThemeToggle />
             </>
           ) : (
             <Link
               href="/login"
-              className="text-sm px-3 py-1 rounded-md bg-slate-900 text-white hover:bg-slate-800"
+              className="text-sm px-3 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Přihlásit
             </Link>
@@ -131,7 +133,7 @@ export function AppTopbar({ user }: { user?: User }) {
                       <Link
                         href={link.href}
                         className={cn(
-                          isActive && "font-medium bg-slate-100"
+                          isActive && "font-medium bg-accent"
                         )}
                       >
                         {link.label}
