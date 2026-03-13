@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { getGlobalCohort } from "@/lib/data";
-
-const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
   try {
@@ -12,6 +10,14 @@ export async function POST(req: Request) {
     if (!email || !password || !firstName || !lastName) {
       return NextResponse.json(
         { message: "Chybí povinné údaje." },
+        { status: 400 }
+      );
+    }
+
+    // Serverová validace hesla
+    if (typeof password !== "string" || password.length < 6) {
+      return NextResponse.json(
+        { message: "Heslo musí mít alespoň 6 znaků." },
         { status: 400 }
       );
     }

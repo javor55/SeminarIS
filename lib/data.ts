@@ -119,6 +119,19 @@ export async function getSubjectById(id: string) {
 }
 
 export async function getEnrollmentWindowsVisible() {
+  const windows = await prisma.enrollmentWindow.findMany({
+    where: {
+      visibleToStudents: true,
+      status: { not: "DRAFT" },
+    },
+  });
+
+  // Lazy sync: synchronizujeme stav oken s aktuálním časem
+  for (const ew of windows) {
+    await syncEnrollmentWindowStatus(ew);
+  }
+
+  // Znovu načteme po synchronizaci
   return await prisma.enrollmentWindow.findMany({
     where: {
       visibleToStudents: true,
@@ -156,35 +169,39 @@ export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = fal
   });
 
   // Synchronizace stavů zápisových oken s aktuálním časem
+  let needsRefresh = false;
   for (const ew of ews) {
-    await syncEnrollmentWindowStatus(ew);
+    const newStatus = await syncEnrollmentWindowStatus(ew);
+    if (newStatus !== ew.status) needsRefresh = true;
   }
 
-  // Znovu načteme data po synchronizaci
-  const refreshedEws = await prisma.enrollmentWindow.findMany({
-    where: whereFilter,
-    include: {
-      blocks: {
-        where: { deletedAt: null },
-        orderBy: { order: "asc" },
+  // Jen pokud se stav změnil, načteme data znovu
+  const source = needsRefresh
+    ? await prisma.enrollmentWindow.findMany({
+        where: whereFilter,
         include: {
-          subjectOccurrences: {
+          blocks: {
             where: { deletedAt: null },
+            orderBy: { order: "asc" },
             include: {
-              subject: true,
-              teacher: true,
-              studentEnrollments: {
+              subjectOccurrences: {
                 where: { deletedAt: null },
+                include: {
+                  subject: true,
+                  teacher: true,
+                  studentEnrollments: {
+                    where: { deletedAt: null },
+                  },
+                },
               },
             },
           },
         },
-      },
-    },
-    orderBy: { startsAt: "asc" },
-  });
+        orderBy: { startsAt: "asc" },
+      })
+    : ews;
 
-  const parsed = refreshedEws.map(ew => ({
+  const parsed = source.map(ew => ({
     ...ew,
     blocks: ew.blocks.map(b => ({
       ...b,
@@ -303,7 +320,9 @@ export async function getAllUsers() {
 }
 
 
+
 export async function getUserByEmail(email: string) {
+  await requireAuth();
   return await prisma.user.findUnique({
     where: { email },
   });
@@ -372,6 +391,11 @@ export async function changeOwnPassword(currentPasswordRaw: string, newPasswordR
   });
   
   if (!user) throw new Error("Uživatel nenalezen.");
+
+  // Ošetření uživatelů bez nastaveného hesla (např. importovaní bez hesla)
+  if (!user.passwordHash) {
+    throw new Error("Pro tento účet není nastaveno heslo. Kontaktujte administrátora.");
+  }
 
   // Ověření starého hesla
   const isValid = await bcrypt.compare(currentPasswordRaw, user.passwordHash);
@@ -517,93 +541,96 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
     throw new Error("Guests cannot enroll");
   }
 
-
-
-
-  // Načteme cílový výskyt s kontextem
-  const targetOcc = await prisma.subjectOccurrence.findUnique({
-    where: { id: subjectOccurrenceId },
-    include: {
-      subject: true,
-      block: {
-        include: { enrollmentWindow: true }
-      },
-      studentEnrollments: {
-        where: { deletedAt: null }
-      }
-    }
-  });
-
-  if (!targetOcc || targetOcc.deletedAt) throw new Error("Seminář nenalezen.");
-
-  // 1. Kontrola kapacity
-  if (targetOcc.capacity !== null && targetOcc.studentEnrollments.length >= targetOcc.capacity) {
-    throw new Error("Kapacita semináře je již naplněna.");
-  }
-
-  // 2. Kontrola, zda už není zapsán v tomto bloku
-  const alreadyInBlock = await prisma.studentEnrollment.findFirst({
-    where: {
-      studentId,
-      deletedAt: null,
-      subjectOccurrence: {
-        blockId: targetOcc.blockId
-      }
-    }
-  });
-  if (alreadyInBlock) {
-    throw new Error("V tomto bloku již máte zapsaný jiný seminář. Nejdříve se odepište.");
-  }
-
-  // 3. Kontrola duplicity předmětu v rámci stejného okna (podle subject.code)
-  if (targetOcc.subject.code) {
-    const subjectCode = targetOcc.subject.code;
-    const sameSubjectInWindow = await prisma.studentEnrollment.findFirst({
-      where: {
-        studentId,
-        deletedAt: null,
-        subjectOccurrence: {
-          block: {
-            enrollmentWindowId: targetOcc.block.enrollmentWindowId
-          },
-          subject: {
-            code: subjectCode
-          }
+  // Celá logika zápisu v transakci – zamezení race condition při kontrole kapacity
+  const res = await prisma.$transaction(async (tx) => {
+    // Načteme cílový výskyt s kontextem
+    const targetOcc = await tx.subjectOccurrence.findUnique({
+      where: { id: subjectOccurrenceId },
+      include: {
+        subject: true,
+        block: {
+          include: { enrollmentWindow: true }
+        },
+        studentEnrollments: {
+          where: { deletedAt: null }
         }
       }
     });
 
-    if (sameSubjectInWindow) {
-      throw new Error("Tento předmět již máte zapsaný v jiném bloku tohoto zápisu.");
+    if (!targetOcc || targetOcc.deletedAt) throw new Error("Seminář nenalezen.");
+
+    // 1. Kontrola kapacity
+    if (targetOcc.capacity !== null && targetOcc.studentEnrollments.length >= targetOcc.capacity) {
+      throw new Error("Kapacita semináře je již naplněna.");
     }
-  }
 
-  // 4. Kontrola, zda je zápisové okno otevřené (pokud uživatel není ADMIN)
-  if (user.role !== "ADMIN") {
-    const ew = targetOcc.block.enrollmentWindow;
-    const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
-
-    // Lazy update: synchronizujeme stav v DB s reálným časem
-    await syncEnrollmentWindowStatus(ew);
-
-    if (computed.is === "closed") {
-      if (ew.status === "DRAFT") throw new Error("Zápis je momentálně v přípravě (Koncept).");
-      const now = new Date();
-      if (now > new Date(ew.endsAt)) throw new Error("Zápis již byl ukončen.");
-      throw new Error("Zápis není otevřen.");
+    // 2. Kontrola, zda už není zapsán v tomto bloku
+    const alreadyInBlock = await tx.studentEnrollment.findFirst({
+      where: {
+        studentId,
+        deletedAt: null,
+        subjectOccurrence: {
+          blockId: targetOcc.blockId
+        }
+      }
+    });
+    if (alreadyInBlock) {
+      throw new Error("V tomto bloku již máte zapsaný jiný seminář. Nejdříve se odepište.");
     }
-    if (computed.is === "planned") {
-      throw new Error("Zápis ještě nebyl zahájen.");
-    }
-  }
 
-  const res = await prisma.studentEnrollment.create({
-    data: {
-      studentId,
-      subjectOccurrenceId,
-      createdById: user.id as string,
-    },
+    // 3. Kontrola duplicity předmětu v rámci stejného okna (podle subject.code)
+    if (targetOcc.subject.code) {
+      const subjectCode = targetOcc.subject.code;
+      const sameSubjectInWindow = await tx.studentEnrollment.findFirst({
+        where: {
+          studentId,
+          deletedAt: null,
+          subjectOccurrence: {
+            block: {
+              enrollmentWindowId: targetOcc.block.enrollmentWindowId
+            },
+            subject: {
+              code: subjectCode
+            }
+          }
+        }
+      });
+
+      if (sameSubjectInWindow) {
+        throw new Error("Tento předmět již máte zapsaný v jiném bloku tohoto zápisu.");
+      }
+    }
+
+    // 4. Kontrola, zda je zápisové okno otevřené (pokud uživatel není ADMIN)
+    if (user.role !== "ADMIN") {
+      const ew = targetOcc.block.enrollmentWindow;
+      const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
+
+      // Lazy update: synchronizujeme stav v DB s reálným časem
+      await syncEnrollmentWindowStatus(ew);
+
+      if (computed.is === "closed") {
+        if (ew.status === "DRAFT") throw new Error("Zápis je momentálně v přípravě (Koncept).");
+        const now = new Date();
+        if (now > new Date(ew.endsAt)) throw new Error("Zápis již byl ukončen.");
+        throw new Error("Zápis není otevřen.");
+      }
+      if (computed.is === "planned") {
+        throw new Error("Zápis ještě nebyl zahájen.");
+      }
+    }
+
+    return await tx.studentEnrollment.create({
+      data: {
+        studentId,
+        subjectOccurrenceId,
+        createdById: user.id as string,
+      },
+    });
+  }, {
+    isolationLevel: 'Serializable',
   });
+
   revalidatePath("/", "layout");
   return res;
 }

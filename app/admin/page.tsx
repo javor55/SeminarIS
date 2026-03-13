@@ -19,11 +19,6 @@ export default function AdminPage() {
   const [cohort, setCohort] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "ADMIN")) {
-      router.push("/");
-    }
-  }, [user, isLoading, router]);
 
   useEffect(() => {
     if (user?.role === "ADMIN") {
