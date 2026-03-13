@@ -110,7 +110,7 @@ export function SubjectsClientView({
                </Button>
             )}
             <Button asChild size="sm">
-              <Link href="/subjects/new">
+              <Link href="/subjects/new/edit">
                 <Plus className="mr-2 h-4 w-4" />
                 Nový předmět
               </Link>

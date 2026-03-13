@@ -172,7 +172,7 @@ export function getOccurrenceColumns(opts: {
                 onEnroll && (
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="default"
                     disabled={isFull}
                     onClick={() => onEnroll(occ)}
                   >

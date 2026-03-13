@@ -23,6 +23,11 @@ export default async function SubjectDetailPage({
   }
 
   const currentUser = session.user as User;
+
+  if (params.id === "new") {
+    redirect("/subjects/new/edit");
+  }
+
   const isPrivileged = currentUser.role === "ADMIN" || currentUser.role === "TEACHER";
 
   // Načítáme všechna potřebná data na serveru
@@ -58,6 +63,12 @@ export default async function SubjectDetailPage({
               ? `${enrolledCount}/∞`
               : `${enrolledCount}/${occ.capacity}`;
 
+          const enrolledByMe = occ.enrollments?.some(
+            (e: any) => e.studentId === currentUser.id && !e.deletedAt
+          );
+
+          const isFull = occ.capacity != null && enrolledCount >= occ.capacity;
+
           const hasStudents = enrolledCount > 0;
 
           const fullCode = occ.subject?.code
@@ -91,6 +102,8 @@ export default async function SubjectDetailPage({
             fullCode,
             teacherName,
             searchText,
+            isFull,
+            enrolledByMe,
           } as OccurrenceRow;
         })
     )

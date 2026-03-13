@@ -18,7 +18,7 @@ export default async function UsersPage() {
 
   const currentUser = session.user as User;
 
-  if (currentUser.role !== "ADMIN") {
+  if (currentUser.role !== "ADMIN" && currentUser.role !== "TEACHER") {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold">Přístup odepřen</h1>

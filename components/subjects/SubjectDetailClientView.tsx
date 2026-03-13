@@ -10,6 +10,7 @@ import {
   Block,
   EnrollmentWindowWithBlocks,
   User,
+  StudentEnrollment,
 } from "@/lib/types";
 import { EditSubjectOccurrenceDialog } from "@/components/occurrences/EditSubjectOccurrenceDialog";
 import { DataTable } from "@/components/ui/data-table";
@@ -17,8 +18,18 @@ import {
   OccurrenceRow,
   getOccurrenceColumns,
 } from "@/components/occurrences/occurrence-columns";
-import { toggleSubjectActive, updateSubjectOccurrence, deleteSubjectOccurrence } from "@/lib/data";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { enrollStudent, unenrollStudent, toggleSubjectActive, updateSubjectOccurrence, deleteSubjectOccurrence } from "@/lib/data";
 
 export function SubjectDetailClientView({
   subject,
@@ -44,6 +55,96 @@ export function SubjectDetailClientView({
     null
   );
 
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+
+  /** Alert: Stejný předmět v jiném bloku stejného okna */
+  const [sameSubjectAlert, setSameSubjectAlert] = useState<{
+    subjectName: string;
+    blockName: string;
+  } | null>(null);
+
+  /** Alert: Přepsat zápis v rámci bloku */
+  const [switchEnroll, setSwitchEnroll] = useState<{
+    fromOccurrenceId: string;
+    toOccurrenceId: string;
+    block: any;
+  } | null>(null);
+
+  /** Alert: Potvrzení odhlášení */
+  const [unenrollConfirm, setUnenrollConfirm] = useState<OccurrenceRow | null>(null);
+
+  const isStudent = currentUser.role === "STUDENT";
+
+  // Najde, zda je student zapsán v libovolném předmětu v rámci daného bloku
+  const findMyEnrollmentInBlock = (block: any) => {
+    for (const occ of block.occurrences || []) {
+      const enr = (occ.enrollments as StudentEnrollment[] | undefined)?.find(
+        (e) => e.studentId === currentUser.id && !e.deletedAt
+      );
+      if (enr) return { occurrenceId: occ.id, enrollmentId: enr.id, occurrence: occ };
+    }
+    return null;
+  };
+
+  // Najde, zda je student zapsán v TOMTO předmětu v jiném bloku stejného okna
+  const findSameSubjectInOtherBlocks = (targetOcc: OccurrenceRow) => {
+    return occurrences.find(occ => 
+      occ.id !== targetOcc.id && 
+      occ.enrollmentWindow?.id === targetOcc.enrollmentWindow?.id &&
+      occ.enrolledByMe
+    );
+  };
+
+  const handleEnroll = async (occ: OccurrenceRow) => {
+    if (!isStudent) return;
+
+    // 1. Už má tento předmět v jiném bloku tohoto okna?
+    const alreadyEnrolled = findSameSubjectInOtherBlocks(occ);
+    if (alreadyEnrolled) {
+      setSameSubjectAlert({
+        subjectName: subject.name,
+        blockName: alreadyEnrolled.blockName
+      });
+      return;
+    }
+
+    // 2. Už má něco jiného v tomto bloku?
+    const inBlock = findMyEnrollmentInBlock(occ.block);
+    if (inBlock && inBlock.occurrenceId !== occ.id) {
+      setSwitchEnroll({
+        fromOccurrenceId: inBlock.occurrenceId,
+        toOccurrenceId: occ.id,
+        block: occ.block
+      });
+      return;
+    }
+
+    try {
+      await enrollStudent(currentUser.id, occ.id);
+      toast.success("Zápis byl úspěšně proveden.");
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || "Nepodařilo se provést zápis.");
+    }
+  };
+
+  const handleUnenroll = async (occ: OccurrenceRow) => {
+    const enr = (occ as any).enrollments?.find(
+      (e: any) => e.studentId === currentUser.id && !e.deletedAt
+    );
+    if (!enr) return;
+
+    try {
+      await unenrollStudent(enr.id);
+      toast.success("Odhlášení bylo úspěšně provedeno.");
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || "Nepodařilo se zrušit zápis.");
+    } finally {
+      setUnenrollConfirm(null);
+    }
+  };
+
   const columns = useMemo(
     () =>
       getOccurrenceColumns({
@@ -56,22 +157,19 @@ export function SubjectDetailClientView({
           }),
         onEdit: (occ) => setEditOccurrence(occ),
         onDelete: async (occ) => {
-            if (window.confirm("Opravdu smazat tento výskyt?")) {
-                await deleteSubjectOccurrence(occ.id);
-                toast.success("Výskyt byl smazán.");
-                router.refresh();
-            }
+          if (window.confirm("Opravdu smazat tento výskyt?")) {
+            await deleteSubjectOccurrence(occ.id);
+            toast.success("Výskyt byl smazán.");
+            router.refresh();
+          }
         },
-        onEnroll: (occ) => {
-          // Logic for enrolling from the table if needed
-        },
+        onEnroll: (occ) => handleEnroll(occ),
+        onUnenroll: (occ) => setUnenrollConfirm(occ),
       }),
-    [currentUser, router]
+    [currentUser, router, occurrences, subject.name]
   );
 
   const handleToggleActive = async () => {
-    const action = subject.isActive ? "archivovat" : "aktivovat";
-    if (!window.confirm(`Opravdu chcete ${action} tento předmět?`)) return;
     try {
       await toggleSubjectActive(subject.id);
       toast.success(`Předmět byl ${subject.isActive ? "archivován" : "aktivován"}.`);
@@ -79,6 +177,8 @@ export function SubjectDetailClientView({
     } catch (err) {
       console.error(err);
       toast.error("Něco se pokazilo při změně stavu předmětu.");
+    } finally {
+      setShowArchiveConfirm(false);
     }
   };
 
@@ -98,6 +198,7 @@ export function SubjectDetailClientView({
   };
 
   const isPrivilegedUser = currentUser.role === "ADMIN" || currentUser.role === "TEACHER";
+  const isAdmin = currentUser.role === "ADMIN";
 
   return (
     <div className="space-y-6">
@@ -150,17 +251,134 @@ export function SubjectDetailClientView({
               >
                 Duplikovat
               </Button>
-              <Button
-                size="sm"
-                variant={subject.isActive ? "destructive" : "default"}
-                onClick={handleToggleActive}
-              >
-                {subject.isActive ? "Archivovat" : "Obnovit"}
-              </Button>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant={subject.isActive ? "destructive" : "default"}
+                  onClick={() => setShowArchiveConfirm(true)}
+                >
+                  {subject.isActive ? "Archivovat" : "Obnovit"}
+                </Button>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      <AlertDialog open={showArchiveConfirm} onOpenChange={setShowArchiveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {subject.isActive ? "Archivovat předmět?" : "Obnovit předmět?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {subject.isActive
+                ? `Opravdu chcete archivovat předmět "${subject.name}"? Předmět se přestane nabízet v aktuálních zápisech, ale jeho data zůstanou zachována.`
+                : `Opravdu chcete obnovit předmět "${subject.name}"? Předmět se opět stane aktivním v katalogu.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Zrušit</AlertDialogCancel>
+            <AlertDialogAction
+              className={subject.isActive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+              onClick={handleToggleActive}
+            >
+              {subject.isActive ? "Archivovat" : "Obnovit"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ALERT: Stejný předmět v jiném bloku */}
+      {sameSubjectAlert && (
+        <AlertDialog open onOpenChange={() => setSameSubjectAlert(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Nelze se zapsat</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tento předmět (<strong>{sameSubjectAlert.subjectName}</strong>) již máte zapsaný v jiném bloku (<strong>{sameSubjectAlert.blockName}</strong>) v rámci tohoto zápisu. Nejdříve se prosím odepište.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => setSameSubjectAlert(null)}>
+                Rozumím
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* ALERT: Přepsat zápis v bloku */}
+      {switchEnroll && (
+        <AlertDialog open onOpenChange={() => setSwitchEnroll(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Přepsat zápis?</AlertDialogTitle>
+              {(() => {
+                const inBlock = findMyEnrollmentInBlock(switchEnroll.block);
+                const toOcc = occurrences.find(o => o.id === switchEnroll.toOccurrenceId);
+
+                return (
+                  <AlertDialogDescription className="space-y-2">
+                    <p>
+                      V bloku <strong>{switchEnroll.block.name}</strong> již máte zapsaný jiný seminář. Pokud budete pokračovat, vaše volba se přepíše.
+                    </p>
+                    {inBlock && toOcc && (
+                      <div className="bg-muted p-3 rounded text-sm space-y-1">
+                        <p><strong>Současný:</strong> {inBlock.occurrence.subject.name}</p>
+                        <p><strong>Nový:</strong> {subject.name}</p>
+                      </div>
+                    )}
+                  </AlertDialogDescription>
+                );
+              })()}
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Zrušit</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  try {
+                    const my = findMyEnrollmentInBlock(switchEnroll.block);
+                    if (my) await unenrollStudent(my.enrollmentId);
+                    await enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
+                    toast.success("Zápis byl úspěšně přepsán.");
+                    router.refresh();
+                  } catch (err: any) {
+                    toast.error(err.message || "Nepodařilo se přepsat zápis.");
+                  } finally {
+                    setSwitchEnroll(null);
+                  }
+                }}
+              >
+                Přepsat
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* ALERT: Potvrzení odhlášení */}
+      {unenrollConfirm && (
+        <AlertDialog open onOpenChange={() => setUnenrollConfirm(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Odhlásit se z předmětu?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Opravdu se chcete odhlásit z předmětu <strong>{subject.name}</strong> v bloku <strong>{unenrollConfirm.blockName}</strong>?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Zrušit</AlertDialogCancel>
+              <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => handleUnenroll(unenrollConfirm)}
+            >
+              Odepsat
+            </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
       <div className="rounded-lg border bg-white p-4 shadow-sm space-y-2">
         <h2 className="text-base font-semibold">Sylabus</h2>

@@ -71,40 +71,38 @@ export const usersColumns: ColumnDef<UserRow>[] = [
         return <span className="text-[10px] text-muted-foreground italic">Nikdy nezapsán</span>;
       }
       
-      // Určíme prioritní stav (Otevřeno > Naplánováno > Uzavřeno)
-      let currentIs: "open" | "planned" | "closed" = "closed";
+      // Seskupit podle zápisového okna a najít to nejnovější (podle startsAt)
+      const windowStats = new Map<string, { name: string, startsAt: string, count: number }>();
       
       for (const enr of enrollments) {
         const ew = enr.subjectOccurrence?.block?.enrollmentWindow;
         if (!ew) continue;
-        const statusMeta = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
-        if (statusMeta.is === "open") {
-          currentIs = "open";
-          break; // Otevřeno má absolutní prioritu
+        
+        if (!windowStats.has(ew.id)) {
+          windowStats.set(ew.id, { name: ew.name, startsAt: ew.startsAt, count: 0 });
         }
-        if (statusMeta.is === "planned") {
-          currentIs = "planned";
-        }
+        windowStats.get(ew.id)!.count++;
       }
+
+      const latest = Array.from(windowStats.values()).sort((a, b) => 
+        new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime()
+      )[0];
+
+      if (!latest) {
+        return <span className="text-[10px] text-muted-foreground italic">Nikdy nezapsán</span>;
+      }
+
+      const getSubjectCountLabel = (count: number) => {
+        if (count === 1) return "předmět";
+        if (count >= 2 && count <= 4) return "předměty";
+        return "předmětů";
+      };
       
       return (
-        <div className="flex gap-1 flex-wrap">
-          {currentIs === "open" && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
-              V probíhajícím zápisu
-            </span>
-          )}
-          {currentIs === "planned" && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800 border border-blue-200">
-              V naplánovaném zápisu
-            </span>
-          )}
-          {currentIs === "closed" && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
-              Pouze historie
-             </span>
-          )}
-        </div>
+        <span className="text-xs text-slate-600 leading-tight">
+          Zapsán na <strong>{latest.count}</strong> {getSubjectCountLabel(latest.count)} v{" "}
+          <span className="text-blue-600 font-medium">{latest.name}</span>
+        </span>
       );
     },
     filterFn: (row, id, value) => {
@@ -138,9 +136,11 @@ export const usersColumns: ColumnDef<UserRow>[] = [
       const u = row.original;
       const { user: currentUser } = useAuth();
       const [loading, setLoading] = React.useState(false);
+      const isAdmin = currentUser?.role === "ADMIN";
       // Maximální pojistka: kontrola přes ID i Email (case-insensitive)
       const isSelf = (currentUser?.id === u.id) || 
                      (currentUser?.email?.toLowerCase() === u.email?.toLowerCase());
+      const canEdit = isAdmin && !isSelf;
       const meta = table.options.meta as any;
 
       const handleRoleChange = async (v: string) => {
@@ -169,7 +169,7 @@ export const usersColumns: ColumnDef<UserRow>[] = [
             */
             <Select
               defaultValue={u.role}
-              disabled={loading || isSelf}
+              disabled={loading || !canEdit}
               onValueChange={async (v) => {
                 // Opraveno: Předáváme nově zvolenou hodnotu 'v' místo 'u.role'
                 if (window.confirm(`Opravdu chcete změnit roli uživatele ${u.firstName} ${u.lastName} na ${v}?`)) {
@@ -202,9 +202,11 @@ export const usersColumns: ColumnDef<UserRow>[] = [
     cell: ({ row, table }) => {
       const u = row.original;
       const { user: currentUser } = useAuth();
+      const isAdmin = currentUser?.role === "ADMIN";
       const checked = u.isActive !== false;
       const [loading, setLoading] = React.useState(false);
       const isSelf = currentUser?.id === u.id || currentUser?.email === u.email;
+      const canEdit = isAdmin && !isSelf;
       const meta = table.options.meta as any;
 
       const handleToggleActive = async () => {
@@ -229,7 +231,7 @@ export const usersColumns: ColumnDef<UserRow>[] = [
             <div className="flex items-center">
               <Switch
                 checked={checked}
-                disabled={loading || isSelf}
+                disabled={loading || !canEdit}
                 className={cn(
                   "border border-slate-300 shadow-inner",
                   "data-[state=checked]:bg-emerald-600 data-[state=unchecked]:bg-slate-200",
@@ -253,6 +255,8 @@ export const usersColumns: ColumnDef<UserRow>[] = [
     header: "Akce",
     cell: ({ row }) => {
       const u = row.original;
+      const { user: currentUser } = useAuth();
+      const isAdmin = currentUser?.role === "ADMIN";
       const [showDetails, setShowDetails] = React.useState(false);
       
       return (
@@ -272,7 +276,9 @@ export const usersColumns: ColumnDef<UserRow>[] = [
             onOpenChange={setShowDetails} 
           />
           
-          <ResetPasswordDialog userId={u.id} userName={`${u.firstName} ${u.lastName}`} />
+          {isAdmin && (
+            <ResetPasswordDialog userId={u.id} userName={`${u.firstName} ${u.lastName}`} />
+          )}
         </div>
       );
     }

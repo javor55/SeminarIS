@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { cn } from "@/lib/utils";
 import { 
   updateUserRole, 
   toggleUserActive, 
@@ -150,7 +151,7 @@ export function UsersClientView({
           filteredRows.map(async (u) => {
             const currentState = u.isActive !== false;
             const isSelf = u.id === currentUser.id || u.email === currentUser.email;
-            if (isSelf && !setActive) return; 
+            if (isSelf && !setActive) return;
             if (currentState !== setActive) await toggleUserActive(u.id);
           })
         );
@@ -191,11 +192,11 @@ export function UsersClientView({
           <div className="space-y-2">
             <Label className="text-xs">Hromadná změna ročníku</Label>
             <div className="flex gap-2">
-              <Input 
-                className="h-8" 
-                placeholder="2024/25" 
-                value={selectedCohort} 
-                onChange={(e) => setSelectedCohort(e.target.value)} 
+              <Input
+                className="h-8"
+                placeholder="2024/25"
+                value={selectedCohort}
+                onChange={(e) => setSelectedCohort(e.target.value)}
               />
               <Button size="sm" className="h-8 shadow-none" onClick={handleBulkSetCohort} disabled={!selectedCohort || loading}>OK</Button>
             </div>
@@ -224,10 +225,12 @@ export function UsersClientView({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="gap-2">
-            <Upload className="w-4 h-4" />
-            Import uživatelů
-          </Button>
+          {currentUser.role === "ADMIN" && (
+            <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="gap-2">
+              <Upload className="w-4 h-4" />
+              Import uživatelů
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
             <Download className="w-4 h-4" />
             Export do CSV
@@ -236,26 +239,28 @@ export function UsersClientView({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-1 border-emerald-100 bg-emerald-50/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-md">Systémový ročník</CardTitle>
-            <CardDescription className="text-xs text-balance">Výchozí hodnota pro nově registrované uživatele.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Input 
-                id="cohort" 
-                placeholder="např. 2024/2025" 
-                value={globalCohort} 
-                onChange={(e) => setGlobalCohortState(e.target.value)} 
-                className="bg-white"
-              />
-            </div>
-            <Button className="w-full" size="sm" onClick={handleUpdateGlobalCohort} disabled={loading}>Aktualizovat globálně</Button>
-          </CardContent>
-        </Card>
+        {currentUser.role === "ADMIN" && (
+          <Card className="md:col-span-1 border-emerald-100 bg-emerald-50/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-md">Systémový ročník</CardTitle>
+              <CardDescription className="text-xs text-balance">Výchozí hodnota pro nově registrované uživatele.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Input
+                  id="cohort"
+                  placeholder="např. 2024/2025"
+                  value={globalCohort}
+                  onChange={(e) => setGlobalCohortState(e.target.value)}
+                  className="bg-white"
+                />
+              </div>
+              <Button className="w-full" size="sm" onClick={handleUpdateGlobalCohort} disabled={loading}>Aktualizovat globálně</Button>
+            </CardContent>
+          </Card>
+        )}
 
-        <Card className="md:col-span-2">
+        <Card className={cn("md:col-span-2", currentUser.role !== "ADMIN" && "md:col-span-3")}>
           <CardHeader className="pb-2">
             <CardTitle className="text-md">Statistiky a přehled</CardTitle>
           </CardHeader>
@@ -290,10 +295,10 @@ export function UsersClientView({
         </Card>
       </div>
 
-      <ImportUsersDialog 
-        open={showImport} 
-        onOpenChange={setShowImport} 
-        onSuccess={() => router.refresh()} 
+      <ImportUsersDialog
+        open={showImport}
+        onOpenChange={setShowImport}
+        onSuccess={() => router.refresh()}
       />
 
       {users.length <= 1 ? (
@@ -305,7 +310,7 @@ export function UsersClientView({
             <div className="max-w-[400px]">
               <h3 className="text-lg font-semibold">Zatím žádní další uživatelé</h3>
               <p className="text-sm text-muted-foreground">
-                V systému jste zatím jen vy. Chcete-li pokračovat, importujte seznam studentů 
+                V systému jste zatím jen vy. Chcete-li pokračovat, importujte seznam studentů
                 ze souboru CSV nebo nechte studenty, aby se registrovali sami.
               </p>
             </div>
@@ -361,7 +366,7 @@ export function UsersClientView({
             },
           ]}
           forceRefresh={() => router.refresh()}
-          bulkPopoverRender={renderBulkActions}
+          bulkPopoverRender={currentUser.role === "ADMIN" ? renderBulkActions : undefined}
         />
       )}
     </div>

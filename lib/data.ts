@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "./auth";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
+import { computeEnrollmentStatus } from "./utils";
 
 
 // === Pomocné funkce pro autorizaci ===
@@ -29,6 +30,28 @@ async function requirePrivileged() {
     throw new Error("Unauthorized: Access denied");
   }
   return user;
+}
+
+// === Synchronizace stavu zápisového okna s časem ===
+async function syncEnrollmentWindowStatus(ew: { id: string; status: string; startsAt: string | Date; endsAt: string | Date }) {
+  const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
+  let newDbStatus: string | null = null;
+
+  if (computed.is === "open" && ew.status !== "OPEN") {
+    newDbStatus = "OPEN";
+  } else if (computed.is === "closed" && ew.status !== "DRAFT" && ew.status !== "CLOSED") {
+    newDbStatus = "CLOSED";
+  }
+
+  if (newDbStatus) {
+    await prisma.enrollmentWindow.update({
+      where: { id: ew.id },
+      data: { status: newDbStatus as any },
+    });
+    console.log(`syncEnrollmentWindowStatus: Okno "${ew.id}" přepnuto z "${ew.status}" na "${newDbStatus}"`);
+    return newDbStatus;
+  }
+  return ew.status;
 }
 
 
@@ -132,7 +155,36 @@ export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = fal
     orderBy: { startsAt: "asc" },
   });
 
-  const parsed = ews.map(ew => ({
+  // Synchronizace stavů zápisových oken s aktuálním časem
+  for (const ew of ews) {
+    await syncEnrollmentWindowStatus(ew);
+  }
+
+  // Znovu načteme data po synchronizaci
+  const refreshedEws = await prisma.enrollmentWindow.findMany({
+    where: whereFilter,
+    include: {
+      blocks: {
+        where: { deletedAt: null },
+        orderBy: { order: "asc" },
+        include: {
+          subjectOccurrences: {
+            where: { deletedAt: null },
+            include: {
+              subject: true,
+              teacher: true,
+              studentEnrollments: {
+                where: { deletedAt: null },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { startsAt: "asc" },
+  });
+
+  const parsed = refreshedEws.map(ew => ({
     ...ew,
     blocks: ew.blocks.map(b => ({
       ...b,
@@ -171,7 +223,35 @@ export async function getEnrollmentWindowByIdWithBlocks(id: string) {
 
   if (!ew) return undefined;
 
-  const blocksObj = ew.blocks.map((b) => ({
+  // Lazy sync: synchronizujeme stav okna s aktuálním časem
+  await syncEnrollmentWindowStatus(ew);
+
+  // Znovu načteme po případné změně stavu
+  const refreshedEw = await prisma.enrollmentWindow.findUnique({
+    where: { id },
+    include: {
+      blocks: {
+        where: { deletedAt: null },
+        orderBy: { order: "asc" },
+        include: {
+          subjectOccurrences: {
+            where: { deletedAt: null },
+            include: {
+              subject: true,
+              teacher: true,
+              studentEnrollments: {
+                where: { deletedAt: null },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!refreshedEw) return undefined;
+
+  const blocksObj = refreshedEw.blocks.map((b) => ({
     ...b,
     occurrences: b.subjectOccurrences.map((o) => ({
       ...o,
@@ -180,7 +260,7 @@ export async function getEnrollmentWindowByIdWithBlocks(id: string) {
   }));
 
   return {
-    ...ew,
+    ...refreshedEw,
     blocks: blocksObj,
   };
 }
@@ -500,13 +580,20 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
 
   // 4. Kontrola, zda je zápisové okno otevřené (pokud uživatel není ADMIN)
   if (user.role !== "ADMIN") {
-    const window = targetOcc.block.enrollmentWindow;
-    const now = new Date();
-    if (window.status !== "OPEN") {
-       if (window.status === "DRAFT") throw new Error("Zápis je momentálně v přípravě (Koncept).");
-       if (now < new Date(window.startsAt)) throw new Error("Zápis ještě nebyl zahájen.");
-       if (now > new Date(window.endsAt)) throw new Error("Zápis již byl ukončen.");
-       throw new Error("Zápis není otevřen.");
+    const ew = targetOcc.block.enrollmentWindow;
+    const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
+
+    // Lazy update: synchronizujeme stav v DB s reálným časem
+    await syncEnrollmentWindowStatus(ew);
+
+    if (computed.is === "closed") {
+      if (ew.status === "DRAFT") throw new Error("Zápis je momentálně v přípravě (Koncept).");
+      const now = new Date();
+      if (now > new Date(ew.endsAt)) throw new Error("Zápis již byl ukončen.");
+      throw new Error("Zápis není otevřen.");
+    }
+    if (computed.is === "planned") {
+      throw new Error("Zápis ještě nebyl zahájen.");
     }
   }
 
@@ -526,6 +613,15 @@ export async function unenrollStudent(enrollmentId: string) {
   const user = await requireAuth();
   const enrollment = await prisma.studentEnrollment.findUnique({
     where: { id: enrollmentId },
+    include: {
+      subjectOccurrence: {
+        include: {
+          block: {
+            include: { enrollmentWindow: true }
+          }
+        }
+      }
+    }
   });
 
   if (!enrollment) return;
@@ -538,8 +634,21 @@ export async function unenrollStudent(enrollmentId: string) {
     throw new Error("Guests cannot unenroll");
   }
 
+  // Kontrola, zda je zápisové okno otevřené (pro studenty)
+  if (user.role === "STUDENT") {
+    const ew = enrollment.subjectOccurrence.block.enrollmentWindow;
+    const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
 
+    // Lazy update: synchronizujeme stav v DB s reálným časem
+    await syncEnrollmentWindowStatus(ew);
 
+    if (computed.is === "closed") {
+      throw new Error("Zápis je uzavřen – odepsání již není možné.");
+    }
+    if (computed.is === "planned") {
+      throw new Error("Zápis ještě nebyl zahájen.");
+    }
+  }
 
   const res = await prisma.studentEnrollment.delete({
     where: { id: enrollmentId },
@@ -744,7 +853,7 @@ export async function deleteSubjectOccurrence(occurrenceId: string) {
 
 
 export async function createSubject(subject: any) {
-  const admin = await requireAdmin();
+  const admin = await requirePrivileged();
   const res = await prisma.subject.create({
     data: {
       name: subject.name,
@@ -776,7 +885,7 @@ export async function toggleSubjectActive(subjectId: string) {
 
 
 export async function updateSubject(subject: any) {
-  const admin = await requireAdmin();
+  const admin = await requirePrivileged();
   return await prisma.subject.update({
     where: { id: subject.id },
     data: {
