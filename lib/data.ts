@@ -137,19 +137,17 @@ export async function getEnrollmentWindowsVisible() {
     orderBy: { startsAt: "desc" },
   });
 
-  // Lazy sync: synchronizujeme stav oken s aktuálním časem
-  for (const ew of windows) {
-    await syncEnrollmentWindowStatus(ew);
-  }
+  // Paralelní sync – všechna okna najednou místo sekvenčního cyklu
+  const syncResults = await Promise.all(
+    windows.map(async (ew) => {
+      const newStatus = await syncEnrollmentWindowStatus(ew);
+      return { ...ew, status: newStatus as typeof ew.status };
+    })
+  );
 
-  // Znovu načteme po synchronizaci
-  return await prisma.enrollmentWindow.findMany({
-    where: {
-      visibleToStudents: true,
-      status: { not: "DRAFT" },
-    },
-    orderBy: { startsAt: "desc" },
-  });
+  // Vrátíme přímo aktualizovaná data, žádný druhý fetch
+  // Filtrujeme okna, která po syncu zůstala ne-DRAFT
+  return syncResults.filter(ew => ew.status !== "DRAFT");
 }
 
 export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = false) {
@@ -180,49 +178,30 @@ export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = fal
     orderBy: { startsAt: "desc" },
   });
 
-  // Synchronizace stavů zápisových oken s aktuálním časem
-  let needsRefresh = false;
-  for (const ew of ews) {
-    const newStatus = await syncEnrollmentWindowStatus(ew);
-    if (newStatus !== ew.status) needsRefresh = true;
-  }
+  // Paralelní sync – všechna okna najednou
+  await Promise.all(
+    ews.map(ew => syncEnrollmentWindowStatus(ew))
+  );
 
-  // Jen pokud se stav změnil, načteme data znovu
-  const source = needsRefresh
-    ? await prisma.enrollmentWindow.findMany({
-        where: whereFilter,
-        include: {
-          blocks: {
-            where: { deletedAt: null },
-            orderBy: { order: "asc" },
-            include: {
-              subjectOccurrences: {
-                where: { deletedAt: null },
-                include: {
-                  subject: true,
-                  teacher: true,
-                  studentEnrollments: {
-                    where: { deletedAt: null },
-                  },
-                },
-              },
-            },
-          },
-        },
-        orderBy: { startsAt: "desc" },
-      })
-    : ews;
+  // Aplikujeme aktualizované stavy přímo v paměti místo refetche
+  const parsed = ews.map(ew => {
+    const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
+    const currentStatus = computed.is === "open" ? "OPEN"
+      : (computed.is === "closed" && ew.status !== "DRAFT") ? "CLOSED"
+      : ew.status;
 
-  const parsed = source.map(ew => ({
-    ...ew,
-    blocks: ew.blocks.map(b => ({
-      ...b,
-      occurrences: b.subjectOccurrences.map(o => ({
-        ...o,
-        enrollments: o.studentEnrollments,
+    return {
+      ...ew,
+      status: currentStatus,
+      blocks: ew.blocks.map(b => ({
+        ...b,
+        occurrences: b.subjectOccurrences.map(o => ({
+          ...o,
+          enrollments: o.studentEnrollments,
+        })),
       })),
-    })),
-  }));
+    };
+  });
 
   return JSON.parse(JSON.stringify(parsed));
 }
@@ -252,45 +231,46 @@ export async function getEnrollmentWindowByIdWithBlocks(id: string) {
 
   if (!ew) return undefined;
 
-  // Lazy sync: synchronizujeme stav okna s aktuálním časem
-  await syncEnrollmentWindowStatus(ew);
+  // Sync stavu – pouze pokud se stav změní, refetchneme
+  const newStatus = await syncEnrollmentWindowStatus(ew);
+  const statusChanged = newStatus !== ew.status;
 
-  // Znovu načteme po případné změně stavu
-  const refreshedEw = await prisma.enrollmentWindow.findUnique({
-    where: { id },
-    include: {
-      blocks: {
-        where: { deletedAt: null },
-        orderBy: { order: "asc" },
+  // Refetch jen pokud se stav opravdu změnil, jinak použijeme stávající data
+  const source = statusChanged
+    ? await prisma.enrollmentWindow.findUnique({
+        where: { id },
         include: {
-          subjectOccurrences: {
+          blocks: {
             where: { deletedAt: null },
+            orderBy: { order: "asc" },
             include: {
-              subject: true,
-              teacher: true,
-              studentEnrollments: {
+              subjectOccurrences: {
                 where: { deletedAt: null },
+                include: {
+                  subject: true,
+                  teacher: true,
+                  studentEnrollments: {
+                    where: { deletedAt: null },
+                  },
+                },
               },
             },
           },
         },
-      },
-    },
-  });
+      })
+    : ew;
 
-  if (!refreshedEw) return undefined;
-
-  const blocksObj = refreshedEw.blocks.map((b) => ({
-    ...b,
-    occurrences: b.subjectOccurrences.map((o) => ({
-      ...o,
-      enrollments: o.studentEnrollments,
-    })),
-  }));
+  if (!source) return undefined;
 
   return {
-    ...refreshedEw,
-    blocks: blocksObj,
+    ...source,
+    blocks: source.blocks.map((b) => ({
+      ...b,
+      occurrences: b.subjectOccurrences.map((o) => ({
+        ...o,
+        enrollments: o.studentEnrollments,
+      })),
+    })),
   };
 }
 

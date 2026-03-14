@@ -43,15 +43,17 @@ function findDashboardEnrollment(
 }
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions);
+  // Paralelní načtení session a viditelných oken
+  const [session, visible] = await Promise.all([
+    getServerSession(authOptions),
+    getEnrollmentWindowsVisible(),
+  ]);
   
   if (!session?.user) {
     redirect("/");
   }
 
   const user = session.user as User;
-  
-  const visible = await getEnrollmentWindowsVisible();
   const found = findDashboardEnrollment(visible, user);
   
   if (!found) {
@@ -80,4 +82,4 @@ export default async function DashboardPage() {
   }
 
   return <EnrollmentView enrollmentWindow={ew} currentUser={user} />;
-}
+}
