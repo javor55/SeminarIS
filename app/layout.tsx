@@ -7,7 +7,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata = {
   title: "Zápis seminářů",
-  description: "Mock systém pro zápis seminářů",
+  description: "Informační systém pro zápis seminářů",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

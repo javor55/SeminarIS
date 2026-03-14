@@ -1084,5 +1084,37 @@ export async function updateUsersCohort(userIds: string[], cohort: string) {
   });
 }
 
+let isColdStart = true;
 
+export async function runSystemDiagnostics() {
+  const admin = await requireAdmin();
+  const startTime = Date.now();
+  
+  // 1. Database Latency
+  const dbStart = Date.now();
+  await prisma.user.count();
+  const dbLatency = Date.now() - dbStart;
 
+  // 2. Session Latency
+  const sessionCheckLatency = Date.now() - startTime;
+
+  // 3. Env Health
+  const envHealth = {
+    DATABASE_URL: !!process.env.DATABASE_URL,
+    NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET,
+    NEXTAUTH_URL: !!process.env.NEXTAUTH_URL,
+    VERCEL_SPEED_INSIGHTS: !!process.env.VERCEL_SPEED_INSIGHTS_ID || !!process.env.NEXT_PUBLIC_VERCEL_SPEED_INSIGHTS_ID,
+  };
+
+  const wasColdStart = isColdStart;
+  isColdStart = false;
+
+  return {
+    dbLatency,
+    sessionCheckLatency,
+    envHealth,
+    isFirstRequest: wasColdStart,
+    serverTime: new Date().toISOString(),
+    userRole: admin.role,
+  };
+}

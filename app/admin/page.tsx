@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Users, BookOpen, Calendar, Save } from "lucide-react";
 import { toast } from "sonner";
+import { PerformanceBenchmarks } from "@/components/admin/PerformanceBenchmarks";
 
 export default function AdminPage() {
   const { user, isLoading } = useAuth();
@@ -105,7 +106,7 @@ export default function AdminPage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats?.activeEnrollmentCount ?? "..."}</div>
             <p className="text-xs text-muted-foreground">Aktuálně probíhající zápisová okna</p>
-          </CardContent>
+            </CardContent>
         </Card>
       </div>
 
@@ -161,8 +162,10 @@ export default function AdminPage() {
             </div>
           </CardContent>
         </Card>
-
       </div>
+
+      {/* BENCHMARK A DIAGNOSTIKA */}
+      <PerformanceBenchmarks />
     </div>
   );
 }

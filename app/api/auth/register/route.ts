@@ -5,9 +5,12 @@ import { getGlobalCohort, isRegistrationEnabled } from "@/lib/data";
 
 export async function POST(req: Request) {
   try {
-    // Kontrola, zda je registrace povolena
+    const userCount = await prisma.user.count();
+    const isFirstUser = userCount === 0;
+
+    // Kontrola, zda je registrace povolena (první uživatel má výjimku)
     const regEnabled = await isRegistrationEnabled();
-    if (!regEnabled) {
+    if (!regEnabled && !isFirstUser) {
       return NextResponse.json(
         { message: "Registrace je momentálně zakázána. Kontaktujte administrátora." },
         { status: 403 }
@@ -58,6 +61,7 @@ export async function POST(req: Request) {
         lastName,
         isActive: true,
         cohort: currentCohort || null,
+        role: isFirstUser ? "ADMIN" : "GUEST",
       },
     });
 
