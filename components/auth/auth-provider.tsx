@@ -46,7 +46,9 @@ function AuthContextWrapper({ children }: { children: ReactNode }) {
       throw new Error(res.error);
     }
     
-    router.push("/dashboard");
+    // replace místo push – login stránka se nemá vracet v historii
+    router.replace("/dashboard");
+    router.refresh();
   }
 
   // 🚪 Odhlášení

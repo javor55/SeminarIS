@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/auth-provider";
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,11 +17,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle } from "lucide-react"; // Přidána ikona pro úspěch
+import { AlertCircle } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
-  // 🔥 Odstraněna 'register' z 'useAuth'
   const { user } = useAuth();
 
   const [email, setEmail] = React.useState("");
@@ -31,9 +31,6 @@ export default function RegisterPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   
-  // 🔥 Přidán stav pro zobrazení úspěchu
-  const [isSuccess, setIsSuccess] = React.useState(false);
-
   // Efekt pro přesměrování již přihlášených uživatelů
   React.useEffect(() => {
     if (user) {
@@ -47,6 +44,7 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
+      // 1. Zavoláme registrační API
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -59,13 +57,25 @@ export default function RegisterPage() {
         throw new Error(data.message || "Registrace selhala.");
       }
       
-      // Místo přesměrování zobrazíme úspěch
-      setIsSuccess(true);
+      // 2. Automatické přihlášení
+      const loginRes = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (loginRes?.error) {
+        // Pokud přihlášení selže, musíme aspoň informovat, že účet už existuje
+        throw new Error("Účet byl vytvořen, ale nepodařilo se automatické přihlášení. Zkuste se prosím přihlásit ručně.");
+      }
+
+      // 3. Přesměrujeme na dashboard a vynutíme refresh session
+      router.replace("/dashboard");
+      router.refresh();
 
     } catch (err: unknown) {
       const error = err as Error;
       setError(error.message || "Registrace selhala. Zkuste to prosím znovu.");
-    } finally {
       setIsLoading(false);
     }
   };
@@ -84,97 +94,77 @@ export default function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          
-          {/* 🔥 Zobrazení zprávy o úspěchu */}
-          {isSuccess ? (
-            <Alert variant="default" className="border-green-500 text-green-700">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription>
-                Registrace proběhla úspěšně. Nyní se můžete{" "}
-                <Link href="/login" className="font-bold hover:underline">
-                  přihlásit
-                </Link>
-                .
-              </AlertDescription>
-            </Alert>
-          ) : (
-            
-            /* 🔥 Formulář se zobrazí, jen pokud 'isSuccess' je false */
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">Jméno</Label>
-                  <Input
-                    id="firstName"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Příjmení</Label>
-                  <Input
-                    id="lastName"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="email">E-mail</Label>
+                <Label htmlFor="firstName">Jméno</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="vase@adresa.cz"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="firstName"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
                   required
                 />
               </div>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="password">Heslo</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Příjmení</Label>
+                <Input
+                  id="lastName"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                />
               </div>
+            </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Vytváří se účet..." : "Vytvořit účet"}
-              </Button>
-            </form>
-          )}
+            <div className="space-y-2">
+              <Label htmlFor="email">E-mail</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="vase@adresa.cz"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="password">Heslo</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Přihlašuji..." : "Vytvořit účet"}
+            </Button>
+          </form>
         </CardContent>
         
-        {/* 🔥 Patička se zobrazí jen pokud *neběží* úspěch */}
-        {!isSuccess && (
-          <CardFooter className="text-sm text-muted-foreground justify-center">
-            <p>
-              Máte již účet?{" "}
-              <Link
-                href="/login"
-                className="text-primary hover:underline font-medium"
-              >
-                Přihlaste se
-              </Link>
+        <CardFooter className="text-sm text-muted-foreground justify-center">
+          <p>
+            Máte již účet?{" "}
+            <Link
+              href="/login"
+              className="text-primary hover:underline font-medium"
+            >
+              Přihlaste se
+            </Link>
             </p>
-          </CardFooter>
-        )}
+        </CardFooter>
       </Card>
     </div>
   );
