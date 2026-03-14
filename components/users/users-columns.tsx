@@ -40,6 +40,9 @@ const RoleCell = ({ row, table }: { row: Row<UserRow>, table: Table<UserRow> }) 
   const u = row.original;
   const { user: currentUser } = useAuth();
   const [loading, setLoading] = React.useState(false);
+  const [pendingRole, setPendingRole] = React.useState<string | null>(null);
+  const [showConfirm, setShowConfirm] = React.useState(false);
+
   const isAdmin = currentUser?.role === "ADMIN";
   const isSelf = (currentUser?.id === u.id) || 
                  (currentUser?.email?.toLowerCase() === u.email?.toLowerCase());
@@ -61,32 +64,38 @@ const RoleCell = ({ row, table }: { row: Row<UserRow>, table: Table<UserRow> }) 
   };
 
   return (
-    <ConfirmAction
-      title="Změnit roli?"
-      description={`Opravdu chcete změnit roli uživatele ${u.firstName} ${u.lastName}?`}
-      onConfirm={() => {}} 
-      trigger={
-        <Select
-          defaultValue={u.role}
-          disabled={loading || !canEdit}
-          onValueChange={async (v) => {
-            if (window.confirm(`Opravdu chcete změnit roli uživatele ${u.firstName} ${u.lastName} na ${v}?`)) {
-               handleRoleChange(v);
-            }
-          }}
-        >
-          <SelectTrigger className="w-[110px] h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ADMIN">ADMIN</SelectItem>
-            <SelectItem value="TEACHER">TEACHER</SelectItem>
-            <SelectItem value="STUDENT">STUDENT</SelectItem>
-            <SelectItem value="GUEST">GUEST</SelectItem>
-          </SelectContent>
-        </Select>
-      }
-    />
+    <>
+      <Select
+        value={u.role}
+        disabled={loading || !canEdit}
+        onValueChange={(v) => {
+          setPendingRole(v);
+          setShowConfirm(true);
+        }}
+      >
+        <SelectTrigger className="w-[110px] h-8">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="ADMIN">ADMIN</SelectItem>
+          <SelectItem value="TEACHER">TEACHER</SelectItem>
+          <SelectItem value="STUDENT">STUDENT</SelectItem>
+          <SelectItem value="GUEST">GUEST</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <ConfirmAction
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        title="Změnit roli?"
+        description={`Opravdu chcete změnit roli uživatele ${u.firstName} ${u.lastName} na ${pendingRole}?`}
+        onConfirm={async () => {
+          if (pendingRole) {
+            await handleRoleChange(pendingRole);
+          }
+        }}
+      />
+    </>
   );
 };
 

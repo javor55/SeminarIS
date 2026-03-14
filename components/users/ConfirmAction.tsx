@@ -14,12 +14,14 @@ import {
 import { ReactNode } from "react";
 
 interface ConfirmActionProps {
-  trigger: ReactNode;
+  trigger?: ReactNode;
   title: string;
   description: string;
   onConfirm: () => void | Promise<void>;
   actionLabel?: string;
   cancelLabel?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function ConfirmAction({
@@ -29,12 +31,16 @@ export function ConfirmAction({
   onConfirm,
   actionLabel = "Potvrdit",
   cancelLabel = "Zrušit",
+  open,
+  onOpenChange,
 }: ConfirmActionProps) {
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        {trigger}
-      </AlertDialogTrigger>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      {trigger && (
+        <AlertDialogTrigger asChild>
+          {trigger}
+        </AlertDialogTrigger>
+      )}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
