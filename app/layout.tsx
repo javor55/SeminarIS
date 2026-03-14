@@ -3,6 +3,7 @@ import "./globals.css";
 import type { ReactNode } from "react";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/app-shell";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata = {
   title: "Zápis seminářů",
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
