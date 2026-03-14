@@ -134,6 +134,7 @@ export async function getEnrollmentWindowsVisible() {
       visibleToStudents: true,
       status: { not: "DRAFT" },
     },
+    orderBy: { startsAt: "desc" },
   });
 
   // Lazy sync: synchronizujeme stav oken s aktuálním časem
@@ -147,6 +148,7 @@ export async function getEnrollmentWindowsVisible() {
       visibleToStudents: true,
       status: { not: "DRAFT" },
     },
+    orderBy: { startsAt: "desc" },
   });
 }
 
@@ -175,7 +177,7 @@ export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = fal
         },
       },
     },
-    orderBy: { startsAt: "asc" },
+    orderBy: { startsAt: "desc" },
   });
 
   // Synchronizace stavů zápisových oken s aktuálním časem
@@ -207,7 +209,7 @@ export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = fal
             },
           },
         },
-        orderBy: { startsAt: "asc" },
+        orderBy: { startsAt: "desc" },
       })
     : ews;
 
