@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Block, User } from "@/lib/types";
+import { User, StudentEnrollment, SubjectOccurrence } from "@/lib/types";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getUsersForFilters } from "@/lib/data";
+import { getUsersForFilters, unenrollStudent, enrollStudent } from "@/lib/data";
 
 import {
   AlertDialog,
@@ -25,29 +25,27 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { unenrollStudent, enrollStudent } from "@/lib/data";
+
+export type OccurrenceForDialog = SubjectOccurrence & {
+  subject?: {
+    name: string;
+    code?: string | null;
+  };
+  enrollments?: StudentEnrollment[];
+};
 
 export function OccurrencesStudentsDialog({
-  occurrenceId,
-  block,
+  occurrence,
   currentUser,
   onOpenChange,
 }: {
-  occurrenceId: string;
-  block: Block & { occurrences: any[] };
+  occurrence: OccurrenceForDialog;
   currentUser: User;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (_: boolean) => void;
 }) {
   const router = useRouter();
 
-  // najdeme výskyt v rámci JEDNOHO bloku
-  const occurrence = useMemo(() => {
-    return block.occurrences.find((x) => x.id === occurrenceId) ?? null;
-  }, [occurrenceId, block]);
-
-  if (!occurrence) return null;
-
-  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -55,22 +53,35 @@ export function OccurrencesStudentsDialog({
     }
     load();
   }, []);
-  const isPrivileged = currentUser.role === "ADMIN" || currentUser.role === "TEACHER";
 
-
-  const [localEnrollments, setLocalEnrollments] = useState(
-    () => occurrence.enrollments
+  const [localEnrollments, setLocalEnrollments] = useState<StudentEnrollment[]>(
+    () => occurrence.enrollments ?? []
   );
+  
+  useEffect(() => {
+    if (occurrence.enrollments) {
+      setLocalEnrollments(occurrence.enrollments);
+    }
+  }, [occurrence.enrollments]);
+
   const [toUnenroll, setToUnenroll] = useState<string | null>(null);
   const [hasChanged, setHasChanged] = useState(false);
 
-  const alreadyEnrolledIds = new Set(localEnrollments.map((e) => e.studentId));
-  const enrollableStudents = allUsers.filter(
+  const isPrivileged = currentUser.role === "ADMIN" || currentUser.role === "TEACHER";
+
+  const alreadyEnrolledIds = useMemo(() => new Set(localEnrollments.map((e) => e.studentId)), [localEnrollments]);
+  
+  const enrollableStudents = useMemo(() => allUsers.filter(
     (u) => u.role === "STUDENT" && !alreadyEnrolledIds.has(u.id)
-  );
-  const [selectedStudentId, setSelectedStudentId] = useState<string>(
-    enrollableStudents[0]?.id ?? ""
-  );
+  ), [allUsers, alreadyEnrolledIds]);
+
+  const [selectedStudentId, setSelectedStudentId] = useState<string>("");
+
+  useEffect(() => {
+    if (enrollableStudents.length > 0 && !selectedStudentId) {
+      setSelectedStudentId(enrollableStudents[0].id);
+    }
+  }, [enrollableStudents, selectedStudentId]);
 
   const enrollmentToDelete =
     toUnenroll && localEnrollments.find((e) => e.id === toUnenroll);
@@ -81,7 +92,7 @@ export function OccurrencesStudentsDialog({
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              Studenti – {occurrence.subject.name} (
+              Studenti – {occurrence.subject?.name || "Seminář"} (
               {occurrence.subCode ?? "bez kódu"})
             </DialogTitle>
             <DialogDescription>
@@ -90,7 +101,6 @@ export function OccurrencesStudentsDialog({
           </DialogHeader>
 
           {isPrivileged && (
-
             <div className="mb-3 rounded-md border p-3 space-y-2">
               <p className="text-sm font-medium">Ruční zapsání studenta</p>
               {enrollableStudents.length === 0 ? (
@@ -98,13 +108,13 @@ export function OccurrencesStudentsDialog({
                   Všichni studenti jsou už zapsáni.
                 </p>
               ) : (
-                // 🔥 ZMĚNA: Přidán 'flex-col sm:flex-row' pro responzivní layout
                 <div className="flex flex-col sm:flex-row gap-2">
                   <select
-                    className="flex-1 border rounded-md px-2 py-1 text-sm"
+                    className="flex-1 border rounded-md px-2 py-1 text-sm bg-background text-foreground"
                     value={selectedStudentId}
                     onChange={(e) => setSelectedStudentId(e.target.value)}
                   >
+                    <option value="" disabled>Vyberte studenta...</option>
                     {enrollableStudents.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.firstName} {s.lastName} ({s.email})
@@ -119,9 +129,9 @@ export function OccurrencesStudentsDialog({
                       try {
                         const newEnr = await enrollStudent(
                           selectedStudentId,
-                          occurrenceId
+                          occurrence.id
                         );
-                        setLocalEnrollments((prev) => [...prev, { ...newEnr } as any]);
+                        setLocalEnrollments((prev) => [...prev, newEnr]);
                         setHasChanged(true);
                         toast.success("Student byl úspěšně zapsán.");
 
@@ -129,8 +139,9 @@ export function OccurrencesStudentsDialog({
                           (s) => s.id !== selectedStudentId
                         );
                         setSelectedStudentId(nextStudents[0]?.id ?? "");
-                      } catch (err: any) {
-                        toast.error(err.message || "Nepodařilo se zapsat studenta.");
+                      } catch (err: unknown) {
+                        const error = err as Error;
+                        toast.error(error.message || "Nepodařilo se zapsat studenta.");
                       }
                     }}
                   >
@@ -150,7 +161,6 @@ export function OccurrencesStudentsDialog({
               localEnrollments.map((enr) => {
                 const u = allUsers.find((x) => x.id === enr.studentId);
                 return (
-                  // 🔥 ZMĚNA: Přidány responzivní třídy pro layout řádku
                   <div
                     key={enr.id}
                     className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border rounded-md px-3 py-2"
@@ -167,11 +177,9 @@ export function OccurrencesStudentsDialog({
                       </p>
                     </div>
                     {isPrivileged && (
-
                       <Button
                         variant="destructive"
                         size="sm"
-                        // 🔥 ZMĚNA: Tlačítko se přizpůsobí
                         className="w-full sm:w-auto"
                         onClick={() => setToUnenroll(enr.id)}
                       >
@@ -196,7 +204,6 @@ export function OccurrencesStudentsDialog({
             >
               Zavřít
             </Button>
-
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -225,8 +232,9 @@ export function OccurrencesStudentsDialog({
                       prev.filter((e) => e.id !== enrToDelete)
                     );
                     setHasChanged(true);
-                  } catch (err: any) {
-                    toast.error(err.message || "Nepodařilo se odepsat studenta.");
+                  } catch (err: unknown) {
+                    const error = err as Error;
+                    toast.error(error.message || "Nepodařilo se odepsat studenta.");
                   } finally {
                     setToUnenroll(null);
                   }

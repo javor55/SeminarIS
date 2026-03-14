@@ -22,7 +22,7 @@ export default async function SubjectsPage() {
 
   return (
     <SubjectsClientView 
-      subjects={dbSubj as any} 
+      subjects={dbSubj} 
       users={dbUser} 
       currentUser={currentUser} 
     />

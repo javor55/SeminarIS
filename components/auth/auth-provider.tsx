@@ -12,6 +12,7 @@ import { SessionProvider, useSession, signIn, signOut } from "next-auth/react";
 type AuthContextValue = {
   user: User | null;
   isLoading: boolean;
+  // eslint-disable-next-line no-unused-vars
   login: (email: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
 };

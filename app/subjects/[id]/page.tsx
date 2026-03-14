@@ -9,13 +9,14 @@ import {
 import { SubjectDetailClientView } from "@/components/subjects/SubjectDetailClientView";
 import { computeEnrollmentStatus } from "@/lib/utils";
 import { OccurrenceRow } from "@/components/occurrences/occurrence-columns";
-import { User, EnrollmentWindowWithBlocks } from "@/lib/types";
+import { User, Subject, EnrollmentWindowWithBlocks, Block, SubjectOccurrence, StudentEnrollment } from "@/lib/types";
 
 export default async function SubjectDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const session = await getServerSession(authOptions);
   
   if (!session?.user) {
@@ -24,20 +25,19 @@ export default async function SubjectDetailPage({
 
   const currentUser = session.user as User;
 
-  if (params.id === "new") {
+  if (id === "new") {
     redirect("/subjects/new/edit");
   }
 
   const isPrivileged = currentUser.role === "ADMIN" || currentUser.role === "TEACHER";
 
-  // Načítáme všechna potřebná data na serveru
   const [usersList, allSubjs, ewWithDetails] = await Promise.all([
     getUsersForFilters(),
     getSubjects(),
     getEnrollmentWindowsWithDetails(!isPrivileged)
   ]);
 
-  const subject = allSubjs.find((s) => s.id === params.id);
+  const subject = (allSubjs as Subject[]).find((s) => s.id === id);
   
   if (!subject) {
     return (
@@ -48,23 +48,21 @@ export default async function SubjectDetailPage({
     );
   }
 
-  // Příprava dat pro tabulku výskytů (OccurrenceRow)
-  const processedOccurrences: OccurrenceRow[] = ewWithDetails.flatMap((ew: any) =>
-    ew.blocks.flatMap((block: any) =>
+  const processedOccurrences: OccurrenceRow[] = (ewWithDetails as EnrollmentWindowWithBlocks[]).flatMap((ew) =>
+    (ew.blocks as (Block & { occurrences: (SubjectOccurrence & { subject: Subject, teacher: User, enrollments: StudentEnrollment[] })[] })[]).flatMap((block) =>
       block.occurrences
-        .filter((occ: any) => occ.subject.id === params.id)
-        .map((occ: any) => {
-          const enrolledCount = occ.enrollments
-            ? occ.enrollments.filter((e: any) => !e.deletedAt).length
-            : 0;
+        .filter((occ) => occ.subject.id === id)
+        .map((occ) => {
+          const activeEnrollments = occ.enrollments?.filter((e) => !e.deletedAt) ?? [];
+          const enrolledCount = activeEnrollments.length;
 
           const capacityText =
             occ.capacity == null
               ? `${enrolledCount}/∞`
               : `${enrolledCount}/${occ.capacity}`;
 
-          const enrolledByMe = occ.enrollments?.some(
-            (e: any) => e.studentId === currentUser.id && !e.deletedAt
+          const enrolledByMe = activeEnrollments.some(
+            (e) => e.studentId === currentUser.id
           );
 
           const isFull = occ.capacity != null && enrolledCount >= occ.capacity;
@@ -79,7 +77,7 @@ export default async function SubjectDetailPage({
             ? `${occ.teacher.firstName} ${occ.teacher.lastName}`
             : "—";
 
-          const status = computeEnrollmentStatus(ew.status as any, ew.startsAt, ew.endsAt, new Date());
+          const status = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
 
           const searchText = [
             ew.name,
@@ -91,9 +89,9 @@ export default async function SubjectDetailPage({
             .join(" ");
 
           return {
-            ...(occ as any),
+            ...(occ as SubjectOccurrence),
             blockName: block.name,
-            block: block,
+            block: block as unknown as OccurrenceRow["block"],
             enrollmentWindow: ew,
             enrollmentName: ew.name,
             statusLabel: status.label,
@@ -104,14 +102,14 @@ export default async function SubjectDetailPage({
             searchText,
             isFull,
             enrolledByMe,
-          } as OccurrenceRow;
+          } as unknown as OccurrenceRow;
         })
     )
   );
 
   return (
     <SubjectDetailClientView
-      subject={subject as any}
+      subject={subject}
       occurrences={processedOccurrences}
       usersList={usersList}
       currentUser={currentUser}

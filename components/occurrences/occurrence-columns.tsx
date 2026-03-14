@@ -4,9 +4,11 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import {
   SubjectOccurrence,
+  SubjectOccurrenceWithRelations,
   Block,
   EnrollmentWindowWithBlocks,
   User,
+  StudentEnrollment,
 } from "@/lib/types";
 import React from "react";
 
@@ -19,8 +21,8 @@ export type OccurrenceRow = SubjectOccurrence & {
   };
 
   blockName: string;
-  block: Block & { occurrences: any[] };
-  enrollmentWindow: EnrollmentWindowWithBlocks;
+  block: Block & { occurrences?: SubjectOccurrenceWithRelations[] };
+  enrollmentWindow?: EnrollmentWindowWithBlocks;
   enrollmentName: string;
   statusLabel: string;
   capacityText: string;
@@ -31,6 +33,7 @@ export type OccurrenceRow = SubjectOccurrence & {
   /** doplňkové flagy pro zápis */
   isFull?: boolean;
   enrolledByMe?: boolean;
+  enrollments?: StudentEnrollment[];
 };
 
 // props pro generování sloupců
@@ -87,7 +90,7 @@ export function getOccurrenceColumns(opts: {
     cols.push({
       accessorKey: "enrollmentName",
       header: "Zápis",
-      cell: ({ row }) => row.original.enrollmentName ?? "",
+      cell: ({ row: _row }) => _row.original.enrollmentName ?? "",
     });
   }
 
@@ -96,10 +99,10 @@ export function getOccurrenceColumns(opts: {
     cols.push({
       accessorKey: "statusLabel",
       header: "Stav",
-      cell: ({ row }) =>
-        row.original.statusLabel ? (
+      cell: ({ row: _row }) =>
+        _row.original.statusLabel ? (
           <span className="inline-flex rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-            {row.original.statusLabel}
+            {_row.original.statusLabel}
           </span>
         ) : null,
     });
@@ -110,7 +113,7 @@ export function getOccurrenceColumns(opts: {
     cols.push({
       accessorKey: "blockName",
       header: "Blok",
-      cell: ({ row }) => row.original.blockName ?? "",
+      cell: ({ row: _row }) => _row.original.blockName ?? "",
     });
   }
 
@@ -118,9 +121,9 @@ export function getOccurrenceColumns(opts: {
   cols.push({
     accessorKey: "fullCode",
     header: "Kód výskytu",
-    cell: ({ row }) => (
+    cell: ({ row: _row }) => (
       <span className="font-mono text-xs text-muted-foreground">
-        {row.original.fullCode ?? ""}
+        {_row.original.fullCode ?? ""}
       </span>
     ),
   });
@@ -129,16 +132,16 @@ export function getOccurrenceColumns(opts: {
   cols.push({
     accessorKey: "teacherName",
     header: "Učitel",
-    cell: ({ row }) => row.original.teacherName ?? "",
+    cell: ({ row: _row }) => _row.original.teacherName ?? "",
   });
 
   // OBSAZENOST
   cols.push({
     accessorKey: "capacityText",
     header: "Obsaz.",
-    cell: ({ row }) => (
+    cell: ({ row: _row }) => (
       <span className="text-muted-foreground text-center block">
-        {row.original.capacityText ?? ""}
+        {_row.original.capacityText ?? ""}
       </span>
     ),
   });

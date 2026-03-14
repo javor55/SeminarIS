@@ -62,8 +62,9 @@ export default function RegisterPage() {
       // Místo přesměrování zobrazíme úspěch
       setIsSuccess(true);
 
-    } catch (err: any) {
-      setError(err.message || "Registrace selhala. Zkuste to prosím znovu.");
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || "Registrace selhala. Zkuste to prosím znovu.");
     } finally {
       setIsLoading(false);
     }

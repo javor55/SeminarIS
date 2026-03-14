@@ -16,13 +16,15 @@ import { Button } from "@/components/ui/button";
 
 type EditBlockDialogProps = {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  // eslint-disable-next-line no-unused-vars
+  onOpenChange: (_open: boolean) => void;
   block: {
     id: string;
     name: string;
     description?: string | null;
   };
-  onSubmit?: (data: { id: string; name: string; description?: string | null }) => void;
+  // eslint-disable-next-line no-unused-vars
+  onSubmit?: (_data: { id: string; name: string; description?: string | null }) => void;
   // případně můžeš přidat isSaving?: boolean
 };
 

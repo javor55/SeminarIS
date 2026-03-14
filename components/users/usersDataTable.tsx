@@ -5,7 +5,6 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
-  getPaginationRowModel,
   useReactTable,
   getSortedRowModel,
 } from "@tanstack/react-table";
@@ -31,7 +30,7 @@ import { updateUserRole, toggleUserActive } from "@/lib/data";
 
 export function UsersDataTable({ data, forceRefresh }: { data: UserRow[], forceRefresh?: () => void }) {
   const [rowSelection, setRowSelection] = React.useState({});
-  const [columnFilters, setColumnFilters] = React.useState<any>([]);
+  const [columnFilters, setColumnFilters] = React.useState<{ id: string; value: unknown }[]>([]);
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [dateFilters, setDateFilters] = React.useState<{
     createdFrom?: string;
@@ -262,7 +261,7 @@ export function UsersDataTable({ data, forceRefresh }: { data: UserRow[], forceR
                 </p>
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">Nastavit roli</label>
-                  <Select value={bulkRole} onValueChange={(v: any) => setBulkRole(v)}>
+                  <Select value={bulkRole} onValueChange={(v: "ADMIN" | "TEACHER" | "STUDENT" | "GUEST" | "") => setBulkRole(v)}>
                     <SelectTrigger className="h-8">
                       <SelectValue placeholder="Nevybráno" />
                     </SelectTrigger>
@@ -276,7 +275,7 @@ export function UsersDataTable({ data, forceRefresh }: { data: UserRow[], forceR
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">Nastavit stav</label>
-                  <Select value={bulkStatus} onValueChange={(v: any) => setBulkStatus(v)}>
+                  <Select value={bulkStatus} onValueChange={(v: "ACTIVE" | "INACTIVE" | "") => setBulkStatus(v)}>
                     <SelectTrigger className="h-8">
                       <SelectValue placeholder="Nevybráno" />
                     </SelectTrigger>

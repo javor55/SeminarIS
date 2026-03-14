@@ -1,7 +1,6 @@
 // app/enrollments/page.tsx
 "use client";
 
-// Importy
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -16,11 +15,10 @@ import {
   getEnrollmentColumns,
   EnrollmentRow,
 } from "@/components/enrollment/enrollment-columns";
-import { EnrollmentWindow, EnrollmentStatus, User } from "@/lib/types";
+import { EnrollmentWindow, EnrollmentStatus, User, EnrollmentWindowWithBlocks } from "@/lib/types";
 
-// ... (Mock data 'newEnrollmentMock' zůstává stejná)
-const newEnrollmentMock = {
-  id: "", // prázdné ID signalizuje nový zápis
+const newEnrollmentMock: Partial<EnrollmentWindow> = {
+  id: "", 
   name: "Nový zápis",
   description: "",
   status: "DRAFT",
@@ -31,21 +29,13 @@ const newEnrollmentMock = {
 
 export default function EnrollmentsPage() {
   const router = useRouter();
-  // ZMĚNA 1: Načítáme 'user' a 'isLoading'
   const { user, isLoading } = useAuth();
-  const [editEnrollment, setEditEnrollment] = useState<any | null>(null);
+  const [editEnrollment, setEditEnrollment] = useState<EnrollmentWindowWithBlocks | Partial<EnrollmentWindow> | null>(null);
 
-  const [enrollmentWithBlocks, setEnrollmentWithBlocks] = useState<any[]>([]);
+  const [enrollmentWithBlocks, setEnrollmentWithBlocks] = useState<EnrollmentWindowWithBlocks[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // --- Začátek úpravy "Auth Guard" ---
-
-  // ZMĚNA 2: "Auth Guard" (Hlídač přihlášení)
-  // Reaguje na 'isLoading', aby se zabránilo chybnému přesměrování
   useEffect(() => {
-    // Přesměrujeme, POUZE POKUD:
-    // 1. Načítání skončilo (isLoading === false)
-    // 2. A ZÁROVEŇ uživatel neexistuje (user === null)
     if (!isLoading && !user) {
       router.push("/");
     }
@@ -53,25 +43,23 @@ export default function EnrollmentsPage() {
 
   useEffect(() => {
     async function fetch() {
-      // Rešení N+1: Jedno efektivni volani
-      const withB = await getEnrollmentWindowsWithDetails(false); // chceme vidět i ty invisible pro tabulku administrátorů
+      const withB = await getEnrollmentWindowsWithDetails(false);
       setEnrollmentWithBlocks(withB);
       setLoadingData(false);
     }
     fetch();
   }, []);
 
-  const rows = useMemo(() => {
+  const rows: EnrollmentRow[] = useMemo(() => {
     return enrollmentWithBlocks.map((ew) => {
-      // ... (vaše mapovací logika)
-      const allBlockIds = new Set<string>(ew.blocks?.map((b: any) => b.id) ?? []);
+      const allBlockIds = new Set<string>(ew.blocks?.map((b) => b.id) ?? []);
       const allStudents = new Set<string>();
       const studentBlockMap = new Map<string, Set<string>>();
 
-      ew.blocks?.forEach((block: any) => {
-        block.occurrences?.forEach((occ: any) => {
-          occ.enrollments?.forEach((en: any) => {
-            const sid = en.student?.id ?? en.studentId;
+      ew.blocks?.forEach((block) => {
+        block.occurrences?.forEach((occ) => {
+          occ.enrollments?.forEach((en) => {
+            const sid = en.studentId;
             if (sid) {
               allStudents.add(sid);
               if (!studentBlockMap.has(sid)) {
@@ -84,7 +72,7 @@ export default function EnrollmentsPage() {
       });
 
       const blocksWithCounts =
-        ew.blocks?.map((block: any) => {
+        ew.blocks?.map((block) => {
           return {
             id: block.id,
             name: block.name,
@@ -118,19 +106,15 @@ export default function EnrollmentsPage() {
     () =>
       getEnrollmentColumns({
         currentUser: user as User,
-        onEdit: (row) => setEditEnrollment(row.fullData),
+        onEdit: (row) => setEditEnrollment(row.fullData as EnrollmentWindowWithBlocks),
       }),
     [user]
   );
 
-  // ZMĚNA 3: "Loading Guard"
-  // Zobrazí "nic" (null), dokud probíhá ověření NEBO pokud není uživatel
   if (isLoading || !user) {
-    return null; // Čekáme na načtení nebo přesměrování
+    return null;
   }
 
-  // ZMĚNA 4: "Authorization Guard" (Hlídač oprávnění)
-  // V tomto bodě víme, že 'user' je přihlášen.
   const isAllowed = user.role === "ADMIN" || user.role === "TEACHER";
 
   if (!isAllowed) {
@@ -144,16 +128,11 @@ export default function EnrollmentsPage() {
     );
   }
 
-  // --- Konec úpravy ---
-
   if (loadingData) return <p className="mt-8 text-center text-muted-foreground">Načítám data zápisů...</p>;
-
-
 
   return (
     <>
       <div className="space-y-6">
-        {/* ... (Hlavička a tlačítko) */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold">Zápisová období</h1>
@@ -161,7 +140,6 @@ export default function EnrollmentsPage() {
               Přehled všech zápisů, bloků a počtu unikátních studentů.
             </p>
           </div>
-          {/* ZMĚNA 5: 'user.role' je zde již bezpečné (bez '?.') */}
           {user.role === "ADMIN" && (
             <Button onClick={() => setEditEnrollment(newEnrollmentMock)}>
               Vytvořit nový zápis
@@ -229,7 +207,6 @@ export default function EnrollmentsPage() {
         )}
       </div>
 
-      {/* ... (Dialog) ... */}
       {editEnrollment && (
         <EditEnrollmentDialog
           enrollment={editEnrollment}

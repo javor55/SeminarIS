@@ -12,6 +12,45 @@ export type UserRow = User & {
   lastLoginAt?: string;
 };
 
+// Vytvoříme samostatné komponenty pro buňky s hooky
+function RoleCell({ user }: { user: UserRow }) {
+  const [role, setRole] = useState(user.role);
+  
+  return (
+    <Select
+      value={role}
+      onValueChange={async (value) => {
+        await updateUserRole(user.id, value);
+        setRole(value as User["role"]);
+      }}
+    >
+      <SelectTrigger className="w-[130px] h-8">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="ADMIN">ADMIN</SelectItem>
+        <SelectItem value="TEACHER">TEACHER</SelectItem>
+        <SelectItem value="STUDENT">STUDENT</SelectItem>
+        <SelectItem value="GUEST">GUEST</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
+function ActiveCell({ user }: { user: UserRow }) {
+  const [active, setActive] = useState(user.isActive !== false);
+  
+  return (
+    <Switch
+      checked={active}
+      onCheckedChange={async () => {
+        await toggleUserActive(user.id);
+        setActive(!active);
+      }}
+    />
+  );
+}
+
 export const columns: ColumnDef<UserRow>[] = [
   {
     accessorKey: "firstName",
@@ -32,30 +71,7 @@ export const columns: ColumnDef<UserRow>[] = [
   {
     accessorKey: "role",
     header: "Role",
-    cell: ({ row }) => {
-      const u = row.original;
-      // drobný trik, aby se re-renderlo po změně
-      const [, setBump] = useState(0);
-      return (
-        <Select
-          defaultValue={u.role}
-          onValueChange={async (value) => {
-            await updateUserRole(u.id, value);
-            setBump((x) => x + 1);
-          }}
-        >
-          <SelectTrigger className="w-[130px] h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ADMIN">ADMIN</SelectItem>
-            <SelectItem value="TEACHER">TEACHER</SelectItem>
-            <SelectItem value="STUDENT">STUDENT</SelectItem>
-            <SelectItem value="GUEST">GUEST</SelectItem>
-          </SelectContent>
-        </Select>
-      );
-    },
+    cell: ({ row }) => <RoleCell user={row.original} />,
     // umožní faceted filter podle role
     filterFn: (row, id, value) => {
       if (!value || value.length === 0) return true;
@@ -65,20 +81,7 @@ export const columns: ColumnDef<UserRow>[] = [
   {
     accessorKey: "isActive",
     header: "Aktivní",
-    cell: ({ row }) => {
-      const u = row.original;
-      const checked = u.isActive !== false;
-      const [, setBump] = useState(0);
-      return (
-        <Switch
-          checked={checked}
-          onCheckedChange={async () => {
-            await toggleUserActive(u.id);
-            setBump((x) => x + 1);
-          }}
-        />
-      );
-    },
+    cell: ({ row }) => <ActiveCell user={row.original} />,
     filterFn: (row, id, value) => {
       if (!value || value.length === 0) return true;
       const active = row.getValue(id) !== false;

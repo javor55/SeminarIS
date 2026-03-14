@@ -18,7 +18,7 @@ import { cn, computeEnrollmentStatus } from "@/lib/utils";
 interface UserDetailsDialogProps {
   user: UserRow | null;
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (_open: boolean) => void;
 }
 
 export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialogProps) {
@@ -93,7 +93,7 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
 
             {enrollments.length > 0 ? (
               <div className="border rounded-md divide-y overflow-hidden bg-slate-50/30">
-                {enrollments.map((en: any) => {
+                {enrollments.map((en) => {
                   const window = en.subjectOccurrence?.block?.enrollmentWindow;
                   const subject = en.subjectOccurrence?.subject;
                   const block = en.subjectOccurrence?.block;

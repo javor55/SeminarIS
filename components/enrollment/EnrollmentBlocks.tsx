@@ -1,6 +1,6 @@
 "use client";
 
-import { EnrollmentWindowWithBlocks, User, Block } from "@/lib/types";
+import { EnrollmentWindowWithBlocks, User } from "@/lib/types";
 import { EnrollmentBlockCard } from "@/components/blocks/EnrollmentBlockCard";
 
 export function EnrollmentBlocks({

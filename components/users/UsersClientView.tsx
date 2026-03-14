@@ -6,8 +6,7 @@ import {
   updateUserRole, 
   toggleUserActive, 
   setGlobalCohort,
-  updateUsersCohort,
-  importUsers
+  updateUsersCohort
 } from "@/lib/data";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
@@ -42,13 +41,13 @@ export function UsersClientView({
   const router = useRouter();
   const [globalCohort, setGlobalCohortState] = React.useState(globalCohortInitial);
   const [showImport, setShowImport] = React.useState(false);
-  const [loading, setLoading] = React.useState(false);
+  // Removed unused loading state
 
   const handleExport = () => {
     const headers = ["Jméno", "Příjmení", "Email", "Registrace", "Poslední přihlášení", "Aktivní", "Role", "Zápisy"];
     const rows = users.map(u => {
       const enrollments = u.studentEnrollments
-        ?.map((e: any) => e.subjectOccurrence?.subject?.name)
+        ?.map((e: { subjectOccurrence?: { subject?: { name: string } } }) => e.subjectOccurrence?.subject?.name)
         .filter(Boolean)
         .join(", ") || "";
 
@@ -81,8 +80,9 @@ export function UsersClientView({
       await setGlobalCohort(globalCohort);
       toast.success("Výchozí ročník byl uložen.");
       router.refresh();
-    } catch (e: any) {
-      toast.error("Chyba při ukládání: " + e.message);
+    } catch (e: unknown) {
+      const error = e as Error;
+      toast.error("Chyba při ukládání: " + error.message);
     }
   };
 
@@ -102,26 +102,23 @@ export function UsersClientView({
     .sort()
     .map(c => ({ label: String(c), value: String(c) }));
 
-  const renderBulkActions = ({
-    filteredRows,
-    forceRefresh,
-  }: {
-    filteredRows: UserRow[];
-    forceRefresh: () => void;
-  }) => {
+  function BulkActionsPanel({ filteredRows, forceRefresh }: { filteredRows: UserRow[], forceRefresh: () => void }) {
+    const router = useRouter(); // Moved router here
     const [selectedRole, setSelectedRole] = React.useState<string | null>(null);
-    const [selectedCohort, setSelectedCohort] = React.useState<string>("");
+    const [selectedCohort, setSelectedCohort] = React.useState("");
+    const [loading, setLoading] = React.useState(false); // New loading state for bulk actions
 
     const handleBulkSetRole = async () => {
       if (!selectedRole) return;
-      if (!window.confirm(`Opravdu chcete nastavit roli ${selectedRole} pro ${filteredRows.length} uživatelů?`)) return;
       setLoading(true);
       try {
-        await Promise.all(filteredRows.map((u) => updateUserRole(u.id, selectedRole)));
-        toast.success(`Role byla nastavena pro ${filteredRows.length} uživatelů.`);
+        await Promise.all(filteredRows.map(u => updateUserRole(u.id, selectedRole)));
+        toast.success(`Role byla změněna pro ${filteredRows.length} uživatelů.`);
         router.refresh();
-      } catch (e: any) {
-        toast.error("Chyba při hromadné změně role: " + e.message);
+        forceRefresh();
+      } catch (e: unknown) {
+        const error = e as Error;
+        toast.error("Chyba při hromadné změně role: " + error.message);
       } finally {
         setLoading(false);
       }
@@ -129,22 +126,22 @@ export function UsersClientView({
 
     const handleBulkSetCohort = async () => {
       if (!selectedCohort) return;
-      if (!window.confirm(`Opravdu chcete nastavit ročník "${selectedCohort}" pro ${filteredRows.length} uživatelů?`)) return;
       setLoading(true);
       try {
-        await updateUsersCohort(filteredRows.map(u => u.id), selectedCohort);
-        toast.success(`Ročník byl nastaven pro ${filteredRows.length} uživatelů.`);
+        await Promise.all(filteredRows.map(u => updateUsersCohort([u.id], selectedCohort)));
+        toast.success(`Ročník byl změněn pro ${filteredRows.length} uživatelů.`);
         router.refresh();
-      } catch (e: any) {
-        toast.error("Chyba při hromadné změně ročníku: " + e.message);
+        forceRefresh();
+      } catch (e: unknown) {
+        const error = e as Error;
+        toast.error("Chyba při hromadné změně ročníku: " + error.message);
       } finally {
         setLoading(false);
       }
     };
 
     const handleBulkSetActive = async (setActive: boolean) => {
-      const action = setActive ? "aktivovat" : "deaktivovat";
-      if (!window.confirm(`Opravdu chcete ${action} ${filteredRows.length} uživatelů?`)) return;
+      const action = setActive ? "Aktivace" : "Deaktivace";
       setLoading(true);
       try {
         await Promise.all(
@@ -157,8 +154,10 @@ export function UsersClientView({
         );
         toast.success(`Stav byl změněn pro ${filteredRows.length} uživatelů.`);
         router.refresh();
-      } catch (e: any) {
-        toast.error(`Chyba při hromadné akci (${action}): ` + e.message);
+        forceRefresh();
+      } catch (e: unknown) {
+        const error = e as Error;
+        toast.error(`Chyba při hromadné akci (${action}): ` + error.message);
       } finally {
         setLoading(false);
       }
@@ -214,7 +213,7 @@ export function UsersClientView({
         </div>
       </div>
     );
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -255,7 +254,7 @@ export function UsersClientView({
                   className="bg-background"
                 />
               </div>
-              <Button className="w-full" size="sm" onClick={handleUpdateGlobalCohort} disabled={loading}>Aktualizovat globálně</Button>
+              <Button className="w-full" size="sm" onClick={handleUpdateGlobalCohort}>Aktualizovat globálně</Button>
             </CardContent>
           </Card>
         )}
@@ -366,7 +365,7 @@ export function UsersClientView({
             },
           ]}
           forceRefresh={() => router.refresh()}
-          bulkPopoverRender={currentUser.role === "ADMIN" ? renderBulkActions : undefined}
+          bulkPopoverRender={currentUser.role === "ADMIN" ? (args) => <BulkActionsPanel {...args} /> : undefined}
         />
       )}
     </div>

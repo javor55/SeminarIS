@@ -16,7 +16,7 @@ import {
 
 type DateTimePickerProps = {
   value: Date | null;
-  onChange: (date: Date | null) => void;
+  onChange: (_: Date | null) => void;
   className?: string;
 };
 

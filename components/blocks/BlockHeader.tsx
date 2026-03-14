@@ -27,7 +27,7 @@ export function BlockHeader({
   totalBlocks,
   isAdmin,
 }: {
-  block: Block & { description?: string; occurrences?: any[] };
+  block: Block & { description?: string; occurrences?: SubjectOccurrence[] };
   blockIndex: number;
   totalBlocks: number;
   isAdmin: boolean;
@@ -35,8 +35,6 @@ export function BlockHeader({
   const router = useRouter();
   const hasOccurrences = (block.occurrences?.length ?? 0) > 0;
 
-
-  // lokální stavy pro dialogy
   const [editBlock, setEditBlock] = useState<Block | null>(null);
   const [editOccurrence, setEditOccurrence] = useState<SubjectOccurrence | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -44,7 +42,6 @@ export function BlockHeader({
   return (
     <>
       <div className="px-4 py-3 border-b flex items-center justify-between gap-2">
-        {/* Název + popis */}
         <div className="min-w-0 flex-1">
           <h2 className="font-medium truncate">{block.name}</h2>
           {block.description ? (
@@ -54,10 +51,8 @@ export function BlockHeader({
           ) : null}
         </div>
 
-        {/* Akce – jen pro admina */}
         {isAdmin && (
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            {/* Přidat nový předmět do bloku */}
             <Button
               variant="default"
               size="sm"
@@ -70,16 +65,15 @@ export function BlockHeader({
                   subCode: "",
                   capacity: 0,
                   createdById: "",
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
                   updatedById: "",
-                } as any)
+                } as SubjectOccurrence)
               }
             >
               Přidat předmět
             </Button>
 
-            {/* Upravit blok */}
             <Button
               variant="secondary"
               size="sm"
@@ -88,7 +82,6 @@ export function BlockHeader({
               Upravit
             </Button>
 
-            {/* Posunout blok nahoru */}
             <Button
               variant="outline"
               size="sm"
@@ -99,13 +92,11 @@ export function BlockHeader({
                   toast.success("Blok posunut nahoru");
                   router.refresh();
                 } else toast.error("Blok nelze posunout výš");
-
               }}
             >
               ↑
             </Button>
 
-            {/* Posunout blok dolů */}
             <Button
               variant="outline"
               size="sm"
@@ -116,13 +107,11 @@ export function BlockHeader({
                   toast.success("Blok posunut dolů");
                   router.refresh();
                 } else toast.error("Blok nelze posunout níž");
-
               }}
             >
               ↓
             </Button>
 
-            {/* Smazat blok */}
             <Button
               variant="destructive"
               size="sm"
@@ -135,7 +124,6 @@ export function BlockHeader({
         )}
       </div>
 
-      {/* ALERT: Potvrzení smazání bloku */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -155,11 +143,11 @@ export function BlockHeader({
                     toast.success("Blok byl smazán");
                     router.refresh();
                   } else {
-
                     toast.error("Blok se nepodařilo smazat");
                   }
-                } catch (e: any) {
-                  toast.error(e.message || "Nastala chyba při mazání bloku");
+                } catch (err: unknown) {
+                  const error = err as Error;
+                  toast.error(error.message || "Nastala chyba při mazání bloku");
                 } finally {
                   setShowDeleteConfirm(false);
                 }
@@ -176,7 +164,6 @@ export function BlockHeader({
             open={!!editBlock}
             block={editBlock}
             onOpenChange={(open) => {
-              // když se dialog zavře, smažeme vybraný blok
               if (!open) setEditBlock(null);
             }}
             onSubmit={async (data) => {
@@ -184,8 +171,7 @@ export function BlockHeader({
                 await updateBlock(data);
                 toast.success("Blok byl upraven");
                 router.refresh();
-
-              } catch (e) {
+              } catch {
                 toast.error("Blok se nepodařilo upravit");
               }
             }}
@@ -194,7 +180,7 @@ export function BlockHeader({
 
       {editOccurrence && (
         <EditSubjectOccurrenceDialog
-          occurrence={editOccurrence as any}
+          occurrence={editOccurrence}
           onOpenChange={(open) => !open && setEditOccurrence(null)}
           onSubmit={async (data) => {
               if (data.id) {
@@ -204,12 +190,10 @@ export function BlockHeader({
               }
               router.refresh();
           }}
-
           onDelete={async (id) => {
               await deleteSubjectOccurrence(id);
               router.refresh();
           }}
-
         />
       )}
     </>

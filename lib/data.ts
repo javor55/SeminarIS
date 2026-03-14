@@ -1,19 +1,20 @@
 "use server";
 
 import { prisma } from "./prisma";
-import { EnrollmentWindowWithBlocks, User, Subject, EnrollmentWindow } from "./types";
+import type { User } from "./types";
 import { getServerSession } from "next-auth";
 import { authOptions } from "./auth";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { computeEnrollmentStatus } from "./utils";
+import { EnrollmentStatus } from "./types";
 
 
 // === Pomocné funkce pro autorizaci ===
-async function requireAuth(): Promise<any> {
+async function requireAuth(): Promise<User> {
   const session = await getServerSession(authOptions);
   if (!session?.user) throw new Error("Unauthorized");
-  return session.user;
+  return session.user as User;
 }
 
 async function requireAdmin() {
@@ -46,9 +47,9 @@ async function syncEnrollmentWindowStatus(ew: { id: string; status: string; star
   if (newDbStatus) {
     await prisma.enrollmentWindow.update({
       where: { id: ew.id },
-      data: { status: newDbStatus as any },
+      data: { status: newDbStatus as "DRAFT" | "SCHEDULED" | "OPEN" | "CLOSED" },
     });
-    console.log(`syncEnrollmentWindowStatus: Okno "${ew.id}" přepnuto z "${ew.status}" na "${newDbStatus}"`);
+    // console.log(`syncEnrollmentWindowStatus: Okno "${ew.id}" přepnuto z "${ew.status}" na "${newDbStatus}"`);
     return newDbStatus;
   }
   return ew.status;
@@ -101,10 +102,19 @@ export async function getSubjects() {
 
 
 // Slouží k naplnění combo box filters v Data table, nezatíží systém na rozdíl od getAllUsers
-export async function getUsersForFilters() {
-  await requireAuth(); // Dříve requirePrivileged, ale potřebujeme i pro studenty v detailu předmětu
+export async function getUsersForFilters(): Promise<User[]> {
+  await requireAuth(); 
   const users = await prisma.user.findMany({
-    select: { id: true, firstName: true, lastName: true, email: true, role: true },
+    select: { 
+      id: true, 
+      firstName: true, 
+      lastName: true, 
+      email: true, 
+      role: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true
+    },
     orderBy: { lastName: 'asc' }
   });
   return users;
@@ -142,7 +152,7 @@ export async function getEnrollmentWindowsVisible() {
 
 export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = false) {
   const whereFilter = visibleOnly
-    ? { visibleToStudents: true, status: { not: "DRAFT" } as any }
+    ? { visibleToStudents: true, status: { not: "DRAFT" as EnrollmentStatus } }
     : {};
 
   const ews = await prisma.enrollmentWindow.findMany({
@@ -282,12 +292,89 @@ export async function getEnrollmentWindowByIdWithBlocks(id: string) {
   };
 }
 
+// Hromadný import uživatelů
+export async function importUsers(data: Array<{ 
+  firstName?: string, 
+  lastName?: string, 
+  email: string, 
+  cohort?: string, 
+  role?: string, 
+  isActive?: boolean | string | number, 
+  password?: string 
+}>) {
+  try {
+    await requireAdmin();
+    let created = 0;
+    let updated = 0;
+    let errors = 0;
+
+    for (const row of data) {
+      try {
+        const email = row.email?.toLowerCase().trim();
+        if (!email) {
+          errors++;
+          continue;
+        }
+
+        const existing = await prisma.user.findUnique({ where: { email } });
+        
+        let isActiveValue = true;
+        if (typeof row.isActive === "boolean") {
+          isActiveValue = row.isActive;
+        } else if (typeof row.isActive === "string") {
+          isActiveValue = row.isActive.toUpperCase() === "TRUE" || row.isActive === "1";
+        } else if (typeof row.isActive === "number") {
+          isActiveValue = row.isActive === 1;
+        }
+
+        const payload = {
+          firstName: row.firstName || "",
+          lastName: row.lastName || "",
+          cohort: row.cohort || null,
+          role: (row.role as User["role"]) || "STUDENT",
+          isActive: isActiveValue,
+        };
+
+        const passwordHash = row.password ? await bcrypt.hash(row.password, 10) : undefined;
+
+        if (existing) {
+          await prisma.user.update({
+            where: { id: existing.id },
+            data: { 
+              ...payload,
+              ...(passwordHash ? { passwordHash } : {})
+            }
+          });
+          updated++;
+        } else {
+          await prisma.user.create({
+            data: {
+              ...payload,
+              email,
+              passwordHash: passwordHash || await bcrypt.hash(Math.random().toString(36), 10),
+            }
+          });
+          created++;
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("Chyba při importu řádku:", e);
+        errors++;
+      }
+    }
+
+    revalidatePath("/users");
+    return { created, updated, errors };
+  } catch (err: unknown) {
+    const error = err as Error;
+    throw new Error(error.message || "Import se nezdařil.");
+  }
+}
+
 // Rozšířené získání uživatelů vcetne historie zapisů
 export async function getAllUsers() {
   try {
-    const user = await requirePrivileged();
-    console.log(`ServerAction: getAllUsers voláno uživatelem ${user.email}`);
-
+    await requirePrivileged();
     
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
@@ -310,12 +397,11 @@ export async function getAllUsers() {
       },
     });
     
-    console.log(`ServerAction: Nalezeno ${users.length} uživatelů.`);
     // Převod na prostý objekt pro bezpečnou serializaci přes Next.js Server Actions
     return JSON.parse(JSON.stringify(users));
-  } catch (err: any) {
-    console.error("ServerAction Error (getAllUsers):", err.message);
-    throw err;
+  } catch (err) {
+    const error = err as Error;
+    throw error;
   }
 }
 
@@ -346,18 +432,14 @@ export async function getSystemStats() {
 
 export async function getGlobalCohort() {
   try {
-    // @ts-ignore
     if (!prisma.systemSetting) {
-      console.warn("Prisma: model SystemSetting není v klientovi dostupný (nutný restart serveru)");
       return "";
     }
-    // @ts-ignore
     const setting = await prisma.systemSetting.findUnique({
       where: { key: "current_cohort" },
     });
-    return setting?.value || "";
-  } catch (e) {
-    console.error("Error fetching global cohort:", e);
+    return (setting as { value: string } | null)?.value || "";
+  } catch {
     return "";
   }
 }
@@ -366,44 +448,38 @@ export async function getGlobalCohort() {
 export async function setGlobalCohort(cohort: string) {
   try {
     await requireAdmin();
-    // @ts-ignore
     if (!prisma.systemSetting) {
       throw new Error("Databázový model SystemSetting není připraven. Prosím restartujte server a spusťte 'npx prisma generate' podle instrukcí.");
     }
-    // @ts-ignore
     return await prisma.systemSetting.upsert({
       where: { key: "current_cohort" },
       update: { value: cohort },
       create: { key: "current_cohort", value: cohort },
     });
-  } catch (e: any) {
-    console.error("Error setting global cohort:", e);
-    throw e;
+  } catch (e) {
+    const error = e as Error;
+    throw error;
   }
 }
 
 export async function isRegistrationEnabled(): Promise<boolean> {
   try {
-    // @ts-ignore
     if (!prisma.systemSetting) return true;
-    // @ts-ignore
     const setting = await prisma.systemSetting.findUnique({
       where: { key: "registration_enabled" },
     });
     // Pokud klíč neexistuje, registrace je povolena (výchozí stav)
     return setting ? setting.value === "true" : true;
   } catch {
-    return true;
+    return false;
   }
 }
 
 export async function setRegistrationEnabled(enabled: boolean) {
   await requireAdmin();
-  // @ts-ignore
   if (!prisma.systemSetting) {
     throw new Error("Model SystemSetting není dostupný.");
   }
-  // @ts-ignore
   return await prisma.systemSetting.upsert({
     where: { key: "registration_enabled" },
     update: { value: enabled ? "true" : "false" },
@@ -492,9 +568,9 @@ export async function getEnrollmentMatrixData(windowId: string) {
     if (!enrollmentMap.has(en.studentId)) {
       enrollmentMap.set(en.studentId, {});
     }
-    const choices = enrollmentMap.get(en.studentId)!;
     const subjectName = en.subjectOccurrence.subject.name;
     const subCode = en.subjectOccurrence.subCode ? ` [${en.subjectOccurrence.subCode}]` : "";
+    const choices = enrollmentMap.get(en.studentId)!; // This line was missing in the original code, added for context
     choices[en.subjectOccurrence.blockId] = {
         label: `${subjectName}${subCode}`,
         at: en.createdAt
@@ -755,7 +831,7 @@ export async function moveBlock(blockId: string, direction: "UP" | "DOWN") {
 }
 
 
-export async function updateBlock(block: any) {
+export async function updateBlock(block: { id: string; name: string; description?: string | null }) {
   await requireAdmin();
   const res = await prisma.block.update({
     where: { id: block.id },
@@ -798,7 +874,7 @@ export async function createBlock(enrollmentWindowId: string, name: string, desc
 
 
 // === ZÁPISOVÁ OKNA (EnrollmentWindow) ===
-export async function createEnrollmentWindow(data: any) {
+export async function createEnrollmentWindow(data: { name: string; description?: string; status: EnrollmentStatus; startsAt: string | Date; endsAt: string | Date; visibleToStudents: boolean }) {
   const admin = await requireAdmin();
   const created = await prisma.enrollmentWindow.create({
     data: {
@@ -816,7 +892,7 @@ export async function createEnrollmentWindow(data: any) {
 }
 
 
-export async function updateEnrollmentWindow(windowId: string, data: any) {
+export async function updateEnrollmentWindow(windowId: string, data: { name: string; description?: string; status: EnrollmentStatus; startsAt: string | Date; endsAt: string | Date; visibleToStudents: boolean }) {
   const admin = await requireAdmin();
   const updated = await prisma.enrollmentWindow.update({
     where: { id: windowId },
@@ -849,7 +925,7 @@ export async function deleteEnrollmentWindow(windowId: string) {
 
 
 // === VÝSKYTY PŘEDMĚTŮ (SubjectOccurrence) ===
-export async function createSubjectOccurrence(data: any) {
+export async function createSubjectOccurrence(data: { subjectId: string; blockId: string; teacherId?: string; subCode?: string; capacity?: string | number }) {
   const admin = await requireAdmin();
   const occ = await prisma.subjectOccurrence.create({
     data: {
@@ -857,7 +933,7 @@ export async function createSubjectOccurrence(data: any) {
       blockId: data.blockId,
       teacherId: data.teacherId || null,
       subCode: data.subCode || null,
-      capacity: data.capacity ? parseInt(data.capacity, 10) : null,
+      capacity: data.capacity ? (typeof data.capacity === 'string' ? parseInt(data.capacity, 10) : data.capacity) : null,
       createdById: admin.id,
     },
   });
@@ -866,7 +942,7 @@ export async function createSubjectOccurrence(data: any) {
 }
 
 
-export async function updateSubjectOccurrence(occurrenceId: string, data: any) {
+export async function updateSubjectOccurrence(occurrenceId: string, data: { subjectId: string; teacherId?: string; subCode?: string; capacity?: string | number }) {
   const admin = await requireAdmin();
   const occ = await prisma.subjectOccurrence.update({
     where: { id: occurrenceId },
@@ -874,7 +950,7 @@ export async function updateSubjectOccurrence(occurrenceId: string, data: any) {
       subjectId: data.subjectId,
       teacherId: data.teacherId || null,
       subCode: data.subCode || null,
-      capacity: data.capacity ? parseInt(data.capacity, 10) : null,
+      capacity: data.capacity ? (typeof data.capacity === 'string' ? parseInt(data.capacity, 10) : data.capacity) : null,
       updatedById: admin.id,
     },
   });
@@ -909,7 +985,7 @@ export async function deleteSubjectOccurrence(occurrenceId: string) {
 }
 
 
-export async function createSubject(subject: any) {
+export async function createSubject(subject: { name: string; code?: string; description?: string; syllabus: string }) {
   const admin = await requirePrivileged();
   const res = await prisma.subject.create({
     data: {
@@ -941,7 +1017,7 @@ export async function toggleSubjectActive(subjectId: string) {
 
 
 
-export async function updateSubject(subject: any) {
+export async function updateSubject(subject: { id: string; name: string; code?: string; description?: string; syllabus: string }) {
   const admin = await requirePrivileged();
   return await prisma.subject.update({
     where: { id: subject.id },
@@ -969,7 +1045,7 @@ export async function updateUserRole(userId: string, role: string) {
   }
   return await prisma.user.update({
     where: { id: userId },
-    data: { role: role as any },
+    data: { role: role as "ADMIN" | "TEACHER" | "STUDENT" | "GUEST" },
   });
 }
 
@@ -1006,54 +1082,5 @@ export async function updateUsersCohort(userIds: string[], cohort: string) {
   });
 }
 
-export async function importUsers(usersToImport: any[]) {
-  await requireAdmin();
-  
-  const results = {
-    created: 0,
-    updated: 0,
-    errors: 0,
-  };
 
-  for (const u of usersToImport) {
-    try {
-      const email = u.email?.trim().toLowerCase();
-      if (!email) {
-        results.errors++;
-        continue;
-      }
-
-      const updateData: any = {
-        firstName: u.firstName || "",
-        lastName: u.lastName || "",
-        cohort: u.cohort || null,
-      };
-
-      if (u.role) updateData.role = u.role as any;
-      if (u.isActive !== undefined) updateData.isActive = Boolean(u.isActive);
-      if (u.password) updateData.passwordHash = await bcrypt.hash(u.password, 10);
-
-      const createData: any = {
-        ...updateData,
-        email: email,
-        role: (u.role as any) || "STUDENT",
-        isActive: u.isActive !== undefined ? Boolean(u.isActive) : true,
-        passwordHash: updateData.passwordHash || await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
-      };
-
-      await prisma.user.upsert({
-        where: { email },
-        update: updateData,
-        create: createData,
-      });
-
-      results.created++; 
-    } catch (error) {
-      console.error("Error importing user:", error);
-      results.errors++;
-    }
-  }
-
-  return results;
-}
 

@@ -65,8 +65,8 @@ export async function POST(req: Request) {
       { message: "Uživatel úspěšně vytvořen" },
       { status: 201 }
     );
-  } catch (error) {
-    console.error("Chyba při registraci:", error);
+  } catch {
+    // console.error("Chyba při registraci:", error);
     return NextResponse.json(
       { message: "Omlouváme se, nastala vnitřní chyba serveru." },
       { status: 500 }

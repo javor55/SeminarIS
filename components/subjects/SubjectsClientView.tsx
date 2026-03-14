@@ -15,7 +15,7 @@ export function SubjectsClientView({
   currentUser,
 }: {
   subjects: SubjectRow[];
-  users: any[];
+  users: User[];
   currentUser: User;
 }) {
   const isAllowed = currentUser.role === "ADMIN" || currentUser.role === "TEACHER";

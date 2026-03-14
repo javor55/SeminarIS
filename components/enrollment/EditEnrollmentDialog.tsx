@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation"; // 🔥 1. Import routeru
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,6 @@ import {
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-// 🔥 2. Import pro Alert Dialog
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,46 +35,46 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { updateEnrollmentWindow, createEnrollmentWindow, deleteEnrollmentWindow } from "@/lib/data";
+import { EnrollmentStatus, EnrollmentWindowWithBlocks } from "@/lib/types";
 
 type EditEnrollmentDialogProps = {
-  enrollment: any;
+  enrollment: Partial<EnrollmentWindowWithBlocks> & { id?: string; name?: string; description?: string | null; status?: EnrollmentStatus; startsAt?: string | Date; endsAt?: string | Date; visibleToStudents?: boolean };
   onOpenChange: (open: boolean) => void;
 };
 
-// ... (funkce guessStatus zůstává)
-function guessStatus(en: any) {
+function guessStatus(en: Partial<EnrollmentWindowWithBlocks>) {
   const now = new Date();
+  if (!en.startsAt || !en.endsAt) return "DRAFT" as EnrollmentStatus;
   const s = new Date(en.startsAt);
   const e = new Date(en.endsAt);
-  if (now < s) return "SCHEDULED";
-  if (now >= s && now <= e) return "OPEN";
-  return "CLOSED";
+  if (now < s) return "SCHEDULED" as EnrollmentStatus;
+  if (now >= s && now <= e) return "OPEN" as EnrollmentStatus;
+  return "CLOSED" as EnrollmentStatus;
 }
 
 export function EditEnrollmentDialog({
   enrollment,
   onOpenChange,
 }: EditEnrollmentDialogProps) {
-  const router = useRouter(); // 🔥 3. Inicializace routeru
+  const router = useRouter();
   const [name, setName] = React.useState(enrollment.name ?? "");
   const [description, setDescription] = React.useState(
     enrollment.description ?? ""
   );
-  const [status, setStatus] = React.useState(
-    enrollment.status ?? guessStatus(enrollment)
+  const [status, setStatus] = React.useState<EnrollmentStatus>(
+    (enrollment.status as EnrollmentStatus) ?? guessStatus(enrollment)
   );
   const [visibleToStudents, setVisibleToStudents] = React.useState(
     enrollment.visibleToStudents ?? false
   );
   const [startsAt, setStartsAt] = React.useState<Date>(
-    new Date(enrollment.startsAt)
+    new Date(enrollment.startsAt ?? Date.now())
   );
   const [endsAt, setEndsAt] = React.useState<Date>(
-    new Date(enrollment.endsAt)
+    new Date(enrollment.endsAt ?? Date.now() + 7 * 24 * 60 * 60 * 1000)
   );
   const [saving, setSaving] = React.useState(false);
   
-  // Kontrola, zda editujeme existující záznam (má ID)
   const isExisting = !!enrollment.id;
 
   async function handleSave() {
@@ -90,20 +89,19 @@ export function EditEnrollmentDialog({
         endsAt: endsAt.toISOString(),
       };
 
-      if (isExisting) {
-        // --- LOGIKA PRO UPDATE ---
-        const ok = await updateEnrollmentWindow(enrollment.id, data);
-        onOpenChange(false); // Zavřeme dialog po updatu
+      if (isExisting && enrollment.id) {
+        await updateEnrollmentWindow(enrollment.id, data);
+        onOpenChange(false);
       } else {
-        // --- LOGIKA PRO CREATE ---
         const newRecord = await createEnrollmentWindow(data);
-        onOpenChange(false); // Zavřeme dialog
-        router.push(`/enrollments/${newRecord.id}`); // Přesměrování na detail existujícího záznamu
+        onOpenChange(false);
+        router.push(`/enrollments/${newRecord.id}`);
       }
 
       router.refresh();
 
-    } catch (e) {
+    } catch (e: unknown) {
+      // eslint-disable-next-line no-console
       console.error(e);
       alert("Došlo k chybě při ukládání okna.");
     } finally {
@@ -112,13 +110,14 @@ export function EditEnrollmentDialog({
   }
   
   async function handleDelete() {
-    if (!isExisting) return;
+    if (!isExisting || !enrollment.id) return;
     try {
       await deleteEnrollmentWindow(enrollment.id);
-      onOpenChange(false); // Zavřeme dialog
+      onOpenChange(false);
       router.push("/enrollments");
-      router.refresh(); // Obnoví data
-    } catch(err) {
+      router.refresh();
+    } catch(err: unknown) {
+      // eslint-disable-next-line no-console
       console.error(err);
       alert("Tento záznam se nepodařilo smazat. Může obsahovat existující bloky, které musíte smazat nejdříve.");
     }
@@ -128,7 +127,6 @@ export function EditEnrollmentDialog({
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          {/* Měníme titulek podle kontextu */}
           <DialogTitle>
             {isExisting ? "Upravit zápis" : "Vytvořit nový zápis"}
           </DialogTitle>
@@ -140,9 +138,7 @@ export function EditEnrollmentDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* ... (formulářové pole - beze změny) ... */}
         <div className="space-y-4 py-2">
-          {/* Název */}
           <div className="space-y-1">
             <label className="text-sm font-medium" htmlFor="name">
               Název
@@ -153,7 +149,6 @@ export function EditEnrollmentDialog({
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          {/* Popis */}
           <div className="space-y-1">
             <label className="text-sm font-medium" htmlFor="description">
               Popis
@@ -165,12 +160,11 @@ export function EditEnrollmentDialog({
               rows={3}
             />
           </div>
-          {/* Stav */}
           <div className="space-y-1">
             <Label className="text-sm font-medium" htmlFor="status">
               Stav
             </Label>
-            <Select value={status} onValueChange={(v) => setStatus(v)}>
+            <Select value={status} onValueChange={(v) => setStatus(v as EnrollmentStatus)}>
               <SelectTrigger id="status" className="w-full">
                 <SelectValue placeholder="Vyberte stav..." />
               </SelectTrigger>
@@ -182,11 +176,10 @@ export function EditEnrollmentDialog({
               </SelectContent>
             </Select>
             <p className="text-xs text-slate-400">
-              Tip: Stavy "Otevřeno" a "Uzavřeno" lze nastavit i ručně pro vynucení stavu bez ohledu na čas (např. předčasné uzavření).
+              Tip: Stavy &quot;Otevřeno&quot; a &quot;Uzavřeno&quot; lze nastavit i ručně pro vynucení stavu bez ohledu na čas (např. předčasné uzavření).
             </p>
 
           </div>
-          {/* Switch viditelnosti */}
           <div className="flex items-center space-x-2 pt-2">
             <Switch
               id="visibleToStudents"
@@ -200,7 +193,6 @@ export function EditEnrollmentDialog({
               Viditelné pro studenty
             </Label>
           </div>
-          {/* Začátek a Konec */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
             <div className="space-y-1">
               <Label className="text-sm font-medium" htmlFor="startsAt">
@@ -225,10 +217,8 @@ export function EditEnrollmentDialog({
           </div>
         </div>
 
-        {/* 🔥 5. Upravená patička s tlačítkem Smazat */}
         <AlertDialog>
           <div className="flex justify-between gap-2">
-            {/* Tlačítko Smazat (vlevo) */}
             <div>
               {isExisting && (
                 <AlertDialogTrigger asChild>
@@ -239,7 +229,6 @@ export function EditEnrollmentDialog({
               )}
             </div>
             
-            {/* Tlačítka Zrušit a Uložit (vpravo) */}
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -254,13 +243,12 @@ export function EditEnrollmentDialog({
             </div>
           </div>
           
-          {/* Potvrzovací dialog pro smazání */}
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Opravdu smazat zápis?</AlertDialogTitle>
               <AlertDialogDescription>
                 Tato akce je nevratná. Smažete zápisové období
-                "{name}". Všechna data o zápisech studentů budou
+                &quot;{name}&quot;. Všechna data o zápisech studentů budou
                 ztracena.
               </AlertDialogDescription>
             </AlertDialogHeader>

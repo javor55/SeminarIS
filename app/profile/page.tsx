@@ -34,8 +34,9 @@ export default function ProfilePage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (err: any) {
-      toast.error(err.message || "Chyba při změně hesla.");
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error(error.message || "Chyba při změně hesla.");
     } finally {
       setIsChanging(false);
     }

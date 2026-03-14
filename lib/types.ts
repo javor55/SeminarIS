@@ -20,13 +20,13 @@ export type EnrollmentWindow = {
   name: string;
   description?: string;
   status: EnrollmentStatus;
-  startsAt: string;
-  endsAt: string;
+  startsAt: string | Date;
+  endsAt: string | Date;
   visibleToStudents: boolean;
   createdById: string;
   updatedById?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
 };
 
 export type Block = {
@@ -37,21 +37,22 @@ export type Block = {
   enrollmentWindowId: string;
   createdById: string;
   updatedById?: string;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  deletedAt?: string | Date | null;
 };
 
 export type Subject = {
   id: string;
   name: string;
   description?: string;
-  code?: string;
+  code?: string | null;
   syllabus: string;
+  isActive: boolean;
   createdById: string;
-  updatedById?: string;
-  createdAt: string;
-  updatedAt: string;
+  updatedById?: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date | null;
 };
 
 export type SubjectOccurrence = {
@@ -63,9 +64,9 @@ export type SubjectOccurrence = {
   capacity: number | null;
   createdById: string;
   updatedById?: string;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  deletedAt?: string | Date | null;
 };
 
 export type StudentEnrollment = {
@@ -74,22 +75,22 @@ export type StudentEnrollment = {
   subjectOccurrenceId: string;
   createdById: string;
   updatedById?: string;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  deletedAt?: string | Date | null;
   deletedById?: string;
+};
+
+export type SubjectOccurrenceWithRelations = SubjectOccurrence & {
+  subject: Subject;
+  teacher?: User | null;
+  enrollments: StudentEnrollment[];
 };
 
 export type EnrollmentWindowWithBlocks = EnrollmentWindow & {
   blocks: Array<
     Block & {
-      occurrences: Array<
-        SubjectOccurrence & {
-          subject: Subject;
-          teacher: User;
-          enrollments: StudentEnrollment[];
-        }
-      >;
+      occurrences: Array<SubjectOccurrenceWithRelations>;
     }
   >;
 };

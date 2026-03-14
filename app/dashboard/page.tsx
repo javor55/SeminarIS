@@ -52,7 +52,7 @@ export default async function DashboardPage() {
   const user = session.user as User;
   
   const visible = await getEnrollmentWindowsVisible();
-  const found = findDashboardEnrollment(visible as any[], user);
+  const found = findDashboardEnrollment(visible, user);
   
   if (!found) {
     return (
@@ -79,5 +79,5 @@ export default async function DashboardPage() {
     );
   }
 
-  return <EnrollmentView enrollmentWindow={ew as any} currentUser={user} />;
-}
+  return <EnrollmentView enrollmentWindow={ew} currentUser={user} />;
+}

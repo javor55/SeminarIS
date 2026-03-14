@@ -73,9 +73,9 @@ export function ImportUsersDialog({ open, onOpenChange, onSuccess }: ImportUsers
         
         const json = lines.slice(1).map(line => {
           const values = line.split(";").map(v => v.trim());
-          const obj: any = {};
+          const obj: Record<string, string | boolean> = {};
           headers.forEach((header, index) => {
-            let val = values[index];
+            const val = values[index];
             if (header === "isActive") {
               obj[header] = val.toUpperCase() === "TRUE" || val === "1" || val.toUpperCase() === "ANO";
             } else {
@@ -85,12 +85,13 @@ export function ImportUsersDialog({ open, onOpenChange, onSuccess }: ImportUsers
           return obj;
         });
 
-        const res = await importUsers(json);
+        const res = await importUsers(json as Array<{ firstName?: string, lastName?: string, email: string, cohort?: string, role?: string, isActive?: boolean | string | number, password?: string }>);
         setImportResult(res);
         toast.success("Import dokončen");
         onSuccess();
-      } catch (err) {
-        console.error(err);
+      } catch (err: unknown) {
+        const error = err as Error;
+        toast.error(error.message || "Nepodařilo se zrušit zápis.");
         toast.error("Chyba při parsování CSV souboru.");
       } finally {
         setIsImporting(false);

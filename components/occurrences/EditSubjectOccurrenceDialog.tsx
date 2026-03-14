@@ -1,13 +1,12 @@
 "use client";
 
-import { SubjectOccurrence } from "@/lib/types";
+import { SubjectOccurrence, Subject, User, StudentEnrollment } from "@/lib/types";
 import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getAllUsers, getSubjects } from "@/lib/data";
-import { Trash } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,26 +37,23 @@ export function EditSubjectOccurrenceDialog({
   onOpenChange,
   onSubmit,
   onDelete,
-  onShowStudents, // 👈 nový prop
 }: {
   open?: boolean;
-  occurrence: SubjectOccurrence & { enrollments?: any[] };
+  occurrence: SubjectOccurrence & { enrollments?: StudentEnrollment[] };
   onOpenChange: (open: boolean) => void;
   onSubmit?: (data: SubjectOccurrence) => void;
   onDelete?: (id: string) => void;
   onShowStudents?: (id: string) => void;
 }) {
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [teachers, setTeachers] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [teachers, setTeachers] = useState<User[]>([]);
 
-  // Lokální stavy pro formulář
   const [subjectId, setSubjectId] = useState(occurrence.subjectId ?? "");
   const [teacherId, setTeacherId] = useState(occurrence.teacherId ?? "");
   const [subCode, setSubCode] = useState(occurrence.subCode ?? "");
   const [capacity, setCapacity] = useState<string | number>(occurrence.capacity ?? "");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Sync prop -> state
   useEffect(() => {
     if (open) {
       setSubjectId(occurrence.subjectId ?? "");
@@ -72,7 +67,7 @@ export function EditSubjectOccurrenceDialog({
      async function load() {
        const [subjs, allU] = await Promise.all([getSubjects(), getAllUsers()]);
        setSubjects(subjs);
-       setTeachers(allU.filter((u: any) => u.role === "TEACHER"));
+       setTeachers(allU.filter((u) => u.role === "TEACHER"));
      }
      load();
   }, []);
@@ -80,7 +75,7 @@ export function EditSubjectOccurrenceDialog({
   const isNew = occurrence.id === "";
 
   const enrolledCount = occurrence.enrollments
-    ? occurrence.enrollments.filter((e: any) => !e.deletedAt).length
+    ? occurrence.enrollments.filter((e) => !e.deletedAt).length
     : 0;
   const hasStudents = enrolledCount > 0;
 
@@ -148,9 +143,7 @@ export function EditSubjectOccurrenceDialog({
           </div>
         </div>
 
-        {/* spodní řádek ovládacích prvků */}
         <div className="flex justify-between items-center mt-4 gap-2">
-          {/* LEVÁ strana */}
           {!isNew && (
             <div className="flex gap-2">            
               <Button
@@ -169,7 +162,6 @@ export function EditSubjectOccurrenceDialog({
             </div>
           )}
 
-          {/* ALERT: Potvrzení smazání z dialogu */}
           <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -194,7 +186,6 @@ export function EditSubjectOccurrenceDialog({
             </AlertDialogContent>
           </AlertDialog>
 
-          {/* PRAVÁ strana */}
           <DialogFooter className="ml-auto flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Zrušit
@@ -219,7 +210,7 @@ export function EditSubjectOccurrenceDialog({
                       teacherId: teacherId || null,
                       subCode: subCode || null,
                       capacity: capNum,
-                    } as any);
+                    } as unknown as SubjectOccurrence);
                   }
                   onOpenChange(false);
                 }}

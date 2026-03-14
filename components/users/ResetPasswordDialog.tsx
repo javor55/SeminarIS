@@ -37,8 +37,9 @@ export function ResetPasswordDialog({ userId, userName }: ResetPasswordDialogPro
       toast.success(`Heslo pro uživatele ${userName} bylo změněno.`);
       setOpen(false);
       setPassword("");
-    } catch (e: any) {
-      toast.error("Chyba při změně hesla: " + e.message);
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error("Chyba při změně hesla: " + error.message);
     } finally {
       setLoading(false);
     }

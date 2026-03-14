@@ -2,21 +2,19 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
-import { useRouter } from "next/navigation";
 import { getSystemStats, getGlobalCohort, setGlobalCohort, isRegistrationEnabled, setRegistrationEnabled } from "@/lib/data";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Users, BookOpen, Calendar, Save, Trash2, ShieldAlert } from "lucide-react";
+import { Users, BookOpen, Calendar, Save } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminPage() {
   const { user, isLoading } = useAuth();
-  const router = useRouter();
 
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<{ userCount: number; subjectCount: number; activeEnrollmentCount: number } | null>(null);
   const [cohort, setCohort] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [regEnabled, setRegEnabled] = useState(true);
@@ -34,8 +32,7 @@ export default function AdminPage() {
       setStats(s);
       setCohort(c);
       setRegEnabled(r);
-    } catch (e) {
-      console.error(e);
+    } catch {
       toast.error("Nepodařilo se načíst data administrace.");
     }
   }
@@ -45,7 +42,7 @@ export default function AdminPage() {
     try {
       await setGlobalCohort(cohort);
       toast.success("Globální ročník byl úspěšně aktualizován.");
-    } catch (e) {
+    } catch {
       toast.error("Chyba při ukládání ročníku.");
     } finally {
       setIsSaving(false);
@@ -155,8 +152,9 @@ export default function AdminPage() {
                     await setRegistrationEnabled(checked);
                     setRegEnabled(checked);
                     toast.success(checked ? "Registrace povolena." : "Registrace zakázána.");
-                  } catch (err: any) {
-                    toast.error(err.message || "Nepodařilo se změnit nastavení.");
+                  } catch (err) {
+                    const error = err as Error;
+                    toast.error(error.message || "Nepodařilo se změnit nastavení.");
                   }
                 }}
               />

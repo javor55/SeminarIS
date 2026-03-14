@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
 import {
@@ -21,7 +21,7 @@ import {
   Redo2,
 } from "lucide-react";
 
-function MenuBar({ editor }: { editor: any }) {
+function MenuBar({ editor }: { editor: Editor | null }) {
   if (!editor) return null;
 
   const btnClass = "p-1.5 rounded-md text-sm text-muted-foreground hover:bg-accent transition-colors disabled:opacity-50";
@@ -165,7 +165,8 @@ export function TiptapEditor({
   onChange,
 }: {
   value: string;
-  onChange: (val: string) => void;
+  // eslint-disable-next-line no-unused-vars
+  onChange: (_val: string) => void;
 }) {
   const [isClient, setIsClient] = useState(false);
   useEffect(() => {

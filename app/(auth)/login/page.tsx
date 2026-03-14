@@ -19,8 +19,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-    } catch (err: any) {
-      setError(err.message ?? "Nepodařilo se přihlásit.");
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message ?? "Nepodařilo se přihlásit.");
     } finally {
       setLoading(false);
     }

@@ -8,8 +8,9 @@ import { User } from "@/lib/types";
 export default async function EnrollmentDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session?.user) {
@@ -30,7 +31,7 @@ export default async function EnrollmentDetailPage({
     );
   }
 
-  const ew = await getEnrollmentWindowByIdWithBlocks(params.id);
+  const ew = await getEnrollmentWindowByIdWithBlocks(id);
 
   if (!ew) {
     return (

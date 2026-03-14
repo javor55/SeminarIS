@@ -35,7 +35,6 @@ import {
 import { Filter, Settings2, X } from "lucide-react";
 // Importy pro DateTimePicker
 import { DateTimePicker } from "@/components/ui/datetime-picker";
-import { cs } from "date-fns/locale";
 // Import pro popisky "Od:" / "Do:"
 import { Label } from "@/components/ui/label";
 
@@ -52,12 +51,12 @@ type DateFilterDef<T> = {
   id: string;
   label: string;
   /** funkce která z řádku vrátí Date nebo null */
-  getDate: (row: T) => Date | null;
+  getDate: (_: T) => Date | null;
 };
 
 export type DataTableProps<T> = {
   data: T[];
-  columns: ColumnDef<T, any>[];
+  columns: ColumnDef<T, unknown>[];
   /** placeholder pro hledání */
   searchPlaceholder?: string;
   /** pole klíčů, ve kterých se hledá (např. ['name','email']) */
@@ -67,7 +66,7 @@ export type DataTableProps<T> = {
   /** datumové filtry – aplikují se *po* TanStack filtrech */
   dateFilters?: DateFilterDef<T>[];
   /** panel hromadných akcí v popoveru (vedle tlačítka Filtry) */
-  bulkPopoverRender?: (args: {
+  bulkPopoverRender?: (_: {
     /** vyfiltrované řádky (po všech filtrech) */
     filteredRows: T[];
     /** callback pro rerender */
@@ -99,7 +98,7 @@ export function DataTable<T>({
   forceRefresh: externalForceRefresh,
 }: DataTableProps<T>) {
   const [globalFilter, setGlobalFilter] = React.useState("");
-  const [columnFilters, setColumnFilters] = React.useState<any>([]);
+  const [columnFilters, setColumnFilters] = React.useState<{ id: string; value: unknown }[]>([]);
   const [, force] = React.useState(0);
   const forceRefresh = () => force((x) => x + 1);
 
@@ -129,9 +128,9 @@ export function DataTable<T>({
       const q = String(filterValue).toLowerCase().trim();
       if (!q) return true;
       if (searchKeys.length === 0) return true; // nic neurčeno => nefiltrujeme
-      const original: any = row.original;
+      const original = row.original as Record<string, unknown>;
       return searchKeys.some((k) => {
-        const val = (original?.[k] ?? "") as string;
+        const val = (original[k as string] ?? "") as string;
         return String(val).toLowerCase().includes(q);
       });
     },

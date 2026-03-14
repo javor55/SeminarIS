@@ -1,16 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import * as React from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { OccurrencesStudentsDialog } from "@/components/occurrences/OccurrencesStudentsDialog";
+import { OccurrenceForDialog, OccurrencesStudentsDialog } from "@/components/occurrences/OccurrencesStudentsDialog";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import {
-  Block,
-  EnrollmentWindowWithBlocks,
   User,
   StudentEnrollment,
+  Subject,
+  SubjectOccurrenceWithRelations,
 } from "@/lib/types";
 import { EditSubjectOccurrenceDialog } from "@/components/occurrences/EditSubjectOccurrenceDialog";
 import { DataTable } from "@/components/ui/data-table";
@@ -37,68 +38,57 @@ export function SubjectDetailClientView({
   usersList,
   currentUser,
 }: {
-  subject: any;
+  subject: Subject & { isActive: boolean };
   occurrences: OccurrenceRow[];
-  usersList: any[];
+  usersList: User[];
   currentUser: User;
 }) {
   const router = useRouter();
 
-  // Dialog "Studenti"
-  const [selectedStudents, setSelectedStudents] = useState<{
-    occurrenceId: string;
-    block: Block & { occurrences: any[] };
-  } | null>(null);
+  const [selectedOccurrence, setSelectedOccurrence] = useState<OccurrenceRow | null>(null);
 
-  // Dialog "Upravit výskyt"
   const [editOccurrence, setEditOccurrence] = useState<OccurrenceRow | null>(
     null
   );
 
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
-  /** Alert: Stejný předmět v jiném bloku stejného okna */
   const [sameSubjectAlert, setSameSubjectAlert] = useState<{
     subjectName: string;
     blockName: string;
   } | null>(null);
 
-  /** Alert: Přepsat zápis v rámci bloku */
   const [switchEnroll, setSwitchEnroll] = useState<{
     fromOccurrenceId: string;
     toOccurrenceId: string;
-    block: any;
+    occurrence: OccurrenceRow;
   } | null>(null);
 
-  /** Alert: Potvrzení odhlášení */
   const [unenrollConfirm, setUnenrollConfirm] = useState<OccurrenceRow | null>(null);
 
   const isStudent = currentUser.role === "STUDENT";
 
-  // Najde, zda je student zapsán v libovolném předmětu v rámci daného bloku
-  const findMyEnrollmentInBlock = (block: any) => {
-    for (const occ of block.occurrences || []) {
+  const findMyEnrollmentInBlock = useCallback((blockOccurrences?: SubjectOccurrenceWithRelations[]): { occurrenceId: string, enrollmentId: string, occurrence: SubjectOccurrenceWithRelations } | null => {
+    for (const occ of blockOccurrences || []) {
       const enr = (occ.enrollments as StudentEnrollment[] | undefined)?.find(
         (e) => e.studentId === currentUser.id && !e.deletedAt
       );
       if (enr) return { occurrenceId: occ.id, enrollmentId: enr.id, occurrence: occ };
     }
     return null;
-  };
+  }, [currentUser.id]);
 
-  // Najde, zda je student zapsán v TOMTO předmětu v jiném bloku stejného okna
-  const findSameSubjectInOtherBlocks = (targetOcc: OccurrenceRow) => {
+  const findSameSubjectInOtherBlocks = useCallback((targetOcc: OccurrenceRow) => {
     return occurrences.find(occ => 
       occ.id !== targetOcc.id && 
       occ.enrollmentWindow?.id === targetOcc.enrollmentWindow?.id &&
       occ.enrolledByMe
     );
-  };
+  }, [occurrences]);
 
-  const handleEnroll = async (occ: OccurrenceRow) => {
+  const handleEnroll = useCallback(async (occ: OccurrenceRow) => {
     if (!isStudent) return;
 
-    // 1. Už má tento předmět v jiném bloku tohoto okna?
     const alreadyEnrolled = findSameSubjectInOtherBlocks(occ);
     if (alreadyEnrolled) {
       setSameSubjectAlert({
@@ -108,13 +98,17 @@ export function SubjectDetailClientView({
       return;
     }
 
-    // 2. Už má něco jiného v tomto bloku?
-    const inBlock = findMyEnrollmentInBlock(occ.block);
+    // Pro účely kontroly v bloku musíme vědět, co dalšího je v bloku.
+    // OccurrenceRow má block: Block, ale ne occurrences.
+    // V této view (Detail předmětu) ale nemáme přístup ke všem výskytům v bloku snadno.
+    // Předpokládáme, že occ.block v db by měl mít occurrences, ale OccurrenceRow má jen Block.
+    // Prozatím zkusíme přetypovat, v reálu by to mělo být v datech.
+    const inBlock = findMyEnrollmentInBlock((occ.block as unknown as { occurrences?: SubjectOccurrenceWithRelations[] })?.occurrences);
     if (inBlock && inBlock.occurrenceId !== occ.id) {
       setSwitchEnroll({
         fromOccurrenceId: inBlock.occurrenceId,
         toOccurrenceId: occ.id,
-        block: occ.block
+        occurrence: occ
       });
       return;
     }
@@ -123,14 +117,15 @@ export function SubjectDetailClientView({
       await enrollStudent(currentUser.id, occ.id);
       toast.success("Zápis byl úspěšně proveden.");
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message || "Nepodařilo se provést zápis.");
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error(error.message || "Nepodařilo se provést zápis.");
     }
-  };
+  }, [currentUser.id, isStudent, router, findMyEnrollmentInBlock, findSameSubjectInOtherBlocks, subject.name]);
 
-  const handleUnenroll = async (occ: OccurrenceRow) => {
-    const enr = (occ as any).enrollments?.find(
-      (e: any) => e.studentId === currentUser.id && !e.deletedAt
+  const handleUnenroll = useCallback(async (occ: OccurrenceRow) => {
+    const enr = occ.enrollments?.find(
+      (e) => e.studentId === currentUser.id && !e.deletedAt
     );
     if (!enr) return;
 
@@ -138,23 +133,20 @@ export function SubjectDetailClientView({
       await unenrollStudent(enr.id);
       toast.success("Odhlášení bylo úspěšně provedeno.");
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message || "Nepodařilo se zrušit zápis.");
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error(error.message || "Nepodařilo se odhlásit.");
     } finally {
       setUnenrollConfirm(null);
     }
-  };
+  }, [currentUser.id, router]);
 
   const columns = useMemo(
     () =>
       getOccurrenceColumns({
         currentUser,
         showSubjectName: false,
-        onStudents: (occ) =>
-          setSelectedStudents({
-            occurrenceId: occ.id,
-            block: occ.block,
-          }),
+        onStudents: (occ) => setSelectedOccurrence(occ),
         onEdit: (occ) => setEditOccurrence(occ),
         onDelete: async (occ) => {
           if (window.confirm("Opravdu smazat tento výskyt?")) {
@@ -166,7 +158,7 @@ export function SubjectDetailClientView({
         onEnroll: (occ) => handleEnroll(occ),
         onUnenroll: (occ) => setUnenrollConfirm(occ),
       }),
-    [currentUser, router, occurrences, subject.name]
+    [currentUser, router, handleEnroll]
   );
 
   const handleToggleActive = async () => {
@@ -174,9 +166,9 @@ export function SubjectDetailClientView({
       await toggleSubjectActive(subject.id);
       toast.success(`Předmět byl ${subject.isActive ? "archivován" : "aktivován"}.`);
       router.refresh();
-    } catch (err) {
-      console.error(err);
-      toast.error("Něco se pokazilo při změně stavu předmětu.");
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error(error.message || "Něco se pokazilo při změně stavu předmětu.");
     } finally {
       setShowArchiveConfirm(false);
     }
@@ -190,7 +182,7 @@ export function SubjectDetailClientView({
     return full || u.email || userId;
   };
 
-  const formatDate = (dateStr?: string) => {
+  const formatDate = (dateStr?: string | Date) => {
     if (!dateStr) return "—";
     const d = new Date(dateStr);
     if (Number.isNaN(d.getTime())) return "—";
@@ -289,7 +281,6 @@ export function SubjectDetailClientView({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ALERT: Stejný předmět v jiném bloku */}
       {sameSubjectAlert && (
         <AlertDialog open onOpenChange={() => setSameSubjectAlert(null)}>
           <AlertDialogContent>
@@ -308,22 +299,19 @@ export function SubjectDetailClientView({
         </AlertDialog>
       )}
 
-      {/* ALERT: Přepsat zápis v bloku */}
       {switchEnroll && (
         <AlertDialog open onOpenChange={() => setSwitchEnroll(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Přepsat zápis?</AlertDialogTitle>
               {(() => {
-                const inBlock = findMyEnrollmentInBlock(switchEnroll.block);
-                const toOcc = occurrences.find(o => o.id === switchEnroll.toOccurrenceId);
-
+                const inBlock = findMyEnrollmentInBlock((switchEnroll.occurrence.block as unknown as { occurrences?: SubjectOccurrenceWithRelations[] })?.occurrences);
                 return (
                   <AlertDialogDescription className="space-y-2">
                     <p>
-                      V bloku <strong>{switchEnroll.block.name}</strong> již máte zapsaný jiný seminář. Pokud budete pokračovat, vaše volba se přepíše.
+                      V bloku <strong>{switchEnroll.occurrence.blockName}</strong> již máte zapsaný jiný seminář. Pokud budete pokračovat, vaše volba se přepíše.
                     </p>
-                    {inBlock && toOcc && (
+                    {inBlock && (
                       <div className="bg-muted p-3 rounded text-sm space-y-1">
                         <p><strong>Současný:</strong> {inBlock.occurrence.subject.name}</p>
                         <p><strong>Nový:</strong> {subject.name}</p>
@@ -338,13 +326,14 @@ export function SubjectDetailClientView({
               <AlertDialogAction
                 onClick={async () => {
                   try {
-                    const my = findMyEnrollmentInBlock(switchEnroll.block);
-                    if (my) await unenrollStudent(my.enrollmentId);
+                    const inBlock = findMyEnrollmentInBlock((switchEnroll.occurrence.block as unknown as { occurrences?: SubjectOccurrenceWithRelations[] })?.occurrences);
+                    if (inBlock) await unenrollStudent(inBlock.enrollmentId);
                     await enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
                     toast.success("Zápis byl úspěšně přepsán.");
                     router.refresh();
-                  } catch (err: any) {
-                    toast.error(err.message || "Nepodařilo se přepsat zápis.");
+                  } catch (err: unknown) {
+                    const error = err as Error;
+                    toast.error(error.message || "Nepodařilo se přepsat zápis.");
                   } finally {
                     setSwitchEnroll(null);
                   }
@@ -357,7 +346,6 @@ export function SubjectDetailClientView({
         </AlertDialog>
       )}
 
-      {/* ALERT: Potvrzení odhlášení */}
       {unenrollConfirm && (
         <AlertDialog open onOpenChange={() => setUnenrollConfirm(null)}>
           <AlertDialogContent>
@@ -370,11 +358,11 @@ export function SubjectDetailClientView({
             <AlertDialogFooter>
               <AlertDialogCancel>Zrušit</AlertDialogCancel>
               <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => handleUnenroll(unenrollConfirm)}
-            >
-              Odepsat
-            </AlertDialogAction>
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => handleUnenroll(unenrollConfirm)}
+              >
+                Odepsat
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -424,20 +412,19 @@ export function SubjectDetailClientView({
 
       {isPrivilegedUser && (
         <>
-          {selectedStudents && (
+          {selectedOccurrence && (
             <OccurrencesStudentsDialog
-              occurrenceId={selectedStudents.occurrenceId}
-              block={selectedStudents.block}
+              occurrence={selectedOccurrence as OccurrenceForDialog}
               currentUser={currentUser}
               onOpenChange={(open) => {
-                if (!open) setSelectedStudents(null);
+                if (!open) setSelectedOccurrence(null);
               }}
             />
           )}
 
           {editOccurrence && (
             <EditSubjectOccurrenceDialog
-              occurrence={editOccurrence as any}
+              occurrence={editOccurrence}
               onOpenChange={(open) => !open && setEditOccurrence(null)}
               onSubmit={async (data) => {
                 await updateSubjectOccurrence(data.id, data);

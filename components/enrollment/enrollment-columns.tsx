@@ -2,7 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { User, EnrollmentWindow, EnrollmentStatus } from "@/lib/types";
+import { User, EnrollmentWindow } from "@/lib/types";
 import { cn, computeEnrollmentStatus } from "@/lib/utils";
 import Link from "next/link"; // Pro proklik z názvu
 import { Badge } from "@/components/ui/badge"; // Pro badge stavu
@@ -18,7 +18,7 @@ export type EnrollmentRow = EnrollmentWindow & {
     name: string;
     count: number;
   }[];
-  fullData: any;
+  fullData: unknown;
 };
 
 // Odstraněno: getStatusBadgeVariant se logikou přesunul do computeEnrollmentStatus a renderování do buňky
@@ -26,7 +26,7 @@ export type EnrollmentRow = EnrollmentWindow & {
 // Funkce pro generování sloupců
 export function getEnrollmentColumns(opts: {
   currentUser: User | null;
-  onEdit: (row: EnrollmentRow) => void;
+  onEdit: (_: EnrollmentRow) => void;
 }): ColumnDef<EnrollmentRow>[] {
   const { currentUser, onEdit } = opts;
 
@@ -117,7 +117,7 @@ export function getEnrollmentColumns(opts: {
             {blocksWithCounts.length === 0 && (
               <span className="text-xs text-muted-foreground">Žádné bloky</span>
             )}
-            {blocksWithCounts.map((b: any) => (
+            {blocksWithCounts.map((b: { id: string; name: string; count: number }) => (
               <span
                 key={b.id}
                 className="inline-flex items-center gap-1 text-xs text-foreground"

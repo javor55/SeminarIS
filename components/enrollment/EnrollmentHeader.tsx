@@ -24,7 +24,7 @@ import {
 import { computeEnrollmentStatus } from "@/lib/utils";
 
 // Pomocná funkce pro formátování data
-function formatDateTime(iso: string) {
+function formatDateTime(iso: string | Date) {
   return new Date(iso).toLocaleString("cs-CZ", {
     day: "numeric",
     month: "numeric",
@@ -48,7 +48,7 @@ export function EnrollmentHeader({
   const router = useRouter();
 
   const [now, setNow] = useState(new Date());
-  const [editEnrollment, setEditEnrollment] = useState<any | null>(null);
+  const [editEnrollment, setEditEnrollment] = useState<EnrollmentWindowWithBlocks | null>(null);
   const [isCreatingBlock, setIsCreatingBlock] = useState(false);
 
   // 1) Časovač
@@ -103,14 +103,15 @@ export function EnrollmentHeader({
       const csv = [headers.map(h => `"${h}"`), ...rows].map(e => e.join(";")).join("\n");
       downloadCSV(csv, `export_matice_${ew.name.replace(/\s+/g, "_")}.csv`);
       toast.success("Matrix export dokončen.");
-    } catch (err: any) {
-      toast.error(err.message || "Export se nezdařil.");
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error(error.message || "Export se nezdařil.");
     }
   };
 
   const handleExportStudentList = async () => {
     try {
-      const { window, allStudents } = await getEnrollmentDetails(ew.id);
+      const { window } = await getEnrollmentDetails(ew.id);
       const headers = ["Příjmení", "Jméno", "Email", "Ročník", "Blok", "Předmět", "Kód semináře", "Vyučující", "Zapsáno dne"];
       const rows: string[][] = [];
 
@@ -135,8 +136,9 @@ export function EnrollmentHeader({
       const csv = [headers.map(h => `"${h}"`), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`))].map(e => e.join(";")).join("\n");
       downloadCSV(csv, `seznam_studentu_${ew.name.replace(/\s+/g, "_")}.csv`);
       toast.success("Seznam studentů exportován.");
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error(error.message || "Export se nezdařil.");
     }
   };
 
@@ -164,8 +166,9 @@ export function EnrollmentHeader({
       const csv = [headers.map(h => `"${h}"`), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`))].map(e => e.join(";")).join("\n");
       downloadCSV(csv, `obsazenost_seminaru_${ew.name.replace(/\s+/g, "_")}.csv`);
       toast.success("Obsazenost exportována.");
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error(error.message || "Export se nezdařil.");
     }
   };
 
@@ -197,8 +200,9 @@ export function EnrollmentHeader({
       const csv = [headers.map(h => `"${h}"`), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`))].map(e => e.join(";")).join("\n");
       downloadCSV(csv, `sestavy_pro_ucitele_${ew.name.replace(/\s+/g, "_")}.csv`);
       toast.success("Sestavy pro učitele exportovány.");
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error(error.message || "Export se nezdařil.");
     }
   };
 
@@ -237,17 +241,15 @@ export function EnrollmentHeader({
       const csv = [headers.map(h => `"${h}"`), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`))].map(e => e.join(";")).join("\n");
       downloadCSV(csv, `chybejici_zapisy_${ew.name.replace(/\s+/g, "_")}.csv`);
       toast.success("Report nezapsaných exportován.");
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error(error.message || "Export se nezdařil.");
     }
   };
 
   return (
     <>
-      {/* --- Sekce se dvěma kartami --- */}
       <div className="flex flex-col md:flex-row gap-4 md:items-stretch">
-        
-        {/* KARTA 1: Levá (Název, Popis) */}
         <div
           className={cn(
             "rounded-lg border bg-card text-card-foreground shadow-sm w-full flex-1"
@@ -263,7 +265,6 @@ export function EnrollmentHeader({
           </div>
         </div>
 
-        {/* KARTA 2: Pravá (Stav, Data) */}
         <div
           className={cn(
             "rounded-lg border bg-card text-card-foreground shadow-sm flex-shrink-0",
@@ -272,7 +273,6 @@ export function EnrollmentHeader({
         >
           <div className="p-6 flex"> 
             
-            {/* Sloupec 1: Začátek a Konec */}
             <div className="space-y-2 text-sm pr-6">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -284,9 +284,7 @@ export function EnrollmentHeader({
               </div>
             </div>
 
-            {/* Sloupec 2: Stav + Countdown */}
             <div className="space-y-2 pl-6 border-l border-border">
-              {/* Stav */}
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Stav</div>
                 <div
@@ -299,7 +297,6 @@ export function EnrollmentHeader({
                 </div>
               </div>
 
-              {/* Countdown */}
               {absoluteStatus.is === "planned" && (() => {
                 const diff = new Date(ew.startsAt).getTime() - now.getTime();
                 if (diff <= 0) return null;
@@ -346,7 +343,6 @@ export function EnrollmentHeader({
         </div>
       )}
 
-      {/* --- Sekce tlačítek --- */}
       {isAdmin && (
         <div className="flex justify-end gap-2">
           <DropdownMenu>
@@ -394,7 +390,6 @@ export function EnrollmentHeader({
         </div>
       )}
 
-      {/* Dialog pro úpravu */}
       {editEnrollment && (
         <EditEnrollmentDialog
           enrollment={editEnrollment}
@@ -404,7 +399,6 @@ export function EnrollmentHeader({
         />
       )}
       
-      {/* Dialog pro zbrusu nový blok */}
       <EditBlockDialog
         open={isCreatingBlock}
         onOpenChange={setIsCreatingBlock}
@@ -415,7 +409,8 @@ export function EnrollmentHeader({
             router.refresh();
             setIsCreatingBlock(false);
 
-          } catch (e) {
+          } catch (e: unknown) {
+            // eslint-disable-next-line no-console
             console.error(e);
             alert("Nepodařilo se vytvořit blok.");
           }
