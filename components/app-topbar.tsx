@@ -108,7 +108,8 @@ export function AppTopbar({ user }: { user?: User }) {
         </div>
 
         {/* 🔥 MOBILNÍ Menu: Viditelné jen na mobilu (md:hidden) */}
-        <div className="flex md:hidden">
+        <div className="flex md:hidden items-center gap-2">
+          <ThemeToggle />
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
