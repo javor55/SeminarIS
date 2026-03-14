@@ -18,7 +18,7 @@ import { cn, computeEnrollmentStatus } from "@/lib/utils";
 interface UserDetailsDialogProps {
   user: UserRow | null;
   open: boolean;
-  onOpenChange: (_open: boolean) => void;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialogProps) {

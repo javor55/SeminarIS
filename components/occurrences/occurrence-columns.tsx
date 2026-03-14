@@ -39,11 +39,11 @@ export type OccurrenceRow = SubjectOccurrence & {
 // props pro generování sloupců
 export function getOccurrenceColumns(opts: {
   currentUser: User | null;
-  onStudents: (row: OccurrenceRow) => void;
-  onEdit: (row: OccurrenceRow) => void;
-  onDelete: (row: OccurrenceRow) => void;
-  onEnroll?: (row: OccurrenceRow) => void;
-  onUnenroll?: (row: OccurrenceRow) => void;
+  onStudents: (_: OccurrenceRow) => void;
+  onEdit: (_: OccurrenceRow) => void;
+  onDelete: (_: OccurrenceRow) => void;
+  onEnroll?: (_: OccurrenceRow) => void;
+  onUnenroll?: (_: OccurrenceRow) => void;
   /** možnost skrýt některé sloupce podle kontextu */
   showSubjectName?: boolean;
   showEnrollmentName?: boolean;

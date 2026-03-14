@@ -4,7 +4,7 @@
     "next/typescript"
   ],
     "rules": {
-    "no-unused-vars": "warn",
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
     "no-console": "warn",
     "react/prop-types": "off"
   }

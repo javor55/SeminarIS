@@ -26,7 +26,7 @@ export type EnrollmentRow = EnrollmentWindow & {
 // Funkce pro generování sloupců
 export function getEnrollmentColumns(opts: {
   currentUser: User | null;
-  onEdit: (_: EnrollmentRow) => void;
+  onEdit: (row: EnrollmentRow) => void;
 }): ColumnDef<EnrollmentRow>[] {
   const { currentUser, onEdit } = opts;
 

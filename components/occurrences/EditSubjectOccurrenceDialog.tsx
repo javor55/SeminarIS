@@ -40,10 +40,10 @@ export function EditSubjectOccurrenceDialog({
 }: {
   open?: boolean;
   occurrence: SubjectOccurrence & { enrollments?: StudentEnrollment[] };
-  onOpenChange: (open: boolean) => void;
-  onSubmit?: (data: SubjectOccurrence) => void;
-  onDelete?: (id: string) => void;
-  onShowStudents?: (id: string) => void;
+  onOpenChange: (_: boolean) => void;
+  onSubmit?: (_: SubjectOccurrence) => void;
+  onDelete?: (_: string) => void;
+  onShowStudents?: (_: string) => void;
 }) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [teachers, setTeachers] = useState<User[]>([]);

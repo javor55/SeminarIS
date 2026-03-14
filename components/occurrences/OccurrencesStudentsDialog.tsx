@@ -41,7 +41,7 @@ export function OccurrencesStudentsDialog({
 }: {
   occurrence: OccurrenceForDialog;
   currentUser: User;
-  onOpenChange: (_: boolean) => void;
+  onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
 
