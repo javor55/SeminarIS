@@ -102,6 +102,7 @@ export default async function SubjectDetailPage({
             searchText,
             isFull,
             enrolledByMe,
+            isWindowOpen: ew.status === "OPEN",
           } as unknown as OccurrenceRow;
         })
     )

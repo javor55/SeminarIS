@@ -114,7 +114,11 @@ export function SubjectDetailClientView({
     }
 
     try {
-      await enrollStudent(currentUser.id, occ.id);
+      const res = await enrollStudent(currentUser.id, occ.id);
+      if (res && res.error) {
+        toast.error(res.error);
+        return;
+      }
       toast.success("Zápis byl úspěšně proveden.");
       router.refresh();
     } catch (err: unknown) {
@@ -130,7 +134,11 @@ export function SubjectDetailClientView({
     if (!enr) return;
 
     try {
-      await unenrollStudent(enr.id);
+      const res = await unenrollStudent(enr.id);
+      if (res && res.error) {
+        toast.error(res.error);
+        return;
+      }
       toast.success("Odhlášení bylo úspěšně provedeno.");
       router.refresh();
     } catch (err: unknown) {
@@ -327,8 +335,18 @@ export function SubjectDetailClientView({
                 onClick={async () => {
                   try {
                     const inBlock = findMyEnrollmentInBlock((switchEnroll.occurrence.block as unknown as { occurrences?: SubjectOccurrenceWithRelations[] })?.occurrences);
-                    if (inBlock) await unenrollStudent(inBlock.enrollmentId);
-                    await enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
+                    if (inBlock) {
+                      const unRes = await unenrollStudent(inBlock.enrollmentId);
+                      if (unRes && unRes.error) {
+                         toast.error(unRes.error);
+                         return;
+                      }
+                    }
+                    const enRes = await enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
+                    if (enRes && enRes.error) {
+                      toast.error(enRes.error);
+                      return;
+                    }
                     toast.success("Zápis byl úspěšně přepsán.");
                     router.refresh();
                   } catch (err: unknown) {

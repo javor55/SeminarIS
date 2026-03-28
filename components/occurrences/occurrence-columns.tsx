@@ -34,6 +34,7 @@ export type OccurrenceRow = SubjectOccurrence & {
   isFull?: boolean;
   enrolledByMe?: boolean;
   enrollments?: StudentEnrollment[];
+  isWindowOpen?: boolean;
 };
 
 // props pro generování sloupců
@@ -166,6 +167,7 @@ export function getOccurrenceColumns(opts: {
                   <Button
                     size="sm"
                     variant="destructive"
+                    disabled={occ.isWindowOpen === false}
                     onClick={() => onUnenroll(occ)}
                   >
                     Odepsat
@@ -176,7 +178,7 @@ export function getOccurrenceColumns(opts: {
                   <Button
                     size="sm"
                     variant="default"
-                    disabled={isFull}
+                    disabled={isFull || occ.isWindowOpen === false}
                     onClick={() => onEnroll(occ)}
                   >
                     Zapsat

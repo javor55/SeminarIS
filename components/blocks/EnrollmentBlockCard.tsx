@@ -38,12 +38,14 @@ export function EnrollmentBlockCard({
   index,
   total,
   currentUser,
+  isWindowOpen = true,
 }: {
   block: BlockWithOccurrences;
   allBlocks: BlockWithOccurrences[];
   index: number;
   total: number;
   currentUser: User;
+  isWindowOpen?: boolean;
 }) {
   const router = useRouter();
   const isAdmin = currentUser.role === "ADMIN"; 
@@ -130,7 +132,11 @@ export function EnrollmentBlockCard({
     }
 
     try {
-      await enrollStudent(currentUser.id, occId);
+      const res = await enrollStudent(currentUser.id, occId);
+      if (res && res.error) {
+        toast.error(res.error);
+        return;
+      }
       toast.success("Zápis byl úspěšně proveden.");
       router.refresh();
     } catch (err: unknown) {
@@ -154,7 +160,11 @@ export function EnrollmentBlockCard({
     );
     if (!enr) return;
     try {
-      await unenrollStudent(enr.id);
+      const res = await unenrollStudent(enr.id);
+      if (res && res.error) {
+        toast.error(res.error);
+        return;
+      }
       toast.success("Odhlášení bylo úspěšně provedeno.");
       router.refresh();
     } catch (err: unknown) {
@@ -212,6 +222,7 @@ export function EnrollmentBlockCard({
         searchText,
         isFull,
         enrolledByMe,
+        isWindowOpen,
       } as unknown as OccurrenceRow;
     });
   }, [block, currentUser.id, isStudent]);
@@ -371,8 +382,18 @@ export function EnrollmentBlockCard({
                 onClick={async () => {
                   try {
                     const my = findMyOccurrenceInThisBlock();
-                    if (my) await unenrollStudent(my.enrollmentId);
-                    await enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
+                    if (my) {
+                      const unRes = await unenrollStudent(my.enrollmentId);
+                      if (unRes && unRes.error) {
+                         toast.error(unRes.error);
+                         return;
+                      }
+                    }
+                    const enRes = await enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
+                    if (enRes && enRes.error) {
+                       toast.error(enRes.error);
+                       return;
+                    }
                     toast.success("Zápis byl úspěšně přepsán.");
                     router.refresh();
                   } catch (err: unknown) {

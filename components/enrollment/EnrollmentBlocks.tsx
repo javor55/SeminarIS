@@ -27,6 +27,7 @@ export function EnrollmentBlocks({
           index={index}
           total={enrollment.blocks.length}
           currentUser={currentUser}
+          isWindowOpen={enrollment.status === "OPEN"}
         />
       ))}
     </div>

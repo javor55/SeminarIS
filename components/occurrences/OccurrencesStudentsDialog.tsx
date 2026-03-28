@@ -131,7 +131,15 @@ export function OccurrencesStudentsDialog({
                           selectedStudentId,
                           occurrence.id
                         );
-                        setLocalEnrollments((prev) => [...prev, newEnr]);
+                        if (newEnr && 'error' in newEnr && newEnr.error) {
+                           toast.error(newEnr.error);
+                           return;
+                        }
+                        if (newEnr && 'data' in newEnr) {
+                           setLocalEnrollments((prev) => [...prev, newEnr.data]);
+                        } else {
+                           setLocalEnrollments((prev) => [...prev, newEnr as any]);
+                        }
                         setHasChanged(true);
                         toast.success("Student byl úspěšně zapsán.");
 
@@ -226,7 +234,11 @@ export function OccurrencesStudentsDialog({
                   const enrToDelete = toUnenroll;
                   if (!enrToDelete) return;
                   try {
-                    await unenrollStudent(enrToDelete);
+                    const unRes = await unenrollStudent(enrToDelete);
+                    if (unRes && unRes.error) {
+                      toast.error(unRes.error);
+                      return;
+                    }
                     toast.success("Student byl úspěšně odepsán.");
                     setLocalEnrollments((prev) =>
                       prev.filter((e) => e.id !== enrToDelete)

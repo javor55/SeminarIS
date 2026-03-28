@@ -619,157 +619,165 @@ export async function getEnrollmentDetails(windowId: string) {
 
 // === MUTACE (zapis) ===
 export async function enrollStudent(studentId: string, subjectOccurrenceId: string) {
-  const user = await requireAuth();
-  // Zamezit studentům zápis jiných studentů
-  if (user.role === "STUDENT" && user.id !== studentId) {
-    throw new Error("Unauthorized mapping");
-  }
-  // Hosté nemohou zapisovat
-  if (user.role === "GUEST") {
-    throw new Error("Guests cannot enroll");
-  }
-
-  // Celá logika zápisu v transakci – zamezení race condition při kontrole kapacity
-  const res = await prisma.$transaction(async (tx) => {
-    // Načteme cílový výskyt s kontextem
-    const targetOcc = await tx.subjectOccurrence.findUnique({
-      where: { id: subjectOccurrenceId },
-      include: {
-        subject: true,
-        block: {
-          include: { enrollmentWindow: true }
-        },
-        studentEnrollments: {
-          where: { deletedAt: null }
-        }
-      }
-    });
-
-    if (!targetOcc || targetOcc.deletedAt) throw new Error("Seminář nenalezen.");
-
-    // 1. Kontrola kapacity
-    if (targetOcc.capacity !== null && targetOcc.studentEnrollments.length >= targetOcc.capacity) {
-      throw new Error("Kapacita semináře je již naplněna.");
+  try {
+    const user = await requireAuth();
+    // Zamezit studentům zápis jiných studentů
+    if (user.role === "STUDENT" && user.id !== studentId) {
+      throw new Error("Unauthorized mapping");
+    }
+    // Hosté nemohou zapisovat
+    if (user.role === "GUEST") {
+      throw new Error("Guests cannot enroll");
     }
 
-    // 2. Kontrola, zda už není zapsán v tomto bloku
-    const alreadyInBlock = await tx.studentEnrollment.findFirst({
-      where: {
-        studentId,
-        deletedAt: null,
-        subjectOccurrence: {
-          blockId: targetOcc.blockId
-        }
-      }
-    });
-    if (alreadyInBlock) {
-      throw new Error("V tomto bloku již máte zapsaný jiný seminář. Nejdříve se odepište.");
-    }
-
-    // 3. Kontrola duplicity předmětu v rámci stejného okna (podle subject.code)
-    if (targetOcc.subject.code) {
-      const subjectCode = targetOcc.subject.code;
-      const sameSubjectInWindow = await tx.studentEnrollment.findFirst({
-        where: {
-          studentId,
-          deletedAt: null,
-          subjectOccurrence: {
-            block: {
-              enrollmentWindowId: targetOcc.block.enrollmentWindowId
-            },
-            subject: {
-              code: subjectCode
-            }
+    // Celá logika zápisu v transakci – zamezení race condition při kontrole kapacity
+    const res = await prisma.$transaction(async (tx) => {
+      // Načteme cílový výskyt s kontextem
+      const targetOcc = await tx.subjectOccurrence.findUnique({
+        where: { id: subjectOccurrenceId },
+        include: {
+          subject: true,
+          block: {
+            include: { enrollmentWindow: true }
+          },
+          studentEnrollments: {
+            where: { deletedAt: null }
           }
         }
       });
 
-      if (sameSubjectInWindow) {
-        throw new Error("Tento předmět již máte zapsaný v jiném bloku tohoto zápisu.");
+      if (!targetOcc || targetOcc.deletedAt) throw new Error("Seminář nenalezen.");
+
+      // 1. Kontrola kapacity
+      if (targetOcc.capacity !== null && targetOcc.studentEnrollments.length >= targetOcc.capacity) {
+        throw new Error("Kapacita semináře je již naplněna.");
       }
+
+      // 2. Kontrola, zda už není zapsán v tomto bloku
+      const alreadyInBlock = await tx.studentEnrollment.findFirst({
+        where: {
+          studentId,
+          deletedAt: null,
+          subjectOccurrence: {
+            blockId: targetOcc.blockId
+          }
+        }
+      });
+      if (alreadyInBlock) {
+        throw new Error("V tomto bloku již máte zapsaný jiný seminář. Nejdříve se odepište.");
+      }
+
+      // 3. Kontrola duplicity předmětu v rámci stejného okna (podle subject.code)
+      if (targetOcc.subject.code) {
+        const subjectCode = targetOcc.subject.code;
+        const sameSubjectInWindow = await tx.studentEnrollment.findFirst({
+          where: {
+            studentId,
+            deletedAt: null,
+            subjectOccurrence: {
+              block: {
+                enrollmentWindowId: targetOcc.block.enrollmentWindowId
+              },
+              subject: {
+                code: subjectCode
+              }
+            }
+          }
+        });
+
+        if (sameSubjectInWindow) {
+          throw new Error("Tento předmět již máte zapsaný v jiném bloku tohoto zápisu.");
+        }
+      }
+
+      // 4. Kontrola, zda je zápisové okno otevřené (pokud uživatel není ADMIN)
+      if (user.role !== "ADMIN") {
+        const ew = targetOcc.block.enrollmentWindow;
+        const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
+
+        // Lazy update: synchronizujeme stav v DB s reálným časem
+        await syncEnrollmentWindowStatus(ew);
+
+        if (computed.is === "closed") {
+          if (ew.status === "DRAFT") throw new Error("Zápis je momentálně v přípravě (Koncept).");
+          const now = new Date();
+          if (now > new Date(ew.endsAt)) throw new Error("Zápis již byl ukončen.");
+          throw new Error("Zápis není otevřen.");
+        }
+        if (computed.is === "planned") {
+          throw new Error("Zápis ještě nebyl zahájen.");
+        }
+      }
+
+      return await tx.studentEnrollment.create({
+        data: {
+          studentId,
+          subjectOccurrenceId,
+          createdById: user.id as string,
+        },
+      });
+    }, {
+      isolationLevel: 'Serializable',
+    });
+
+    revalidatePath("/", "layout");
+    return { success: true, data: res };
+  } catch (err: any) {
+    return { error: err.message || "Nepodařilo se provést zápis." };
+  }
+}
+
+
+export async function unenrollStudent(enrollmentId: string) {
+  try {
+    const user = await requireAuth();
+    const enrollment = await prisma.studentEnrollment.findUnique({
+      where: { id: enrollmentId },
+      include: {
+        subjectOccurrence: {
+          include: {
+            block: {
+              include: { enrollmentWindow: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!enrollment) return { error: "Zápis nenalezen." };
+    // Student může odepsat jen sebe, ADMIN/TEACHER kohokoliv
+    if (user.role === "STUDENT" && enrollment.studentId !== user.id) {
+      throw new Error("Unauthorized mapping");
+    }
+    // Hosté nemohou odepisovat
+    if (user.role === "GUEST") {
+      throw new Error("Guests cannot unenroll");
     }
 
-    // 4. Kontrola, zda je zápisové okno otevřené (pokud uživatel není ADMIN)
-    if (user.role !== "ADMIN") {
-      const ew = targetOcc.block.enrollmentWindow;
+    // Kontrola, zda je zápisové okno otevřené (pro studenty)
+    if (user.role === "STUDENT") {
+      const ew = enrollment.subjectOccurrence.block.enrollmentWindow;
       const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
 
       // Lazy update: synchronizujeme stav v DB s reálným časem
       await syncEnrollmentWindowStatus(ew);
 
       if (computed.is === "closed") {
-        if (ew.status === "DRAFT") throw new Error("Zápis je momentálně v přípravě (Koncept).");
-        const now = new Date();
-        if (now > new Date(ew.endsAt)) throw new Error("Zápis již byl ukončen.");
-        throw new Error("Zápis není otevřen.");
+        throw new Error("Zápis je uzavřen – odepsání již není možné.");
       }
       if (computed.is === "planned") {
         throw new Error("Zápis ještě nebyl zahájen.");
       }
     }
 
-    return await tx.studentEnrollment.create({
-      data: {
-        studentId,
-        subjectOccurrenceId,
-        createdById: user.id as string,
-      },
+    const res = await prisma.studentEnrollment.delete({
+      where: { id: enrollmentId },
     });
-  }, {
-    isolationLevel: 'Serializable',
-  });
-
-  revalidatePath("/", "layout");
-  return res;
-}
-
-
-export async function unenrollStudent(enrollmentId: string) {
-  const user = await requireAuth();
-  const enrollment = await prisma.studentEnrollment.findUnique({
-    where: { id: enrollmentId },
-    include: {
-      subjectOccurrence: {
-        include: {
-          block: {
-            include: { enrollmentWindow: true }
-          }
-        }
-      }
-    }
-  });
-
-  if (!enrollment) return;
-  // Student může odepsat jen sebe, ADMIN/TEACHER kohokoliv
-  if (user.role === "STUDENT" && enrollment.studentId !== user.id) {
-    throw new Error("Unauthorized mapping");
+    revalidatePath("/", "layout");
+    return { success: true, data: res };
+  } catch (err: any) {
+    return { error: err.message || "Nepodařilo se zrušit zápis." };
   }
-  // Hosté nemohou odepisovat
-  if (user.role === "GUEST") {
-    throw new Error("Guests cannot unenroll");
-  }
-
-  // Kontrola, zda je zápisové okno otevřené (pro studenty)
-  if (user.role === "STUDENT") {
-    const ew = enrollment.subjectOccurrence.block.enrollmentWindow;
-    const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
-
-    // Lazy update: synchronizujeme stav v DB s reálným časem
-    await syncEnrollmentWindowStatus(ew);
-
-    if (computed.is === "closed") {
-      throw new Error("Zápis je uzavřen – odepsání již není možné.");
-    }
-    if (computed.is === "planned") {
-      throw new Error("Zápis ještě nebyl zahájen.");
-    }
-  }
-
-  const res = await prisma.studentEnrollment.delete({
-    where: { id: enrollmentId },
-  });
-  revalidatePath("/", "layout");
-  return res;
 }
 
 
