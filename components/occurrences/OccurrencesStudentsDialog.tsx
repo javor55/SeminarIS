@@ -138,7 +138,7 @@ export function OccurrencesStudentsDialog({
                         if (newEnr && 'data' in newEnr) {
                            setLocalEnrollments((prev) => [...prev, newEnr.data]);
                         } else {
-                           setLocalEnrollments((prev) => [...prev, newEnr as any]);
+                           setLocalEnrollments((prev) => [...prev, newEnr as unknown as StudentEnrollment]);
                         }
                         setHasChanged(true);
                         toast.success("Student byl úspěšně zapsán.");

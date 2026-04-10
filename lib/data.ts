@@ -722,8 +722,9 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
 
     revalidatePath("/", "layout");
     return { success: true, data: res };
-  } catch (err: any) {
-    return { error: err.message || "Nepodařilo se provést zápis." };
+  } catch (err: unknown) {
+    const error = err as Error;
+    return { error: error.message || "Nepodařilo se provést zápis." };
   }
 }
 
@@ -775,8 +776,9 @@ export async function unenrollStudent(enrollmentId: string) {
     });
     revalidatePath("/", "layout");
     return { success: true, data: res };
-  } catch (err: any) {
-    return { error: err.message || "Nepodařilo se zrušit zápis." };
+  } catch (err: unknown) {
+    const error = err as Error;
+    return { error: error.message || "Nepodařilo se zrušit zápis." };
   }
 }
 
