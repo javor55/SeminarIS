@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -d /c/Projekty/zapis/SeminarIS/*/)"
+    ]
+  }
+}
