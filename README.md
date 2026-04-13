@@ -700,19 +700,38 @@ Komponenta je dostupná **pouze pro roli ADMIN** – jak middleware (`/admin/*`)
 
 ## 9. Tým, kompetence, strávená doba
 
-| Jméno | Role | Kompetence | Odhadovaná doba |
-|-------|------|------------|-----------------|
-| `Michal Novotný` | Full-stack developer / vedoucí projektu | Next.js, TypeScript, Prisma, PostgreSQL, NextAuth, UI/UX | `[DOPLNIT]` |
-| `Jan Drozd` | Tester | Testování funkčnosti webové aplikace/tvorba dokumentace | 10 hodin |
-| `Tichý Jaroslav` | Architekt? | |  |
-| `Lucie Tesařová` | Tvorba dokumentace? |  | |
+**Organizace týmu a spolupráce:**
+Nedílnou součástí celého vývoje byly pravidelné konzultace přes Discord. Tým fungoval tak, že **Lucie Tesařová** působila v roli hlavního „zákazníka“ ze samotné praxe – coby učitelka ze školy, pro niž se plánuje reálné nasazení celého systému – a dodávala klíčové požadavky. Ostatní členové týmu si rozdělili práce na debatách o architektuře, důkladném testování webové aplikace a samotném programování. Úlohou programátora bylo získané požadavky implementovat do funkčního kódu, přičemž mu v tomto procesu výrazně asistovala umělá inteligence – zkrátka a dobře, „bičoval AI až do zdárného konce“.
 
 ### Časový rozsah práce na projektu
 
 | Milestone | Datum |
 |-----------|-------|
 | První commit | 9. 11. 2025 |
-| Poslední commit | 10. 4. 2026 |
+| Poslední commit | 13. 4. 2026 |
+
+**Metodika odhadu času (z Git historie):**
+
+Z časových značek jednotlivých commitů lze zhruba odhadnout čistý čas strávený na samotném vývoji. Byl použit script pro extrapolaci dat z `git log` s následujícím výpočtem:
+1. Nastavení sekvence: Všechny commity z gitu jsou seřazeny chronologicky.
+2. Definice pracovního bloku (session): Pokud je časový rozestup mezi dvěma po sobě jdoucími commity menší než 2 hodiny, považují se tyto záznamy za součást jednoho spojitého pracovního bloku.
+3. Výpočet času bloku: Délka pracovního bloku je spočítána jako rozdíl času mezi jeho posledním a prvním commitem.
+4. Fixní příplatek za úvodní činnost: Ke každému izolovanému commitu či pracovnímu bloku je přičtena fixní 1 hodina (60 minut). Tento čas reprezentuje přípravu, návrh a rešerši úkolu před vytvořením prvního commitu daného bloku.
+5. Celkové shrnutí: Celkový čas projektu je postupným součtem časů za všechny takovéto pracovní bloky.
+
+**Výsledek kalkulace:**
+
+- **Celkový počet commitů:** 66
+- **Počet detekovaných pracovních bloků:** 24
+- **Odhadovaný strávený čas:** ~36,5 hodin
+
+**Vliv umělé inteligence na časový rozsah:**
+
+Celý vývoj aplikace probíhal s extrémní podporou moderních AI asistentů, primárně nástrojů **Antigravity** (poháněný Google Gemini) a **Claude Code** (od Anthropic). Tyto nástroje se podílely jak na počáteční architektuře a návrhu databázových modelů, tak i na generování převážné části kódové základny, odstraňování chyb (debugging) a strukturování této finální dokumentace.
+
+Bez intenzivního využití umělé inteligence by klasický manuální vývoj – zahrnující hlubší ruční studium dokumentací (Next.js App Router, Prisma, TypeScript), řešení dílčích implementačních problémů a návrh uživatelského rozhraní – trval orientačně **3x až 4x déle**.
+
+Očekávaný odhad pro tradiční manuální vývoj podobně komplexní a robustní aplikace tohoto rozsahu by činil zhruba **110 až 140 hodin** namísto výsledných necelých 37 hodin.
 
 ## 10. Závěr
 
