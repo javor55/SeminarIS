@@ -1,15 +1,11 @@
 # Dokumentace projektu — Systém zápisu seminářů
 
-**Název projektu:** SeminarIS — Online systém zápisu seminářů  
-**Číslo skupiny:** `[DOPLNIT]`  
-**Repozitář:** `[DOPLNIT]`  
-**Nasazená verze:** `[DOPLNIT]`
-
----
-
 ## 1. Úvod
 
-SeminarIS je webová aplikace určená k organizaci a online správě zápisu volitelných seminářů na střední škole. Nahrazuje papírové formuláře a ruční administrativní procesy digitálním řešením dostupným z libovolného zařízení s webovým prohlížečem.
+**Název projektu:** SeminarIS — Online systém pro zápisy seminářů  
+**Číslo skupiny:** `8 (Drozd Jan, Tichý Jaroslav, Tesařová Lucie, Michal Novotný)`  
+
+SeminarIS je webová aplikace pro správu zápisu seminářů, kdy si studenti musí zvolit volitelné předměty do dalšího ročníku. Doteď se používaly různé webové nástroje, které ale nebyly ideální.
 
 Aplikace je postavena na frameworku **Next.js 14** (App Router, Server Actions, React Server Components), databázovou vrstvu tvoří **PostgreSQL** přes **Prisma ORM 6**, autentizace běží na **NextAuth.js v4** s JWT session strategií. Systém je nasazen na platformě **Vercel**.
 
@@ -19,26 +15,35 @@ Aplikace je postavena na frameworku **Next.js 14** (App Router, Server Actions, 
 
 ### Co aplikace řeší
 
-Školy tradičně organizují zápis do volitelných předmětů/seminářů pomocí papírových formulářů nebo sdílených tabulek. Tento přístup je náchylný na chyby, obtížně koordinovatelný v reálném čase a kapacitní limity jsou těžko vymahatelné. SeminarIS tento proces plně digitalizuje — od administrátorské přípravy zápisových oken až po vlastní zápis studenta s okamžitou kontrolou kapacity.
+Tento systém vznikl jako jednoduchý, přehledný a interaktivní nástroj pro organizaci školních seminářů a zápisů studentů. Je navržen tak, aby pokryl klíčové potřeby školy, ale zároveň zůstal dostatečně lehký a intuitivní.
 
-### Pro koho je určena
+Cílem systému je vytvořit jednotné místo, kde:
+- studenti mohou snadno vybírat semináře podle svých preferencí
+- u dostupných předmětů se může podívat na dertaily
+- učitelé mají přehled o svých skupinách a mohou vidět zapsané studenty,
+- administrátoři mohou spravovat předměty, bloky, zápisová období a uživatele,
+- celý proces zápisu je jasně strukturovaný, přehledný a transparentní.
 
-| Role | Popis |
+SeminarIS tak eliminuje nepřehlednou evidenci, zdlouhavou komunikaci e-mailem nebo tabulkovými procesory a přináší automatizaci a pořádek.
+
+### Pro koho je určena a role v systému
+
+Systém primárně navrhuje čtyři přístupové úrovně chráněné autentizací.
+
+| Role | Popis oprávnění |
 |------|-------|
-| **Student** | Zapisuje sám sebe do seminářů v rámci aktivního zápisového okna; vidí pouze okna s `visibleToStudents = true` a stavem ≠ DRAFT |
-| **Učitel (Teacher)** | Prohlíží zápisy a spravuje studenty, má přístup do sekce `/users`, může vytvářet a editovat předměty |
-| **Administrátor (Admin)** | Plná správa systému — předměty, zápisová okna, bloky, výskyty předmětů, uživatelé a globální nastavení |
-| **Host (Guest)** | Výchozí role po běžné registraci — může se přihlásit, ale nemůže se zapisovat do seminářů, dokud jej admin nepovýší |
+| **Student (`STUDENT`)** | Vidí dashboard s dostupnými zápisovými obdobími. V otevřených oknech (`OPEN`) se může zapisovat do seminářů nebo se odhlásit. Vidí obsazenost výskytů (např. 7/30). Může zobrazit detail předmětu a jeho syllabus. |
+| **Učitel (`TEACHER`)** | Má přístup do sekcí Předměty a Uživatelé (jen pro čtení). Může vytvářet a upravovat předměty. Vidí zápisy, obsazenost a seznamy zapsaných studentů, ale sám se do seminářů nezapisuje. Nemůže měnit stav uživatelů ani resetovat hesla. |
+| **Administrátor (`ADMIN`)** | Plná správa systému. Vytváří a upravuje předměty, bloky, výskyty i zápisová okna. Spravuje uživatele a přiděluje role (povyšuje GUEST na STUDENT/TEACHER), může vkládat studenty uživatelům ručně, provádět exporty dat z tabulek. |
+| **Host (`GUEST`)** | Výchozí role nově registrovaného uživatelů čekajícího na schválení. Vidí pouze přehled zápisů na dashboardu, nemůže se zapisovat ani upravovat data dokud mu admin nezmění roli. |
 
-### Klíčové požadavky
+### Klíčové požadavky a aplikační pravidla
 
-- Zápis probíhá v reálném čase s automatickým vymáháním kapacitních limitů přes serializovatelnou databázovou transakci
-- Zápisová okna mají definovaný časový rozsah; stav (SCHEDULED → OPEN → CLOSED) se automaticky synchronizuje s reálným časem
-- Semináře jsou organizovány do bloků — student si v každém bloku vybírá **právě jeden** seminář
-- Stejný předmět (identifikovaný podle `Subject.code`) nelze zapsat ve více blocích jednoho okna
-- Administrátorské rozhraní pro správu celého procesu (CRUD nad okny, bloky, výskyty, uživateli)
-- Hromadný import uživatelů (CSV/JSON) pro přidání celých tříd najednou
-- Sledování analytiky a výkonu aplikace (Google Analytics 4, Vercel Analytics, Speed Insights, vlastní diagnostika)
+- **Zápisy a jejich kontrola:** Zápis probíhá v reálném čase s automatickým vymáháním kapacitních limitů skrze serializovatelnou databázovou transakci pro zamezení race conditions. Úpravy zápisu či odhlášení obstarává student výhradně ve stavu okna `OPEN`.
+- **Pravidla bloků:** Výskyty předmětů jsou členěny do bloků. V rámci jednoho bloku může mít student **nejvýše jeden aktivní zápis** a stejný předmět (podle kódu) se nesmí vyskytovat na seznamu zapsaných předmětů jednoho studenta dvakrát na daném okně.
+- **Časová synchronizace:** Zápisová okna určuje přesný časový start i konec; stav (`SCHEDULED` → `OPEN` → `CLOSED`) přeskakuje podle reálného běhu času na serveru aplikaci automaticky, kde klient na to nemá vliv.
+- **Hromadné zpracování:** Import uživatelů (CSV/JSON), pro přidání celých tříd najednou a zpřístupnění exportů nad datovými sadami.
+- **Sledování výkonu & analytika:** O monitorování výkonu systému se stará Vercel Analytics spolu se Speed Insights, je integrován Google Analytics 4 a provádí i vlastní diagnostiku uvnitř platformy.
 
 ---
 
