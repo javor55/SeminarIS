@@ -1,6 +1,6 @@
-# Dokumentace projektu — Systém zápisu seminářů
+# Dokumentace projektu – Systém zápisu seminářů
 
-**Název projektu:** SeminarIS — Online systém zápisu seminářů  
+**Název projektu:** SeminarIS – Online systém zápisu seminářů  
 **Číslo skupiny:** `[DOPLNIT]`  
 **Repozitář:** `[DOPLNIT]`  
 **Nasazená verze:** `[DOPLNIT]`
@@ -19,7 +19,7 @@ Aplikace je postavena na frameworku **Next.js 14** (App Router, Server Actions, 
 
 ### Co aplikace řeší
 
-Školy tradičně organizují zápis do volitelných předmětů/seminářů pomocí papírových formulářů nebo sdílených tabulek. Tento přístup je náchylný na chyby, obtížně koordinovatelný v reálném čase a kapacitní limity jsou těžko vymahatelné. SeminarIS tento proces plně digitalizuje — od administrátorské přípravy zápisových oken až po vlastní zápis studenta s okamžitou kontrolou kapacity.
+Školy tradičně organizují zápis do volitelných předmětů/seminářů pomocí papírových formulářů nebo sdílených tabulek. Tento přístup je náchylný na chyby, obtížně koordinovatelný v reálném čase a kapacitní limity jsou těžko vymahatelné. SeminarIS tento proces plně digitalizuje – od administrátorské přípravy zápisových oken až po vlastní zápis studenta s okamžitou kontrolou kapacity.
 
 ### Pro koho je určena
 
@@ -27,14 +27,14 @@ Aplikace je postavena na frameworku **Next.js 14** (App Router, Server Actions, 
 |------|-------|
 | **Student** | Zapisuje sám sebe do seminářů v rámci aktivního zápisového okna; vidí pouze okna s `visibleToStudents = true` a stavem ≠ DRAFT |
 | **Učitel (Teacher)** | Prohlíží zápisy a spravuje studenty, má přístup do sekce `/users`, může vytvářet a editovat předměty |
-| **Administrátor (Admin)** | Plná správa systému — předměty, zápisová okna, bloky, výskyty předmětů, uživatelé a globální nastavení |
-| **Host (Guest)** | Výchozí role po běžné registraci — může se přihlásit, ale nemůže se zapisovat do seminářů, dokud jej admin nepovýší |
+| **Administrátor (Admin)** | Plná správa systému – předměty, zápisová okna, bloky, výskyty předmětů, uživatelé a globální nastavení |
+| **Host (Guest)** | Výchozí role po běžné registraci – může se přihlásit, ale nemůže se zapisovat do seminářů, dokud jej admin nepovýší |
 
 ### Klíčové požadavky
 
 - Zápis probíhá v reálném čase s automatickým vymáháním kapacitních limitů přes serializovatelnou databázovou transakci
 - Zápisová okna mají definovaný časový rozsah; stav (SCHEDULED → OPEN → CLOSED) se automaticky synchronizuje s reálným časem
-- Semináře jsou organizovány do bloků — student si v každém bloku vybírá **právě jeden** seminář
+- Semináře jsou organizovány do bloků – student si v každém bloku vybírá **právě jeden** seminář
 - Stejný předmět (identifikovaný podle `Subject.code`) nelze zapsat ve více blocích jednoho okna
 - Administrátorské rozhraní pro správu celého procesu (CRUD nad okny, bloky, výskyty, uživateli)
 - Hromadný import uživatelů (CSV/JSON) pro přidání celých tříd najednou
@@ -152,18 +152,18 @@ erDiagram
 | Entita | Popis |
 |--------|-------|
 | **User** | Uživatel systému s rolí (`GUEST`, `STUDENT`, `TEACHER`, `ADMIN`). Obsahuje přihlašovací údaje, `passwordHash` (bcrypt), stav účtu (`isActive`), časovou značku posledního přihlášení (`lastLoginAt`) a přiřazení k ročníku (`cohort`). Pole `email` má unikátní index. |
-| **Subject** | Šablona předmětu/semináře — název, kód, popis a `syllabus` (rich text, povinný). Příznak `isActive` umožňuje skrýt předmět bez jeho smazání. Konkrétní nabídka v zápisu je tvořena až skrze `SubjectOccurrence`. |
+| **Subject** | Šablona předmětu/semináře – název, kód, popis a `syllabus` (rich text, povinný). Příznak `isActive` umožňuje skrýt předmět bez jeho smazání. Konkrétní nabídka v zápisu je tvořena až skrze `SubjectOccurrence`. |
 | **EnrollmentWindow** | Zápisové okno definující časový rozsah a stav (`DRAFT`, `SCHEDULED`, `OPEN`, `CLOSED`). Příznak `visibleToStudents` řídí, zda okno student vidí. Smazání okna kaskádově smaže všechny jeho bloky (`onDelete: Cascade`). |
 | **Block** | Tematická skupina výskytů v rámci zápisového okna. Má numerický `order` a unikátní kombinaci `(enrollmentWindowId, order)` kvůli řazení. Podporuje měkké mazání (`deletedAt`). |
-| **SubjectOccurrence** | Konkrétní výskyt předmětu v bloku — obsahuje vyučujícího (`teacherId`), `capacity` (pokud je `null`, kapacita je neomezená) a dílčí kód (`subCode`). Podporuje měkké mazání. |
-| **StudentEnrollment** | Vazba mezi studentem a konkrétním výskytem předmětu. Zaznamenává historii zápisů; při měkkém smazání výskytu se kaskádově měkce smaže i zápis. Pole `createdBy` slouží jako audit — kdo zápis provedl (student sám nebo admin/učitel). |
+| **SubjectOccurrence** | Konkrétní výskyt předmětu v bloku – obsahuje vyučujícího (`teacherId`), `capacity` (pokud je `null`, kapacita je neomezená) a dílčí kód (`subCode`). Podporuje měkké mazání. |
+| **StudentEnrollment** | Vazba mezi studentem a konkrétním výskytem předmětu. Zaznamenává historii zápisů; při měkkém smazání výskytu se kaskádově měkce smaže i zápis. Pole `createdBy` slouží jako audit – kdo zápis provedl (student sám nebo admin/učitel). |
 | **SystemSetting** | Jednoduchý key-value store pro globální nastavení. Aktuálně používané klíče: `current_cohort` (výchozí ročník nových uživatelů) a `registration_enabled` (globální povolení samoregistrace). |
 
 ---
 
 ## 4. Use Cases
 
-### UC1 — Zápis studenta
+### UC1 – Zápis studenta
 
 ```mermaid
 sequenceDiagram
@@ -209,7 +209,7 @@ sequenceDiagram
 
 ---
 
-### UC2 — Administrace zápisového okna
+### UC2 – Administrace zápisového okna
 
 ```mermaid
 flowchart TD
@@ -253,13 +253,13 @@ Verze jsou převzaty z [package.json](../package.json). Zaměřeno na technologi
 | **Next.js** | ^14.2.33 | App Router, Server Actions (`"use server"`), API routes, RSC, middleware |
 | **React** | 18.3.1 | UI vrstva, React Server Components |
 | **TypeScript** | ^5.6.2 | Typová bezpečnost napříč kódem (`strict: false`) |
-| **Prisma** | ^6.19.0 | ORM — schéma, migrace, typově bezpečné dotazy, generátor klienta přes `postinstall` |
+| **Prisma** | ^6.19.0 | ORM – schéma, migrace, typově bezpečné dotazy, generátor klienta přes `postinstall` |
 | **@prisma/client** | ^6.19.0 | Runtime klient pro PostgreSQL, používán jako singleton v `lib/prisma.ts` |
-| **next-auth** | ^4.24.13 | Autentizace — Credentials Provider, JWT session, `withAuth` middleware |
+| **next-auth** | ^4.24.13 | Autentizace – Credentials Provider, JWT session, `withAuth` middleware |
 | **bcryptjs** | ^3.0.3 | Hashování hesel (10 rund salt), ověřování přes `bcrypt.compare` |
 | **@next/third-parties** | ^16.2.3 | Oficiální Google Analytics 4 integrace (`GoogleAnalytics` komponenta) |
-| **@vercel/analytics** | ^2.0.1 | Vercel Analytics — návštěvnost platformy |
-| **@vercel/speed-insights** | ^2.0.0 | Vercel Speed Insights — Core Web Vitals |
+| **@vercel/analytics** | ^2.0.1 | Vercel Analytics – návštěvnost platformy |
+| **@vercel/speed-insights** | ^2.0.0 | Vercel Speed Insights – Core Web Vitals |
 | **@tanstack/react-table** | ^8.21.3 | Datové tabulky pro přehledy zápisů a uživatelů |
 | **@tiptap/react + starter-kit** | ^3.10.4 | Rich text editor pro pole `Subject.syllabus` |
 | **date-fns** | ^4.1.0 | Manipulace s daty při kontrole časových oken |
@@ -274,20 +274,20 @@ Implementováno pomocí **NextAuth.js v4** s `CredentialsProvider` ([lib/auth.ts
 1. Uživatel odešle e-mail a heslo přes formulář na `/login`
 2. NextAuth zavolá `authorize()` callback → `prisma.user.findUnique({ where: { email: email.toLowerCase() } })` (e-mail je case-insensitive)
 3. Heslo se ověří přes `bcrypt.compare(raw, passwordHash)`
-4. Zkontroluje se `isActive` — při `false` je vyhozena chyba `"Tento účet byl deaktivován."`
+4. Zkontroluje se `isActive` – při `false` je vyhozena chyba `"Tento účet byl deaktivován."`
 5. Je vydán **JWT token** podepsaný `NEXTAUTH_SECRET` obsahující: `id`, `email`, `role`, `firstName`, `lastName`, `isActive`
 6. Callback `session` propaguje data z tokenu do `session.user` pro RSC i klient
 7. Event `signIn` aktualizuje pole `lastLoginAt` v databázi
-8. V konfiguraci je `pages.signIn = "/login"` — neautentizované requesty jsou přesměrovány tam
+8. V konfiguraci je `pages.signIn = "/login"` – neautentizované requesty jsou přesměrovány tam
 
-Session strategy je **JWT** (stateless), ne databázová — není tedy potřeba tabulka `Session` ani PrismaAdapter.
+Session strategy je **JWT** (stateless), ne databázová – není tedy potřeba tabulka `Session` ani PrismaAdapter.
 
 #### Autorizace a ochrana routes
 
 **Middleware** ([middleware.ts](../middleware.ts)) využívá `withAuth` z NextAuth. Callback `authorized: ({ token }) => !!token` vyžaduje platný JWT pro všechny cesty v `matcher`. Přísnější role-based přesměrování:
 
-- `/admin/*` — přístup pouze pro roli `ADMIN`
-- `/users/*` — přístup pouze pro `ADMIN` a `TEACHER`
+- `/admin/*` – přístup pouze pro roli `ADMIN`
+- `/users/*` – přístup pouze pro `ADMIN` a `TEACHER`
 
 Neautentizované requesty jsou automaticky přesměrovány na `/login` (dáno NextAuth konfigurací).
 
@@ -299,14 +299,14 @@ async function requireAdmin()      // Vyžaduje roli ADMIN
 async function requirePrivileged() // Vyžaduje ADMIN nebo TEACHER
 ```
 
-Tím je zajištěno, že i přímé volání Server Action (např. z jiného klienta nebo zkoušeného útočníkem) projde autorizační kontrolou — middleware je jen první vrstva.
+Tím je zajištěno, že i přímé volání Server Action (např. z jiného klienta nebo zkoušeného útočníkem) projde autorizační kontrolou – middleware je jen první vrstva.
 
 #### Ochrana citlivých operací
 
 - **Zápis studenta** (`enrollStudent`) probíhá v **serializovatelné databázové transakci** (`isolationLevel: "Serializable"`), což zabraňuje souběžnému překročení kapacity při simultánním zápisu více studentů.
-- **Zápis cizího studenta** — `STUDENT` nesmí zapsat jiného než sebe (`if (user.role === "STUDENT" && user.id !== studentId) throw`). `GUEST` nemá žádná práva zapisovat.
-- **Self-modification protection** — `updateUserRole` a `toggleUserActive` kontrolují, zda admin nemění sám sebe (shoda ID **i** e-mailu case-insensitive), aby nedošlo ke ztrátě přístupu systému.
-- **Kaskádové soft-delete** — `deleteSubjectOccurrence` v rámci transakce měkce smaže samotný výskyt a zároveň všechny aktivní studentské zápisy na něj, aby nezůstaly osiřelé.
+- **Zápis cizího studenta** – `STUDENT` nesmí zapsat jiného než sebe (`if (user.role === "STUDENT" && user.id !== studentId) throw`). `GUEST` nemá žádná práva zapisovat.
+- **Self-modification protection** – `updateUserRole` a `toggleUserActive` kontrolují, zda admin nemění sám sebe (shoda ID **i** e-mailu case-insensitive), aby nedošlo ke ztrátě přístupu systému.
+- **Kaskádové soft-delete** – `deleteSubjectOccurrence` v rámci transakce měkce smaže samotný výskyt a zároveň všechny aktivní studentské zápisy na něj, aby nezůstaly osiřelé.
 
 #### Validace vstupů
 
@@ -330,7 +330,7 @@ Tím je zajištěno, že i přímé volání Server Action (např. z jiného kli
 
 ## 6. Příklady implementace
 
-### 6.1 Middleware — ochrana routes a role-based přesměrování
+### 6.1 Middleware – ochrana routes a role-based přesměrování
 
 ```typescript
 // middleware.ts
@@ -342,12 +342,12 @@ export default withAuth(
     const token = req.nextauth.token;
     const pathname = req.nextUrl.pathname;
 
-    // /admin/* — přístup jen pro ADMIN, ostatní zpět na dashboard
+    // /admin/* – přístup jen pro ADMIN, ostatní zpět na dashboard
     if (pathname.startsWith("/admin") && token?.role !== "ADMIN") {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
-    // /users/* — přístup pro ADMIN i TEACHER (studenti nevidí seznam uživatelů)
+    // /users/* – přístup pro ADMIN i TEACHER (studenti nevidí seznam uživatelů)
     if (pathname.startsWith("/users") && token?.role !== "ADMIN" && token?.role !== "TEACHER") {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
@@ -362,7 +362,7 @@ export default withAuth(
   }
 );
 
-// Matcher definuje chráněné cesty — /login a /register zůstávají veřejné
+// Matcher definuje chráněné cesty – /login a /register zůstávají veřejné
 export const config = {
   matcher: [
     "/dashboard/:path*",
@@ -376,9 +376,9 @@ export const config = {
 };
 ```
 
-### 6.2 Server Action — zápis studenta se serializovatelnou transakcí
+### 6.2 Server Action – zápis studenta se serializovatelnou transakcí
 
-Jedná se o nejkritičtější kus byznys logiky — všechny kontroly musí proběhnout atomicky, aby nedošlo k překročení kapacity při souběžném zápisu.
+Jedná se o nejkritičtější kus byznys logiky – všechny kontroly musí proběhnout atomicky, aby nedošlo k překročení kapacity při souběžném zápisu.
 
 ```typescript
 // lib/data.ts (zkráceno pro přehlednost)
@@ -386,13 +386,13 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
   try {
     const user = await requireAuth();
 
-    // Role guard — student smí zapsat jen sebe, host nikoho
+    // Role guard – student smí zapsat jen sebe, host nikoho
     if (user.role === "STUDENT" && user.id !== studentId) throw new Error("Unauthorized mapping");
     if (user.role === "GUEST") throw new Error("Guests cannot enroll");
 
     // Celá logika zápisu probíhá v Serializable transakci, protože všechny
     // kontroly (kapacita, duplicita v bloku, duplicita subject.code v okně)
-    // musí vidět konzistentní snapshot DB — jinak hrozí race condition.
+    // musí vidět konzistentní snapshot DB – jinak hrozí race condition.
     const res = await prisma.$transaction(async (tx) => {
       const targetOcc = await tx.subjectOccurrence.findUnique({
         where: { id: subjectOccurrenceId },
@@ -405,7 +405,7 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
 
       if (!targetOcc || targetOcc.deletedAt) throw new Error("Seminář nenalezen.");
 
-      // 1. Kapacita — null znamená neomezená
+      // 1. Kapacita – null znamená neomezená
       if (targetOcc.capacity !== null && targetOcc.studentEnrollments.length >= targetOcc.capacity) {
         throw new Error("Kapacita semináře je již naplněna.");
       }
@@ -436,7 +436,7 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
         }
       }
 
-      // 4. Okno musí být reálně otevřené — ADMIN má bypass (může zapsat i mimo čas)
+      // 4. Okno musí být reálně otevřené – ADMIN má bypass (může zapsat i mimo čas)
       if (user.role !== "ADMIN") {
         const ew = targetOcc.block.enrollmentWindow;
         const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
@@ -464,9 +464,9 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
 }
 ```
 
-### 6.3 API Route — registrace uživatele
+### 6.3 API Route – registrace uživatele
 
-Jediná „klasická" API route v projektu — zbytek mutací je řešen přes Server Actions. Route řeší edge case prvního uživatele (stane se automaticky adminem) a globální vypnutí registrace.
+Jediná „klasická" API route v projektu – zbytek mutací je řešen přes Server Actions. Route řeší edge case prvního uživatele (stane se automaticky adminem) a globální vypnutí registrace.
 
 ```typescript
 // app/api/auth/register/route.ts
@@ -480,7 +480,7 @@ export async function POST(req: Request) {
     const userCount = await prisma.user.count();
     const isFirstUser = userCount === 0;
 
-    // Registrace může být vypnuta v SystemSetting — první uživatel má výjimku,
+    // Registrace může být vypnuta v SystemSetting – první uživatel má výjimku,
     // aby bylo možné bootstrapnout systém bez zásahu do DB.
     const regEnabled = await isRegistrationEnabled();
     if (!regEnabled && !isFirstUser) {
@@ -537,7 +537,7 @@ export async function POST(req: Request) {
 
 ### 6.4 Lazy synchronizace stavu zápisového okna
 
-Místo pevně naplánovaného CRON jobu se stav okna aktualizuje „líně" (lazy) — vždy, když nějaký request přistoupí k oknu. Tím se vyhneme závislosti na externím scheduleru, ale cenou je nepatrné zpoždění přechodu stavů (probíhá až při prvním requestu po změně času).
+Místo pevně naplánovaného CRON jobu se stav okna aktualizuje „líně" (lazy) – vždy, když nějaký request přistoupí k oknu. Tím se vyhneme závislosti na externím scheduleru, ale cenou je nepatrné zpoždění přechodu stavů (probíhá až při prvním requestu po změně času).
 
 ```typescript
 // lib/data.ts
@@ -567,14 +567,14 @@ async function syncEnrollmentWindowStatus(ew: {
   return ew.status;
 }
 
-// Použití — všechna viditelná okna se synchronizují paralelně v jednom Promise.all
+// Použití – všechna viditelná okna se synchronizují paralelně v jednom Promise.all
 export async function getEnrollmentWindowsVisible() {
   const windows = await prisma.enrollmentWindow.findMany({
     where: { visibleToStudents: true, status: { not: "DRAFT" } },
     orderBy: { startsAt: "desc" },
   });
 
-  // Paralelní sync přes Promise.all — ne sekvenčně, což by u N oken znamenalo N*latencyDB
+  // Paralelní sync přes Promise.all – ne sekvenčně, což by u N oken znamenalo N*latencyDB
   const syncResults = await Promise.all(
     windows.map(async (ew) => {
       const newStatus = await syncEnrollmentWindowStatus(ew);
@@ -611,7 +611,7 @@ Tabulky testovacích scénářů jsou určeny pro testera z cílové školy (uč
 | S11 | Zápis do již ukončeného okna | 1. Nastavit okno tak, aby `endsAt` bylo v minulosti<br>2. Pokusit se zapsat | Stav se automaticky sesynchronizuje na CLOSED, chybová zpráva „Zápis již byl ukončen." | | |
 | S12 | Odhlášení ze semináře | 1. Kliknout „Odepsat se" u zapsaného semináře | Toast o úspěšném odhlášení, tlačítko se vrátí na „Zapsat se", uvolní se 1 místo | | |
 | S13 | Odhlášení po skončení okna | 1. Čekat, až je `endsAt < now` (okno CLOSED)<br>2. Pokusit se odhlásit ze semináře | Chybová zpráva „Zápis je uzavřen – odepsání již není možné." | | |
-| S14 | Host (GUEST) se pokouší zapsat | 1. Přihlásit se jako čerstvě registrovaný uživatel s rolí GUEST<br>2. Otevřít dashboard<br>3. Pokusit se zapsat do semináře | Chybová zpráva „Guests cannot enroll" — host nemůže zapisovat, dokud mu admin nepřidělí roli STUDENT | | |
+| S14 | Host (GUEST) se pokouší zapsat | 1. Přihlásit se jako čerstvě registrovaný uživatel s rolí GUEST<br>2. Otevřít dashboard<br>3. Pokusit se zapsat do semináře | Chybová zpráva „Guests cannot enroll" – host nemůže zapisovat, dokud mu admin nepřidělí roli STUDENT | | |
 | S15 | Pokus o přístup do admin sekce | 1. Jako student otevřít `/admin` | Middleware přesměruje na `/dashboard`, admin sekce se nezobrazí | | |
 | S16 | Odhlášení z aplikace | 1. Kliknout na jméno v navigaci<br>2. Kliknout „Odhlásit se" | Přesměrování na `/login`, session zrušena, `/dashboard` už není přístupný | | |
 
@@ -662,7 +662,7 @@ Aplikace využívá čtyři vrstvy monitoringu. Všechny tři externí nástroje
 
 ### Vlastní performance monitoring (Admin Dashboard)
 
-Admin stránka `/admin` obsahuje komponentu [PerformanceBenchmarks](../components/admin/PerformanceBenchmarks.tsx) s názvem **Benchmark a Diagnostika**, která byla nasazena kvůli problémům s rychlostí pozorovaným během vývoje. Komponenta **neběží automaticky** — admin ji spouští tlačítkem „Spustit test". Při kliknutí:
+Admin stránka `/admin` obsahuje komponentu [PerformanceBenchmarks](../components/admin/PerformanceBenchmarks.tsx) s názvem **Benchmark a Diagnostika**, která byla nasazena kvůli problémům s rychlostí pozorovaným během vývoje. Komponenta **neběží automaticky** – admin ji spouští tlačítkem „Spustit test". Při kliknutí:
 
 1. Klient si zapamatuje čas startu (`clientStartTime`)
 2. Zavolá Server Action `runSystemDiagnostics()` (viz [lib/data.ts](../lib/data.ts#L1079))
@@ -672,20 +672,20 @@ Admin stránka `/admin` obsahuje komponentu [PerformanceBenchmarks](../component
 
 **Co komponenta zobrazuje:**
 
-- **Odezva serveru (Ping)** — klient-side RTT v ms
-- **Latence databáze** — čas jednoho `prisma.user.count()` dotazu
-- **Ověření relace (Session)** — čas potřebný k dopsání session kontroly na serveru
-- **Konfigurace proměnných** — barevné badge pro každou klíčovou env proměnnou
-- **Typ požadavku** — „Studený start" (Cold) vs „Teplý start" (Warm) podle `isColdStart` modulové flagu
-- **Čas serveru** — ISO timestamp pro porovnání se zónou klienta
-- **Vercel Speed Insights** — indikátor přítomnosti SPEED_INSIGHTS env proměnné
+- **Odezva serveru (Ping)** – klient-side RTT v ms
+- **Latence databáze** – čas jednoho `prisma.user.count()` dotazu
+- **Ověření relace (Session)** – čas potřebný k dopsání session kontroly na serveru
+- **Konfigurace proměnných** – barevné badge pro každou klíčovou env proměnnou
+- **Typ požadavku** – „Studený start" (Cold) vs „Teplý start" (Warm) podle `isColdStart` modulové flagu
+- **Čas serveru** – ISO timestamp pro porovnání se zónou klienta
+- **Vercel Speed Insights** – indikátor přítomnosti SPEED_INSIGHTS env proměnné
 
 **Barevná škála latence** (funkce `getLatencyColor`):
 - Zelená (`text-emerald-500`): < 100 ms (optimální)
 - Oranžová (`text-orange-500`): 100–300 ms (přijatelné)
 - Červená (`text-destructive`): ≥ 300 ms (pomalé)
 
-Komponenta je dostupná **pouze pro roli ADMIN** — jak middleware (`/admin/*`), tak `runSystemDiagnostics()` uvnitř volá `requireAdmin()`.
+Komponenta je dostupná **pouze pro roli ADMIN** – jak middleware (`/admin/*`), tak `runSystemDiagnostics()` uvnitř volá `requireAdmin()`.
 
 ---
 
@@ -720,7 +720,7 @@ Výstup `git shortlog -sn --no-merges --all`:
 ### Co se podařilo implementovat
 
 - Kompletní autentizační a autorizační systém (4 role, JWT session, middleware + server-side role guards)
-- Plná správa zápisových oken — vytvoření, bloky s řazením, výskyty předmětů, kapacity, soft-delete
+- Plná správa zápisových oken – vytvoření, bloky s řazením, výskyty předmětů, kapacity, soft-delete
 - Studentský dashboard s real-time zobrazením aktivního zápisového okna
 - Transakčně bezpečný mechanismus zápisu (Serializable izolace, 4 byznys kontroly v jedné transakci)
 - Automatická lazy synchronizace stavu zápisového okna podle reálného času bez závislosti na CRON
@@ -737,9 +737,9 @@ Výstup `git shortlog -sn --no-merges --all`:
 
 ### Další příležitosti a možná vylepšení
 
-1. **E-mailové notifikace** — zasílání potvrzení zápisu studentům a upozornění adminům při naplnění kapacity (chybí jakákoliv e-mailová integrace)
-2. **CRON-based synchronizace stavu** — nahradit lazy update pevným CRON jobem (Vercel Cron Jobs) pro přesnější přepínání stavu OPEN/CLOSED bez závislosti na příchozím requestu
-3. **Audit log** — zobrazitelná historie změn v administrátorském rozhraní (data jsou sice ukládána přes `createdBy`/`updatedBy`, ale UI pro jejich prohlížení chybí)
+1. **E-mailové notifikace** – zasílání potvrzení zápisu studentům a upozornění adminům při naplnění kapacity (chybí jakákoliv e-mailová integrace)
+2. **CRON-based synchronizace stavu** – nahradit lazy update pevným CRON jobem (Vercel Cron Jobs) pro přesnější přepínání stavu OPEN/CLOSED bez závislosti na příchozím requestu
+3. **Audit log** – zobrazitelná historie změn v administrátorském rozhraní (data jsou sice ukládána přes `createdBy`/`updatedBy`, ale UI pro jejich prohlížení chybí)
 
 ---
 
