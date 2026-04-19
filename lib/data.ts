@@ -1093,7 +1093,7 @@ export async function runSystemDiagnostics() {
     DATABASE_URL: !!process.env.DATABASE_URL,
     NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: !!process.env.NEXTAUTH_URL,
-    VERCEL_SPEED_INSIGHTS: !!process.env.VERCEL_SPEED_INSIGHTS_ID || !!process.env.NEXT_PUBLIC_VERCEL_SPEED_INSIGHTS_ID,
+    VERCEL_SPEED_INSIGHTS: !!process.env.VERCEL || !!process.env.VERCEL_SPEED_INSIGHTS_ID || !!process.env.NEXT_PUBLIC_VERCEL_SPEED_INSIGHTS_ID,
   };
 
   const wasColdStart = isColdStart;

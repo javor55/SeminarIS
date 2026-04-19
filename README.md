@@ -601,7 +601,11 @@ export async function getEnrollmentWindowsVisible() {
 
 ## 7. Testování (uživatelské)
 
-Tabulky testovacích scénářů jsou určeny pro testera z cílové školy (učitel). Sloupce **Skutečný výsledek** a **OK/NOK** prosím doplňte při testování. Scénáře jsou seřazeny od základního flow k edge cases.
+Vedle systematického testování podle níže uvedených scénářů proběhla také reálná prezentace systému přímo na cílové škole, kde se plánuje jeho ostré nasazení. Výsledek tohoto představení hodnotíme jako velmi úspěšný. Jelikož projekt původně vznikal bez striktního formálního zadání, byly mnohé funkcionality z naší strany implementovány proaktivně, a to na základě předpokládaných potřeb z praxe. Během schůzky a testování se zástupcem ředitele byla oceněna především celková uživatelská přívětivost systému. Velkým pozitivem se ukázal i dedikovaný přístup pro běžné učitele – tímto krokem se administrativní zátěž chytře rozdistribuuje mezi celý učitelský sbor, což výrazně uleví hlavnímu správci aplikace.
+
+Zajímavým zjištěním bylo také to, že oproti minulému školnímu roku došlo ke změně pravidel v organizaci seminářů a výskyty již nebudou mít pevně danou kapacitní hranici (všechny budou dostupné bez omezení). Jelikož je ale systém v tomto ohledu plně flexibilní, byl na tento případ od počátku zcela připraven. Dále, s ohledem na nutnost plánování samotných rozvrhů v externích nástrojích školy, byla pozitivně přijata možnost flexibilních exportů. Uživatelská data či matice zápisů totiž lze exportovat do CSV téměř odkudkoliv a v mnoha různých pohledech.
+
+Tabulky s testovacími scénáři jsou primárně určeny pro finálního testera z cílové školy. Sloupce **Skutečný výsledek** a **OK/NOK** přímo odrážejí ověření funkčnosti jednotlivých kroků. 
 
 ### 7.1 Studentský zápis
 
@@ -652,56 +656,39 @@ Tabulky testovacích scénářů jsou určeny pro testera z cílové školy (uč
 
 ## 8. Monitoring
 
-Aplikace využívá čtyři vrstvy monitoringu. Všechny tři externí nástroje jsou integrovány v root layoutu [app/layout.tsx](../app/layout.tsx).
+Aplikace využívá čtyři vrstvy monitoringu, které jsou smysluplně rozděleny na dvě hlavní oblasti: sledování návštěvnosti a sledování výkonu (performance). Všechny externí nástroje jsou napojené přímo do root layoutu platformy ([app/layout.tsx](../app/layout.tsx)).
 
-### Google Analytics 4
-- **Integrace:** Komponenta `GoogleAnalytics` z `@next/third-parties/google` v root layoutu
-- **Tracking ID:** Konfigurováno přes proměnnou prostředí `NEXT_PUBLIC_GA_ID`
-- **Sleduje:** Návštěvy stránek, chování uživatelů, zdroje provozu
-- **Výsledky** budou doplněny po nasbírání dostatečného množství dat.
+### 8.1 Sledování návštěvnosti
 
-### Vercel Analytics
-- **Integrace:** Komponenta `<Analytics />` z `@vercel/analytics/next` v root layoutu
-- **Sleduje:** Unikátní návštěvy, stránky, konverze na úrovni Vercel platformy
-- **Výsledky** budou doplněny po nasbírání dostatečného množství dat.
+Tato sekce se zaměřuje na analytiku toho, jak uživatelé celkově pracují se systémem a z jakých zdrojů přicházejí. Vzhledem k tomu, že projekt běží pouze v raném testovacím nasazení a pro limitovaný počet testujících uživatelů, je ze statistiky návštěvnosti v této chvíli zatím nemožné vyčíst jakékoliv hlubší nebo smysluplné trendy.
 
-### Vercel Speed Insights
-- **Integrace:** Komponenta `<SpeedInsights />` z `@vercel/speed-insights/next` v root layoutu
-- **Sleduje:** Core Web Vitals (LCP, CLS, FID, TTFB, INP) v reálném produkčním provozu
+*   **Google Analytics 4**
+    *   **Integrace:** Využita moderní Next.js komponenta `GoogleAnalytics` z balíčku `@next/third-parties/google`.
+    *   **Konfigurace:** Identifikátor je udržován skrytě přes proměnnou prostředí `NEXT_PUBLIC_GA_ID`.
+    *   **Účel:** Detailní logování stránek, analýza chování klientů a celková uživatelská aktivita.
+*   **Vercel Analytics**
+    *   **Integrace:** Komponenta `<Analytics />` od stejnojmenného hostingu (`@vercel/analytics/next`).
+    *   **Účel:** Sledování unikátních návštěv u verze nasazené přímo přes infrastrukturu Vercelu.
 
-### Vlastní performance monitoring (Admin Dashboard)
+### 8.2 Performance monitoring (Sledování výkonu)
 
-Admin stránka `/admin` obsahuje komponentu [PerformanceBenchmarks](../components/admin/PerformanceBenchmarks.tsx) s názvem **Benchmark a Diagnostika**, která byla nasazena kvůli problémům s rychlostí pozorovaným během vývoje. Komponenta **neběží automaticky** – admin ji spouští tlačítkem „Spustit test". Při kliknutí:
+Oba uvedené nástroje určené pro sledování výkonnosti byly pro projekt masivním přínosem již v ranné fázi. Odhalily totiž kritické dopady na rychlost a latenci – díky těmto číslům jednak došlo k přepsání částí kódu back-endu, a kromě toho se včas přišlo na zásadní problém u databázového a hostingového serveru, který byl v původním nastavení nasměrovaný na americké datacentrum (což mělo za následek nemalé zpoždění při dotazech). Osobní zobrazení latence je navíc dokonalé pro ukázku tvz. *studeného startu (cold start)*, jímž bezplatné servery Vercelu trpí, protože kvůli šetření prostředků po čase nečinnosti backend aplikaci uspí.
 
-1. Klient si zapamatuje čas startu (`clientStartTime`)
-2. Zavolá Server Action `runSystemDiagnostics()` (viz [lib/data.ts](../lib/data.ts#L1079))
-3. Server změří `dbLatency` přes `prisma.user.count()` a `sessionCheckLatency` od startu requestu
-4. Server vrátí envHealth objekt (`DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `VERCEL_SPEED_INSIGHTS`), `isFirstRequest` (cold start detekce přes modulovou proměnnou), serverTime a userRole
-5. Klient dopočítá **RTT** (round-trip time) = `Date.now() - clientStartTime`
+*   **Vercel Speed Insights**
+    *   **Integrace:** Komponenta `<SpeedInsights />` z `@vercel/speed-insights/next`.
+    *   **Účel:** Sledování klíčových parametrů zvaných Core Web Vitals (LCP, CLS, FID atd.) v reálném produkčním provozu.
 
-**Co komponenta zobrazuje:**
-
-- **Odezva serveru (Ping)** – klient-side RTT v ms
-- **Latence databáze** – čas jednoho `prisma.user.count()` dotazu
-- **Ověření relace (Session)** – čas potřebný k dopsání session kontroly na serveru
-- **Konfigurace proměnných** – barevné badge pro každou klíčovou env proměnnou
-- **Typ požadavku** – „Studený start" (Cold) vs „Teplý start" (Warm) podle `isColdStart` modulové flagu
-- **Čas serveru** – ISO timestamp pro porovnání se zónou klienta
-- **Vercel Speed Insights** – indikátor přítomnosti SPEED_INSIGHTS env proměnné
-
-**Barevná škála latence** (funkce `getLatencyColor`):
-- Zelená (`text-emerald-500`): < 100 ms (optimální)
-- Oranžová (`text-orange-500`): 100–300 ms (přijatelné)
-- Červená (`text-destructive`): ≥ 300 ms (pomalé)
-
-Komponenta je dostupná **pouze pro roli ADMIN** – jak middleware (`/admin/*`), tak `runSystemDiagnostics()` uvnitř volá `requireAdmin()`.
+*   **Vlastní performance monitoring (Admin Dashboard)**
+    *   Jedná se o mnohem stručnější, avšak přehlednou vizuální komponentu vestavěnou přímo do administrátorské části `/admin`, spouštěnou manuální formou.
+    *   Pod kapotou zavolá server-action metodu `runSystemDiagnostics()`, která dotazem `prisma.user.count()` spočítá databázové RTT zpoždění a vyhodnotí funkční připravenost klíčových proměnných prostředí.
+    *   Klient si z těchto údajů odvodí celkový reálný Ping pro načtení aktuálního requestu a zobrazí uživatelům i čas, za jak dlouho se provedlo interní ověření `session`. Barevně vizualizuje časy v přijatelné a kritické červené mezi a zobrazuje "Studený" vs "Teplý" start podle aktuálního stavu inicializace modulu v serverové paměti.
 
 ---
 
 ## 9. Tým, kompetence, strávená doba
 
 **Organizace týmu a spolupráce:**
-Nedílnou součástí celého vývoje byly pravidelné konzultace přes Discord. Tým fungoval tak, že **Lucie Tesařová** působila v roli hlavního „zákazníka“ ze samotné praxe – coby učitelka ze školy, pro niž se plánuje reálné nasazení celého systému – a dodávala klíčové požadavky. Ostatní členové týmu si rozdělili práce na debatách o architektuře, důkladném testování webové aplikace a samotném programování. Úlohou programátora bylo získané požadavky implementovat do funkčního kódu, přičemž mu v tomto procesu výrazně asistovala umělá inteligence – zkrátka a dobře, „bičoval AI až do zdárného konce“.
+Nedílnou součástí celého vývoje byly pravidelné konzultace přes Discord. Tým fungoval tak, že **Lucie Tesařová** působila v roli hlavního „zákazníka“ coby učitelka ze školy, pro niž se plánuje reálné nasazení celého systému – a dodávala klíčové požadavky. Ostatní členové týmu si rozdělili práce na debatách o architektuře, důkladném testování webové aplikace a samotném programování. Úlohou programátora bylo získané požadavky implementovat do funkčního kódu, přičemž mu v tomto procesu výrazně asistovala umělá inteligence.
 
 ### Časový rozsah práce na projektu
 
@@ -737,7 +724,7 @@ Očekávaný odhad pro tradiční manuální vývoj podobně komplexní a robust
 
 Cílem projektu SeminarIS bylo usnadnit a zpřehlednit zápis seminářů jak studentům, tak škole. To se podařilo naplnit vytvořením webové aplikace, která nahrazuje nepřehledné papírové formuláře a sdílené tabulky jednotným digitálním řešením.
 
-Výsledkem je funkční systém, který umožňuje pohodlný online zápis, správu zápisových oken, předmětů i uživatelů a zároveň dbá na bezpečnost a správnost dat. Projekt tak ukazuje, že i běžný školní proces lze výrazně zjednodušit pomocí moderních technologií a převést do podoby, která je praktičtější pro všechny zúčastněné.
+Výsledkem je funkční systém, který umožňuje pohodlný online zápis, správu zápisových oken, předmětů i uživatelů a zároveň dbá na bezpečnost a správnost dat. Celkový výsledek navíc prokazatelně považujeme za úspěšný a plně funkční i vzhledem k nedávno proběhlé prezentaci se zástupcem ředitele školy, se kterým je již komunikováno a plánováno jeho budoucí ostré nasazení přímo do školního provozu. Projekt tak ukazuje, že i běžný školní proces lze výrazně zjednodušit pomocí moderních technologií a převést do podoby, která je praktičtější pro všechny zúčastněné.
 
 ### Co se podařilo implementovat
 
