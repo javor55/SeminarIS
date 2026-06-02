@@ -5,15 +5,26 @@ import { User } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { updateUserRole, toggleUserActive } from "@/lib/data";
+import { updateUserRole, toggleUserActive, deleteUserPermanently } from "@/lib/data";
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { toast } from "sonner";
-import { Eye } from "lucide-react";
+import { Eye, Trash2 } from "lucide-react";
 import { cn, computeEnrollmentStatus } from "@/lib/utils";
 import { ConfirmAction } from "./ConfirmAction";
 import { ResetPasswordDialog } from "./ResetPasswordDialog";
 import { UserDetailsDialog } from "./UserDetailsDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export type UserRow = User & { 
   createdAt?: string; 
@@ -150,7 +161,11 @@ const ActionsCell = ({ row }: { row: Row<UserRow> }) => {
   const u = row.original;
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === "ADMIN";
+  const isSelf = currentUser?.id === u.id || currentUser?.email === u.email;
   const [showDetails, setShowDetails] = React.useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const router = useRouter();
   
   return (
     <div className="flex items-center gap-1">
@@ -171,6 +186,56 @@ const ActionsCell = ({ row }: { row: Row<UserRow> }) => {
       
       {isAdmin && (
         <ResetPasswordDialog userId={u.id} userName={`${u.firstName} ${u.lastName}`} />
+      )}
+
+      {isAdmin && !isSelf && (
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+            title="Trvale smazat uživatele"
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+
+          <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Trvale smazat uživatele?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Opravdu chcete <strong>trvale a nevratně smazat</strong> uživatele{" "}
+                  <strong>{u.firstName} {u.lastName}</strong> ({u.email})?<br />
+                  Všechny jeho zápisy budou smazány. Data, která vytvořil (předměty, zápisová okna apod.), zůstanou zachována.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Zrušit</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={deleting}
+                  onClick={async () => {
+                    setDeleting(true);
+                    try {
+                      await deleteUserPermanently(u.id);
+                      toast.success(`Uživatel ${u.firstName} ${u.lastName} byl trvale smazán.`);
+                      router.refresh();
+                    } catch (err: unknown) {
+                      const error = err as Error;
+                      toast.error(error.message || "Nepodařilo se smazat uživatele.");
+                    } finally {
+                      setDeleting(false);
+                      setShowDeleteConfirm(false);
+                    }
+                  }}
+                >
+                  {deleting ? "Mazám..." : "Trvale smazat"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
       )}
     </div>
   );

@@ -6,7 +6,8 @@ import {
   updateUserRole, 
   toggleUserActive, 
   setGlobalCohort,
-  updateUsersCohort
+  updateUsersCohort,
+  deleteUserPermanently
 } from "@/lib/data";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
@@ -20,6 +21,16 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -163,6 +174,35 @@ export function UsersClientView({
       }
     };
 
+    const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = React.useState(false);
+
+    const usersToDelete = filteredRows.filter(
+      (u) => u.id !== currentUser.id && u.email !== currentUser.email
+    );
+
+    const handleBulkDelete = async () => {
+      setLoading(true);
+      let deleted = 0;
+      let errors = 0;
+      try {
+        for (const u of usersToDelete) {
+          try {
+            await deleteUserPermanently(u.id);
+            deleted++;
+          } catch {
+            errors++;
+          }
+        }
+        if (deleted > 0) toast.success(`Trvale smazáno ${deleted} uživatelů.`);
+        if (errors > 0) toast.error(`${errors} uživatelů se nepodařilo smazat.`);
+        router.refresh();
+        forceRefresh();
+      } finally {
+        setLoading(false);
+        setShowBulkDeleteConfirm(false);
+      }
+    };
+
     return (
       <div className="space-y-4 p-2 min-w-[200px]">
         <p className="text-sm font-medium text-muted-foreground border-b pb-2">
@@ -211,6 +251,43 @@ export function UsersClientView({
             <Button size="sm" variant="outline" className="h-8" onClick={() => handleBulkSetActive(false)} disabled={loading}>Deaktivovat</Button>
           </div>
         </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <Label className="text-xs text-destructive">Nebezpečná zóna</Label>
+          <Button
+            size="sm"
+            variant="destructive"
+            className="w-full h-8"
+            disabled={loading || usersToDelete.length === 0}
+            onClick={() => setShowBulkDeleteConfirm(true)}
+          >
+            Trvale smazat ({usersToDelete.length})
+          </Button>
+        </div>
+
+        <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Trvale smazat {usersToDelete.length} uživatelů?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Opravdu chcete <strong>trvale a nevratně smazat</strong> {usersToDelete.length} vybraných uživatelů?<br />
+                Všechny jejich zápisy budou odstraněny. Tato akce je nevratná.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Zrušit</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={loading}
+                onClick={handleBulkDelete}
+              >
+                {loading ? "Mažu..." : `Smazat ${usersToDelete.length} uživatelů`}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }

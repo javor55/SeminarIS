@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { enrollStudent, unenrollStudent, toggleSubjectActive, updateSubjectOccurrence, deleteSubjectOccurrence } from "@/lib/data";
+import { enrollStudent, unenrollStudent, toggleSubjectActive, updateSubjectOccurrence, deleteSubjectOccurrence, deleteSubjectPermanently } from "@/lib/data";
 
 export function SubjectDetailClientView({
   subject,
@@ -52,6 +52,7 @@ export function SubjectDetailClientView({
   );
 
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [sameSubjectAlert, setSameSubjectAlert] = useState<{
     subjectName: string;
@@ -252,13 +253,24 @@ export function SubjectDetailClientView({
                 Duplikovat
               </Button>
               {isAdmin && (
-                <Button
-                  size="sm"
-                  variant={subject.isActive ? "destructive" : "default"}
-                  onClick={() => setShowArchiveConfirm(true)}
-                >
-                  {subject.isActive ? "Archivovat" : "Obnovit"}
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant={subject.isActive ? "destructive" : "default"}
+                    onClick={() => setShowArchiveConfirm(true)}
+                  >
+                    {subject.isActive ? "Archivovat" : "Obnovit"}
+                  </Button>
+                  {!subject.isActive && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setShowDeleteConfirm(true)}
+                    >
+                      Trvale smazat
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -284,6 +296,38 @@ export function SubjectDetailClientView({
               onClick={handleToggleActive}
             >
               {subject.isActive ? "Archivovat" : "Obnovit"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Trvale smazat předmět?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Opravdu chcete <strong>trvale a nevratně smazat</strong> předmět &quot;{subject.name}&quot;?<br />
+              Budou smazány také všechny jeho výskyty v zápisových oknech a veškeré zápisy studentů.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Zrušit</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                try {
+                  await deleteSubjectPermanently(subject.id);
+                  toast.success("Předmět byl trvale smazán.");
+                  router.push("/subjects");
+                } catch (err: unknown) {
+                  const error = err as Error;
+                  toast.error(error.message || "Nepodařilo se smazat předmět.");
+                } finally {
+                  setShowDeleteConfirm(false);
+                }
+              }}
+            >
+              Trvale smazat
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

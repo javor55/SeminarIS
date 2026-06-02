@@ -1108,3 +1108,138 @@ export async function runSystemDiagnostics() {
     userRole: admin.role,
   };
 }
+
+
+// === TRVALÉ MAZÁNÍ ===
+
+/**
+ * Trvale smaže předmět včetně všech jeho výskytů (SubjectOccurrence) a zápisů studentů
+ * (StudentEnrollment). Kaskáda je zajištěna na úrovni DB (onDelete: Cascade).
+ * Pouze ADMIN.
+ */
+export async function deleteSubjectPermanently(subjectId: string) {
+  await requireAdmin();
+
+  const subject = await prisma.subject.findUnique({ where: { id: subjectId } });
+  if (!subject) throw new Error("Předmět nenalezen.");
+
+  await prisma.subject.delete({ where: { id: subjectId } });
+  revalidatePath("/", "layout");
+}
+
+
+/**
+ * Trvale smaže uživatele. V transakci:
+ * 1. Odpojí uživatele jako učitele z výskytů (teacherId → null)
+ * 2. Smaže všechny zápisy, kde byl studentem
+ * 3. Přepíše povinná audit pole createdById → adminId (předměty, okna, bloky, výskyty, zápisy)
+ * 4. Nulluje volitelná audit pole updatedById / deletedById
+ * 5. Smaže uživatele
+ * Nelze smazat sám sebe. Pouze ADMIN.
+ */
+export async function deleteUserPermanently(userId: string) {
+  const admin = await requireAdmin();
+
+  const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (!targetUser) throw new Error("Uživatel nenalezen.");
+
+  const isSelf = admin.id === userId || admin.email.toLowerCase() === targetUser.email.toLowerCase();
+  if (isSelf) throw new Error("Nemůžete smazat svůj vlastní účet.");
+
+  const adminId = admin.id;
+
+  await prisma.$transaction(async (tx) => {
+    // 1. Odpojit jako učitele
+    await tx.subjectOccurrence.updateMany({
+      where: { teacherId: userId },
+      data: { teacherId: null },
+    });
+
+    // 2. Smazat zápisy studenta
+    await tx.studentEnrollment.deleteMany({
+      where: { studentId: userId },
+    });
+
+    // 3. Přepsat povinná createdById → adminId
+
+    // Subject
+    await tx.subject.updateMany({
+      where: { createdById: userId },
+      data: { createdById: adminId },
+    });
+
+    // EnrollmentWindow
+    await tx.enrollmentWindow.updateMany({
+      where: { createdById: userId },
+      data: { createdById: adminId },
+    });
+
+    // Block
+    await tx.block.updateMany({
+      where: { createdById: userId },
+      data: { createdById: adminId },
+    });
+
+    // SubjectOccurrence
+    await tx.subjectOccurrence.updateMany({
+      where: { createdById: userId },
+      data: { createdById: adminId },
+    });
+
+    // StudentEnrollment.createdById (záznamy jiných studentů, kde byl autorem admin/učitel)
+    await tx.studentEnrollment.updateMany({
+      where: { createdById: userId },
+      data: { createdById: adminId },
+    });
+
+    // 4. Nullovat volitelná audit pole
+
+    // Subject.updatedById
+    await tx.subject.updateMany({
+      where: { updatedById: userId },
+      data: { updatedById: null },
+    });
+
+    // EnrollmentWindow.updatedById
+    await tx.enrollmentWindow.updateMany({
+      where: { updatedById: userId },
+      data: { updatedById: null },
+    });
+
+    // Block.updatedById / deletedById
+    await tx.block.updateMany({
+      where: { updatedById: userId },
+      data: { updatedById: null },
+    });
+    await tx.block.updateMany({
+      where: { deletedById: userId },
+      data: { deletedById: null },
+    });
+
+    // SubjectOccurrence.updatedById / deletedById
+    await tx.subjectOccurrence.updateMany({
+      where: { updatedById: userId },
+      data: { updatedById: null },
+    });
+    await tx.subjectOccurrence.updateMany({
+      where: { deletedById: userId },
+      data: { deletedById: null },
+    });
+
+    // StudentEnrollment.updatedById / deletedById
+    await tx.studentEnrollment.updateMany({
+      where: { updatedById: userId },
+      data: { updatedById: null },
+    });
+    await tx.studentEnrollment.updateMany({
+      where: { deletedById: userId },
+      data: { deletedById: null },
+    });
+
+    // 5. Smazat uživatele
+    await tx.user.delete({ where: { id: userId } });
+  });
+
+  revalidatePath("/", "layout");
+}
+

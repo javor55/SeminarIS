@@ -66,7 +66,7 @@ export function EditSubjectOccurrenceDialog({
   useEffect(() => {
      async function load() {
        const [subjs, allU] = await Promise.all([getSubjects(), getAllUsers()]);
-       setSubjects(subjs);
+       setSubjects(subjs.filter((s) => s.isActive !== false));
        setTeachers(allU.filter((u) => u.role === "TEACHER"));
      }
      load();
