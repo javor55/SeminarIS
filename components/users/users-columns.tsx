@@ -15,6 +15,7 @@ import { cn, computeEnrollmentStatus } from "@/lib/utils";
 import { ConfirmAction } from "./ConfirmAction";
 import { ResetPasswordDialog } from "./ResetPasswordDialog";
 import { UserDetailsDialog } from "./UserDetailsDialog";
+import { EditUserDialog } from "./EditUserDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -184,6 +185,10 @@ const ActionsCell = ({ row }: { row: Row<UserRow> }) => {
         onOpenChange={setShowDetails} 
       />
       
+      {isAdmin && (
+        <EditUserDialog user={u} />
+      )}
+
       {isAdmin && (
         <ResetPasswordDialog userId={u.id} userName={`${u.firstName} ${u.lastName}`} />
       )}

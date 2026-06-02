@@ -1041,6 +1041,38 @@ export async function updateUserRole(userId: string, role: string) {
   });
 }
 
+
+export async function updateUserProfile(
+  userId: string,
+  data: { firstName: string; lastName: string; email: string; cohort?: string | null }
+) {
+  await requireAdmin();
+
+  const target = await prisma.user.findUnique({ where: { id: userId } });
+  if (!target) throw new Error("Uzivatel nenalezen.");
+
+  const emailChanged = data.email.toLowerCase() !== target.email.toLowerCase();
+  if (emailChanged) {
+    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existing && existing.id !== userId) {
+      throw new Error(`E-mail "${data.email}" je jiz pouzivan jinym uzivatelem.`);
+    }
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      firstName: data.firstName.trim(),
+      lastName: data.lastName.trim(),
+      email: data.email.trim().toLowerCase(),
+      cohort: data.cohort?.trim() || null,
+    },
+  });
+
+  revalidatePath("/", "layout");
+  return updated;
+}
+
 export async function toggleUserActive(userId: string) {
   const admin = await requireAdmin();
   const targetUser = await prisma.user.findUnique({ where: { id: userId } });
