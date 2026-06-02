@@ -188,11 +188,10 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
   );
 }
 
-export default function EditSubjectPage({ params }: { params: Promise<{ id: string }> }) {
-  const unwrappedParams = React.use(params);
+export default function EditSubjectPage({ params }: { params: { id: string } }) {
   return (
     <Suspense fallback={<p>Načítám formulář...</p>}>
-      <EditSubjectForm params={unwrappedParams} />
+      <EditSubjectForm params={params} />
     </Suspense>
   );
 }
