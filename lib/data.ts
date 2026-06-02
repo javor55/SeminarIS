@@ -667,27 +667,22 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
         throw new Error("V tomto bloku již máte zapsaný jiný seminář. Nejdříve se odepište.");
       }
 
-      // 3. Kontrola duplicity předmětu v rámci stejného okna (podle subject.code)
-      if (targetOcc.subject.code) {
-        const subjectCode = targetOcc.subject.code;
-        const sameSubjectInWindow = await tx.studentEnrollment.findFirst({
-          where: {
-            studentId,
-            deletedAt: null,
-            subjectOccurrence: {
-              block: {
-                enrollmentWindowId: targetOcc.block.enrollmentWindowId
-              },
-              subject: {
-                code: subjectCode
-              }
-            }
+      // 3. Kontrola duplicity predmetu v ramci stejneho okna (podle subjectId, nezavisle na subCode)
+      const sameSubjectInWindow = await tx.studentEnrollment.findFirst({
+        where: {
+          studentId,
+          deletedAt: null,
+          subjectOccurrence: {
+            subjectId: targetOcc.subjectId,
+            block: {
+              enrollmentWindowId: targetOcc.block.enrollmentWindowId
+            },
           }
-        });
-
-        if (sameSubjectInWindow) {
-          throw new Error("Tento předmět již máte zapsaný v jiném bloku tohoto zápisu.");
         }
+      });
+
+      if (sameSubjectInWindow) {
+        throw new Error("Tento predmet jiz mate zapsany v jinem bloku tohoto zapisu.");
       }
 
       // 4. Kontrola, zda je zápisové okno otevřené (pokud uživatel není ADMIN)
