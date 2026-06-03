@@ -86,6 +86,7 @@ export function AppTopbar({ user }: { user?: User }) {
 
         {/* 🔥 DESKTOP User Info: Skryté na mobilu, viditelné od 'md' */}
         <div className="hidden md:flex items-center gap-2">
+          <ThemeToggle />
           {user ? (
             <>
               <span className="text-sm text-muted-foreground">{user.email}</span>
@@ -95,7 +96,6 @@ export function AppTopbar({ user }: { user?: User }) {
               >
                 Odhlásit
               </button>
-              <ThemeToggle />
             </>
           ) : (
             <Link
