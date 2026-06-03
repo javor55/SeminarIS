@@ -28,11 +28,7 @@ export default function PublicHomePage() {
   // 🔥 Toto uvidí pouze nepřihlášení uživatelé
   return (
     <div className="container mx-auto max-w-3xl text-center py-20">
-      <h1 className="text-4xl font-bold mb-4">Vítejte v Zápisu seminářů</h1>
-      <p className="text-lg text-muted-foreground mb-8">
-        Tento systém vám umožňuje snadno a rychle vybírat a zapisovat se na
-        semináře a volitelné předměty pro nadcházející semestr.
-      </p> {/* 🔥 ZDE BYLA CHYBA (S-T) */}
+      <h1 className="text-4xl font-bold mb-4">Zápis seminářů pro 4. ročníky</h1>
       <div className="flex justify-center gap-4">
         <Button asChild size="lg">
           <Link href="/login">Přihlásit se</Link>
@@ -43,8 +39,7 @@ export default function PublicHomePage() {
       </div>
       <div className="mt-12 text-sm text-muted-foreground">
         <p>
-          Po přihlášení zde naleznete svůj osobní dashboard s přehledem
-          zápisových období.
+          Po přihlášení zde naleznete přehled všech předmětů k zapsání.
         </p>
       </div>
     </div>
