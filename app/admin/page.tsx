@@ -2,8 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
-import { getSystemStats, getGlobalCohort, setGlobalCohort, isRegistrationEnabled, setRegistrationEnabled } from "@/lib/data";
+import { getSystemStats, getGlobalCohort, setGlobalCohort, isRegistrationEnabled, setRegistrationEnabled, getDefaultRole, setDefaultRole } from "@/lib/data";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +26,7 @@ export default function AdminPage() {
   const [cohort, setCohort] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [regEnabled, setRegEnabled] = useState(true);
+  const [defaultRole, setDefaultRoleState] = useState<"GUEST" | "STUDENT">("GUEST");
 
 
   useEffect(() => {
@@ -29,10 +37,11 @@ export default function AdminPage() {
 
   async function loadData() {
     try {
-      const [s, c, r] = await Promise.all([getSystemStats(), getGlobalCohort(), isRegistrationEnabled()]);
+      const [s, c, r, dRole] = await Promise.all([getSystemStats(), getGlobalCohort(), isRegistrationEnabled(), getDefaultRole()]);
       setStats(s);
       setCohort(c);
       setRegEnabled(r);
+      setDefaultRoleState(dRole);
     } catch {
       toast.error("Nepodařilo se načíst data administrace.");
     }
@@ -159,6 +168,37 @@ export default function AdminPage() {
                   }
                 }}
               />
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t">
+              <div>
+                <Label htmlFor="defaultRole">Výchozí role pro nové uživatele</Label>
+                <p className="text-xs text-muted-foreground">
+                  Role, která bude přiřazena po dokončení registrace.
+                </p>
+              </div>
+              <Select 
+                value={defaultRole} 
+                onValueChange={async (value) => {
+                  try {
+                    const role = value as "GUEST" | "STUDENT";
+                    await setDefaultRole(role);
+                    setDefaultRoleState(role);
+                    toast.success("Výchozí role byla úspěšně změněna.");
+                  } catch (err) {
+                    const error = err as Error;
+                    toast.error(error.message || "Nepodařilo se změnit nastavení.");
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Vyberte roli" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GUEST">Host (Guest)</SelectItem>
+                  <SelectItem value="STUDENT">Student</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>

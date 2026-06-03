@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { getGlobalCohort, isRegistrationEnabled } from "@/lib/data";
+import { getGlobalCohort, isRegistrationEnabled, getDefaultRole } from "@/lib/data";
 
 export async function POST(req: Request) {
   try {
@@ -46,8 +46,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // Získání aktuálně nastaveného ročníku pro přiřazení novému uživateli
+    // Získání aktuálně nastaveného ročníku a výchozí role
     const currentCohort = await getGlobalCohort();
+    const defaultRole = await getDefaultRole();
 
     // Zahešování nového hesla
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
         lastName,
         isActive: true,
         cohort: currentCohort || null,
-        role: isFirstUser ? "ADMIN" : "GUEST",
+        role: isFirstUser ? "ADMIN" : defaultRole,
       },
     });
 

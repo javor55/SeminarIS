@@ -469,6 +469,33 @@ export async function setRegistrationEnabled(enabled: boolean) {
   });
 }
 
+export async function getDefaultRole(): Promise<"GUEST" | "STUDENT"> {
+  try {
+    if (!prisma.systemSetting) return "GUEST";
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: "default_user_role" },
+    });
+    if (setting && (setting.value === "GUEST" || setting.value === "STUDENT")) {
+      return setting.value as "GUEST" | "STUDENT";
+    }
+    return "GUEST";
+  } catch {
+    return "GUEST";
+  }
+}
+
+export async function setDefaultRole(role: "GUEST" | "STUDENT") {
+  await requireAdmin();
+  if (!prisma.systemSetting) {
+    throw new Error("Model SystemSetting není dostupný.");
+  }
+  return await prisma.systemSetting.upsert({
+    where: { key: "default_user_role" },
+    update: { value: role },
+    create: { key: "default_user_role", value: role },
+  });
+}
+
 
 export async function changeOwnPassword(currentPasswordRaw: string, newPasswordRaw: string) {
   const userFromSession = await requireAuth();
