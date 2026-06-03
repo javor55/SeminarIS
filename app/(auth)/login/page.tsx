@@ -5,6 +5,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -68,6 +69,13 @@ export default function LoginPage() {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Přihlašuji..." : "Přihlásit se"}
           </Button>
+
+          <div className="text-center text-sm text-muted-foreground pt-2">
+            Nemáte ještě účet?{" "}
+            <Link href="/register" className="text-primary hover:underline">
+              Vytvořit účet
+            </Link>
+          </div>
         </form>
       </div>
     </div>
