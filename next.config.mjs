@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* zatím nic speciálního */
+  eslint: {
+    // modules/ není ve výchozím seznamu složek, které `next lint` kontroluje
+    dirs: ["app", "components", "lib", "modules", "types"],
+  },
 };
 
 export default nextConfig;

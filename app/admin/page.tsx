@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
-import { getSystemStats, getGlobalCohort, setGlobalCohort, isRegistrationEnabled, setRegistrationEnabled, getDefaultRole, setDefaultRole } from "@/lib/data";
+import { getAdminOverview, setGlobalCohort, setRegistrationEnabled, setDefaultRole, setModuleEnabledAction, type AdminModuleInfo } from "@/modules/core/actions/admin";
+import type { AdminStat } from "@/modules/server-types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -17,12 +18,20 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Users, BookOpen, Calendar, Save } from "lucide-react";
 import { toast } from "sonner";
-import { PerformanceBenchmarks } from "@/components/admin/PerformanceBenchmarks";
+import { PerformanceBenchmarks } from "@/modules/core/components/admin/PerformanceBenchmarks";
+import { can } from "@/modules/registry";
+
+const STAT_ICONS = {
+  users: <Users className="h-4 w-4 text-slate-500" />,
+  book: <BookOpen className="h-4 w-4 text-slate-500" />,
+  calendar: <Calendar className="h-4 w-4 text-emerald-500" />,
+};
 
 export default function AdminPage() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, refreshSession } = useAuth();
 
-  const [stats, setStats] = useState<{ userCount: number; subjectCount: number; activeEnrollmentCount: number } | null>(null);
+  const [stats, setStats] = useState<AdminStat[] | null>(null);
+  const [modules, setModules] = useState<AdminModuleInfo[]>([]);
   const [cohort, setCohort] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [regEnabled, setRegEnabled] = useState(true);
@@ -30,18 +39,19 @@ export default function AdminPage() {
 
 
   useEffect(() => {
-    if (user?.role === "ADMIN") {
+    if (can(user?.role, "core.admin")) {
       loadData();
     }
   }, [user]);
 
   async function loadData() {
     try {
-      const [s, c, r, dRole] = await Promise.all([getSystemStats(), getGlobalCohort(), isRegistrationEnabled(), getDefaultRole()]);
-      setStats(s);
-      setCohort(c);
-      setRegEnabled(r);
-      setDefaultRoleState(dRole);
+      const overview = await getAdminOverview();
+      setStats(overview.stats);
+      setCohort(overview.cohort);
+      setRegEnabled(overview.registrationEnabled);
+      setDefaultRoleState(overview.defaultRole);
+      setModules(overview.modules);
     } catch {
       toast.error("Nepodařilo se načíst data administrace.");
     }
@@ -59,7 +69,7 @@ export default function AdminPage() {
     }
   }
 
-  if (isLoading || !user || user.role !== "ADMIN") return (
+  if (isLoading || !user || !can(user.role, "core.admin")) return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div>
         <div className="h-9 w-64 bg-muted animate-pulse rounded" />
@@ -85,38 +95,20 @@ export default function AdminPage() {
         </p>
       </div>
 
-      {/* STATISTIKY */}
+      {/* STATISTIKY (dodávají je zapnuté moduly) */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="shadow-sm border-border">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Uživatelé celkem</CardTitle>
-            <Users className="h-4 w-4 text-slate-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.userCount ?? "..."}</div>
-            <p className="text-xs text-muted-foreground">Včetně studentů a učitelů</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-border">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Aktivní předměty</CardTitle>
-            <BookOpen className="h-4 w-4 text-slate-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.subjectCount ?? "..."}</div>
-            <p className="text-xs text-muted-foreground">Nabízené v aktuálním katalogu</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-border">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Otevřené zápisy</CardTitle>
-            <Calendar className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.activeEnrollmentCount ?? "..."}</div>
-            <p className="text-xs text-muted-foreground">Aktuálně probíhající zápisová okna</p>
+        {(stats ?? []).map((stat) => (
+          <Card key={stat.label} className="shadow-sm border-border">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
+              {stat.icon && STAT_ICONS[stat.icon]}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stat.value}</div>
+              <p className="text-xs text-muted-foreground">{stat.hint}</p>
             </CardContent>
-        </Card>
+          </Card>
+        ))}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -200,6 +192,44 @@ export default function AdminPage() {
                 </SelectContent>
               </Select>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* MODULY */}
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle>Moduly</CardTitle>
+            <CardDescription>
+              Vypnutý modul zmizí z menu a jeho stránky ani akce nejsou dostupné. Data zůstávají zachována.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {modules.map((m, idx) => (
+              <div key={m.id} className={`flex items-center justify-between gap-4 ${idx > 0 ? "pt-2 border-t" : ""}`}>
+                <div>
+                  <Label htmlFor={`module-${m.id}`}>{m.name}</Label>
+                  <p className="text-xs text-muted-foreground">{m.description}</p>
+                </div>
+                <Switch
+                  id={`module-${m.id}`}
+                  checked={m.enabled}
+                  disabled={m.core}
+                  onCheckedChange={async (checked) => {
+                    try {
+                      await setModuleEnabledAction(m.id, checked);
+                      // Znovu načíst i statistiky – závisí na zapnutých modulech
+                      await loadData();
+                      toast.success(checked ? `Modul „${m.name}“ zapnut.` : `Modul „${m.name}“ vypnut.`);
+                      // Menu v hlavičce se skládá ze session
+                      await refreshSession();
+                    } catch (err) {
+                      const error = err as Error;
+                      toast.error(error.message || "Nepodařilo se změnit nastavení.");
+                    }
+                  }}
+                />
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>

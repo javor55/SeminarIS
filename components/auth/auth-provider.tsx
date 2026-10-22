@@ -12,6 +12,10 @@ import { SessionProvider, useSession, signIn, signOut } from "next-auth/react";
 type AuthContextValue = {
   user: User | null;
   isLoading: boolean;
+  // Id zapnutých modulů
+  enabledModules: string[];
+  // Znovu načte session (např. po zapnutí/vypnutí modulu)
+  refreshSession: () => Promise<void>;
   // eslint-disable-next-line no-unused-vars
   login: (email: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -29,10 +33,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 function AuthContextWrapper({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   
   const isLoading = status === "loading";
   const user = session?.user as User | null;
+  const enabledModules = session?.enabledModules ?? [];
 
   // 🔐 Přihlášení přes NextAuth credentials provider
   const login = async (email: string, password?: string) => {
@@ -62,6 +67,10 @@ function AuthContextWrapper({ children }: { children: ReactNode }) {
       value={{
         user,
         isLoading,
+        enabledModules,
+        refreshSession: async () => {
+          await update();
+        },
         login,
         logout,
       }}

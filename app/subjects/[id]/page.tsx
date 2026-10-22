@@ -1,15 +1,14 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import {
-  getSubjects,
-  getEnrollmentWindowsWithDetails,
-  getUsersForFilters,
-} from "@/lib/data";
-import { SubjectDetailClientView } from "@/components/subjects/SubjectDetailClientView";
+import { getSubjects } from "@/modules/seminars/actions/subjects";
+import { getEnrollmentWindowsWithDetails } from "@/modules/seminars/actions/windows";
+import { getUsersForFilters } from "@/modules/core/actions/users";
+import { SubjectDetailClientView } from "@/modules/seminars/components/subjects/SubjectDetailClientView";
 import { computeEnrollmentStatus } from "@/lib/utils";
-import { OccurrenceRow } from "@/components/occurrences/occurrence-columns";
+import { OccurrenceRow } from "@/modules/seminars/components/occurrences/occurrence-columns";
 import { User, Subject, EnrollmentWindowWithBlocks, Block, SubjectOccurrence, StudentEnrollment } from "@/lib/types";
+import { can } from "@/modules/registry";
 
 export default async function SubjectDetailPage({
   params,
@@ -29,7 +28,7 @@ export default async function SubjectDetailPage({
     redirect("/subjects/new/edit");
   }
 
-  const isPrivileged = currentUser.role === "ADMIN" || currentUser.role === "TEACHER";
+  const isPrivileged = can(currentUser.role, "seminars.windows.view");
 
   const [usersList, allSubjs, ewWithDetails] = await Promise.all([
     getUsersForFilters(),

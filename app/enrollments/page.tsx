@@ -2,9 +2,10 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getEnrollmentWindowsWithDetails } from "@/lib/data";
-import { EnrollmentsClientView } from "@/components/enrollment/EnrollmentsClientView";
+import { getEnrollmentWindowsWithDetails } from "@/modules/seminars/actions/windows";
+import { EnrollmentsClientView } from "@/modules/seminars/components/enrollment/EnrollmentsClientView";
 import { User } from "@/lib/types";
+import { can } from "@/modules/registry";
 
 export default async function EnrollmentsPage() {
   const [session, enrollments] = await Promise.all([
@@ -18,7 +19,7 @@ export default async function EnrollmentsPage() {
 
   const currentUser = session.user as User;
 
-  if (currentUser.role !== "ADMIN" && currentUser.role !== "TEACHER") {
+  if (!can(currentUser.role, "seminars.windows.view")) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold">Přístup odepřen</h1>

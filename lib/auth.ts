@@ -2,6 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { getEnabledModuleIds } from "@/lib/modules";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -18,6 +19,7 @@ export const authOptions: NextAuthOptions = {
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email.toLowerCase() },
+          omit: { passwordHash: false },
         });
 
         if (!user || !user.passwordHash) {
@@ -53,6 +55,24 @@ export const authOptions: NextAuthOptions = {
         token.firstName = user.firstName;
         token.lastName = user.lastName;
         token.isActive = user.isActive;
+        return token;
+      }
+      // Role a aktivita se při každém ověření session načtou z DB, aby změna role
+      // nebo deaktivace účtu platila hned a ne až po novém přihlášení.
+      if (token.id) {
+        const fresh = await prisma.user.findUnique({
+          where: { id: token.id },
+          select: { role: true, isActive: true, firstName: true, lastName: true, email: true },
+        });
+        if (!fresh) {
+          token.isActive = false;
+        } else {
+          token.role = fresh.role;
+          token.isActive = fresh.isActive;
+          token.firstName = fresh.firstName;
+          token.lastName = fresh.lastName;
+          token.email = fresh.email;
+        }
       }
       return token;
     },
@@ -64,6 +84,7 @@ export const authOptions: NextAuthOptions = {
         session.user.lastName = token.lastName;
         session.user.isActive = token.isActive;
       }
+      session.enabledModules = await getEnabledModuleIds();
       return session;
     },
   },

@@ -4,13 +4,14 @@ import * as React from "react";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
-import { getSubjects, updateSubject, createSubject } from "@/lib/data";
+import { getSubjects, updateSubject, createSubject } from "@/modules/seminars/actions/subjects";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea"; 
 import { Button } from "@/components/ui/button";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { Subject } from "@/lib/types";
 import { toast } from "sonner";
+import { can } from "@/modules/registry";
 
 function EditSubjectForm({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -77,7 +78,7 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
     );
   }
 
-  if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) {
+  if (!user || !can(user.role, "seminars.subjects.edit")) {
     return <p>Nemáte oprávnění upravovat tento předmět.</p>;
   }
 

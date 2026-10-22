@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { KeyRound, ShieldCheck, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
-import { changeOwnPassword } from "@/lib/data";
+import { changeOwnPassword } from "@/modules/core/actions/profile";
 
 export default function ProfilePage() {
   const { user, isLoading } = useAuth();

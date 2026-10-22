@@ -12,7 +12,7 @@ dist/
 
 # Prisma
 prisma/dev.db
-prisma/migrations/
+# prisma/migrations/ se verzuje – migrace jsou součástí kódu
 
 # Logs
 npm-debug.log*

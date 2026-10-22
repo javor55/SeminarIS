@@ -1,13 +1,12 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { 
-  getAllUsers, 
-  getGlobalCohort 
-} from "@/lib/data";
-import { UsersClientView } from "@/components/users/UsersClientView";
+import { getAllUsers } from "@/modules/core/actions/users";
+import { getGlobalCohort } from "@/modules/core/settings";
+import { UsersClientView } from "@/modules/core/components/users/UsersClientView";
 import { User } from "@/lib/types";
-import { UserRow } from "@/components/users/users-columns";
+import { UserRow } from "@/modules/core/components/users/users-columns";
+import { can } from "@/modules/registry";
 
 export default async function UsersPage() {
   const session = await getServerSession(authOptions);
@@ -18,7 +17,7 @@ export default async function UsersPage() {
 
   const currentUser = session.user as User;
 
-  if (currentUser.role !== "ADMIN" && currentUser.role !== "TEACHER") {
+  if (!can(currentUser.role, "core.users.view")) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold">Přístup odepřen</h1>
