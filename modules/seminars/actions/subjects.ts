@@ -4,13 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireAuth, requireModule, requirePermission } from "@/lib/session";
 import { can } from "@/modules/registry";
+import { getViewerGrade, windowsForGradeWhere } from "@/modules/seminars/eligibility";
 
 export async function getSubjects() {
   const user = await requireAuth();
   await requireModule("seminars");
   const isPrivileged = can(user.role, "seminars.windows.view");
+  const grade = await getViewerGrade(user);
 
-  const subjects = await prisma.subject.findMany({
+  const subjects = await prisma.seminar.findMany({
     orderBy: { createdAt: "desc" },
     include: {
       createdBy: { select: { firstName: true, lastName: true, email: true } },
@@ -22,7 +24,9 @@ export async function getSubjects() {
             block: {
               enrollmentWindow: {
                 visibleToStudents: true,
-                status: { not: "DRAFT" }
+                status: { not: "DRAFT" },
+                // jen zápisy určené pro ročník studenta
+                ...(grade !== undefined ? windowsForGradeWhere(grade) : {}),
               }
             }
           } : {})
@@ -50,7 +54,7 @@ export async function getSubjects() {
 
 export async function createSubject(subject: { name: string; code?: string; description?: string; syllabus: string }) {
   const admin = await requirePermission("seminars.subjects.edit");
-  const res = await prisma.subject.create({
+  const res = await prisma.seminar.create({
     data: {
       name: subject.name,
       code: subject.code,
@@ -65,10 +69,10 @@ export async function createSubject(subject: { name: string; code?: string; desc
 
 export async function toggleSubjectActive(subjectId: string) {
   await requirePermission("seminars.subjects.archive");
-  const targetSubject = await prisma.subject.findUnique({ where: { id: subjectId } });
+  const targetSubject = await prisma.seminar.findUnique({ where: { id: subjectId } });
   if (!targetSubject) return;
 
-  const res = await prisma.subject.update({
+  const res = await prisma.seminar.update({
     where: { id: subjectId },
     data: { isActive: !targetSubject.isActive },
   });
@@ -78,7 +82,7 @@ export async function toggleSubjectActive(subjectId: string) {
 
 export async function updateSubject(subject: { id: string; name: string; code?: string; description?: string; syllabus: string }) {
   const admin = await requirePermission("seminars.subjects.edit");
-  return await prisma.subject.update({
+  return await prisma.seminar.update({
     where: { id: subject.id },
     data: {
       name: subject.name,
@@ -99,9 +103,9 @@ export async function updateSubject(subject: { id: string; name: string; code?: 
 export async function deleteSubjectPermanently(subjectId: string) {
   await requirePermission("seminars.subjects.archive");
 
-  const subject = await prisma.subject.findUnique({ where: { id: subjectId } });
+  const subject = await prisma.seminar.findUnique({ where: { id: subjectId } });
   if (!subject) throw new Error("Předmět nenalezen.");
 
-  await prisma.subject.delete({ where: { id: subjectId } });
+  await prisma.seminar.delete({ where: { id: subjectId } });
   revalidatePath("/", "layout");
 }

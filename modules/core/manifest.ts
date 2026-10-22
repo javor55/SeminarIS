@@ -3,7 +3,7 @@ import type { ModuleManifest } from "@/modules/types";
 export const coreModule = {
   id: "core",
   name: "Jádro systému",
-  description: "Uživatelé, přihlášení, profil a administrace.",
+  description: "Uživatelé, přihlášení, profil, škola (třídy, předměty, úvazky) a administrace.",
   core: true,
   enabledByDefault: true,
   permissions: {
@@ -15,15 +15,19 @@ export const coreModule = {
     "core.users.manage": ["ADMIN"],
     // Administrační centrum a globální nastavení
     "core.admin": ["ADMIN"],
+    // Školní roky, třídy, předměty a úvazky
+    "core.school.manage": ["ADMIN"],
   },
   nav: [
     { label: "Dashboard", href: "/", permission: "core.dashboard", order: 0 },
     { label: "Uživatelé", href: "/users", permission: "core.users.view", order: 80 },
+    { label: "Škola", href: "/school", permission: "core.school.manage", order: 85 },
     { label: "Administrace", href: "/admin", permission: "core.admin", order: 90 },
     { label: "Můj Profil", href: "/profile", permission: "core.profile", order: 100 },
   ],
   routes: [
     { prefix: "/users", permission: "core.users.view" },
     { prefix: "/admin", permission: "core.admin" },
+    { prefix: "/school", permission: "core.school.manage" },
   ],
 } as const satisfies ModuleManifest;

@@ -1,6 +1,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
+import { targetGradesLabel } from "@/lib/school";
 import { Button } from "@/components/ui/button";
 import { User, EnrollmentWindow } from "@/lib/types";
 import { cn, computeEnrollmentStatus } from "@/lib/utils";
@@ -94,6 +95,12 @@ export function getEnrollmentColumns(opts: {
       },
     },
     
+    {
+      id: "targetGrades",
+      header: "Pro ročníky",
+      cell: ({ row }) => targetGradesLabel(row.original.targetGrades ?? []),
+    },
+
     { // Sloupec 3 (Začátek)
       accessorKey: "startsAt",
       header: "Začátek",

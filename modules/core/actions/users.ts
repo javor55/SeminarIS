@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache";
 import { requireAuth, requirePermission } from "@/lib/session";
 import { can } from "@/modules/registry";
 import { MODULE_SERVERS } from "@/modules/server-registry";
+import { ensureCurrentSchoolYear, findOrCreateClass, getCurrentSchoolYear } from "@/modules/core/school";
+import { classLabel as formatClassLabel, parseClassLabel, DEFAULT_STUDY_YEARS } from "@/lib/school";
 
 const ROLES: readonly Role[] = ["GUEST", "STUDENT", "TEACHER", "ADMIN"];
 
@@ -43,6 +45,8 @@ export async function importUsers(data: Array<{
   lastName?: string, 
   email: string, 
   cohort?: string, 
+  // Třída v aktuálním školním roce, např. "3.A" (prázdné = beze změny)
+  class?: string,
   role?: string, 
   isActive?: boolean | string | number, 
   password?: string 
@@ -52,13 +56,32 @@ export async function importUsers(data: Array<{
     let created = 0;
     let updated = 0;
     let errors = 0;
+    // Popis chyb pro admina (první desítky řádků)
+    const messages: string[] = [];
+    const { startYear } = await ensureCurrentSchoolYear();
 
-    for (const row of data) {
+    for (const [index, row] of data.entries()) {
+      // +2: číslování od 1 a řádek s hlavičkou
+      const line = index + 2;
       try {
         const email = row.email?.toLowerCase().trim();
         if (!email) {
           errors++;
+          messages.push(`Řádek ${line}: chybí e-mail.`);
           continue;
+        }
+
+        // Třída "3.A" → záznam ClassGroup (založí se, pokud ještě neexistuje)
+        let classGroupId: string | undefined;
+        const classText = row.class?.trim();
+        if (classText) {
+          const parsed = parseClassLabel(classText);
+          if (!parsed || parsed.grade > DEFAULT_STUDY_YEARS) {
+            errors++;
+            messages.push(`Řádek ${line} (${email}): neplatná třída „${classText}“, očekává se např. 3.A.`);
+            continue;
+          }
+          classGroupId = (await findOrCreateClass(parsed.grade, parsed.letter, startYear)).id;
         }
 
         const existing = await prisma.user.findUnique({ where: { email } });
@@ -78,6 +101,7 @@ export async function importUsers(data: Array<{
           cohort: row.cohort || null,
           role: parseRole(row.role, "STUDENT"),
           isActive: isActiveValue,
+          ...(classGroupId ? { classGroupId } : {}),
         };
 
         const passwordHash = row.password ? await bcrypt.hash(row.password, 10) : undefined;
@@ -105,11 +129,12 @@ export async function importUsers(data: Array<{
         // eslint-disable-next-line no-console
         console.error("Chyba při importu řádku:", e);
         errors++;
+        messages.push(`Řádek ${line}: ${(e as Error).message || "neznámá chyba"}`);
       }
     }
 
     revalidatePath("/users");
-    return { created, updated, errors };
+    return { created, updated, errors, messages: messages.slice(0, 20) };
   } catch (err: unknown) {
     const error = err as Error;
     throw new Error(error.message || "Import se nezdařil.");
@@ -120,10 +145,12 @@ export async function importUsers(data: Array<{
 export async function getAllUsers() {
   try {
     await requirePermission("core.users.view");
+    const { startYear } = await getCurrentSchoolYear();
     
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       include: {
+        classGroup: true,
         studentEnrollments: {
           where: { deletedAt: null },
           include: {
@@ -143,7 +170,11 @@ export async function getAllUsers() {
     });
     
     // Převod na prostý objekt pro bezpečnou serializaci přes Next.js Server Actions
-    return JSON.parse(JSON.stringify(users));
+    const withClass = users.map((u) => ({
+      ...u,
+      classLabel: u.classGroup ? formatClassLabel(u.classGroup, startYear) : null,
+    }));
+    return JSON.parse(JSON.stringify(withClass));
   } catch (err) {
     const error = err as Error;
     throw error;
@@ -170,7 +201,8 @@ export async function updateUserRole(userId: string, role: string) {
 
 export async function updateUserProfile(
   userId: string,
-  data: { firstName: string; lastName: string; email: string; cohort?: string | null }
+  // classGroupId: undefined = beze změny, null = bez třídy
+  data: { firstName: string; lastName: string; email: string; cohort?: string | null; classGroupId?: string | null }
 ) {
   await requirePermission("core.users.manage");
 
@@ -192,6 +224,7 @@ export async function updateUserProfile(
       lastName: data.lastName.trim(),
       email: data.email.trim().toLowerCase(),
       cohort: data.cohort?.trim() || null,
+      ...(data.classGroupId !== undefined ? { classGroupId: data.classGroupId } : {}),
     },
   });
 

@@ -29,6 +29,9 @@ import {
 
 export type UserRow = User & { 
   createdAt?: string; 
+  classGroupId?: string | null;
+  // Např. "3.A", dopočítané na serveru podle aktuálního školního roku
+  classLabel?: string | null;
   lastLoginAt?: string;
   studentEnrollments?: Array<{
     id: string;
@@ -257,8 +260,13 @@ export const usersColumns: ColumnDef<UserRow>[] = [
   },
   { accessorKey: "email", header: "E-mail" },
   {
+    accessorKey: "classLabel",
+    header: "Třída",
+    cell: ({ row }) => row.original.classLabel || "—",
+  },
+  {
     accessorKey: "cohort",
-    header: "Ročník",
+    header: "Ročník (původní)",
     cell: ({ row }) => row.original.cohort || "—",
   },
   {

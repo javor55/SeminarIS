@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
-import { getAdminOverview, setGlobalCohort, setRegistrationEnabled, setDefaultRole, setModuleEnabledAction, type AdminModuleInfo } from "@/modules/core/actions/admin";
+import { getAdminOverview, setGlobalCohort, setRegistrationEnabled, setDefaultRole, setModuleEnabledAction, setAuthSettings, type AdminModuleInfo } from "@/modules/core/actions/admin";
+import type { AuthSettings, PasswordLoginScope } from "@/lib/auth-settings";
 import type { AdminStat } from "@/modules/server-types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import {
@@ -32,6 +33,7 @@ export default function AdminPage() {
 
   const [stats, setStats] = useState<AdminStat[] | null>(null);
   const [modules, setModules] = useState<AdminModuleInfo[]>([]);
+  const [auth, setAuth] = useState<AuthSettings | null>(null);
   const [cohort, setCohort] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [regEnabled, setRegEnabled] = useState(true);
@@ -52,6 +54,7 @@ export default function AdminPage() {
       setRegEnabled(overview.registrationEnabled);
       setDefaultRoleState(overview.defaultRole);
       setModules(overview.modules);
+      setAuth(overview.auth);
     } catch {
       toast.error("Nepodařilo se načíst data administrace.");
     }
@@ -234,8 +237,100 @@ export default function AdminPage() {
         </Card>
       </div>
 
+      {/* PŘIHLÁŠENÍ */}
+      {auth && <AuthSettingsCard auth={auth} onChange={setAuth} />}
+
       {/* BENCHMARK A DIAGNOSTIKA */}
       <PerformanceBenchmarks />
     </div>
+  );
+}
+
+const PASSWORD_SCOPE_LABELS: Record<PasswordLoginScope, string> = {
+  ALL: "Všichni",
+  STAFF: "Jen učitelé a admini",
+  ADMIN: "Jen admini",
+};
+
+// eslint-disable-next-line no-unused-vars
+function AuthSettingsCard({ auth, onChange }: { auth: AuthSettings; onChange: (a: AuthSettings) => void }) {
+  async function save(data: Parameters<typeof setAuthSettings>[0], message: string) {
+    try {
+      onChange(await setAuthSettings(data));
+      toast.success(message);
+    } catch (err) {
+      toast.error((err as Error).message || "Nepodařilo se změnit nastavení.");
+    }
+  }
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader>
+        <CardTitle>Přihlášení</CardTitle>
+        <CardDescription>
+          Microsoft 365 a klasické heslo mohou fungovat současně; účty se párují podle e-mailu.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!auth.microsoftConfigured && (
+          <p className="text-sm rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+            Microsoft 365 není nakonfigurováno. Je potřeba registrace aplikace v Microsoft Entra ID a proměnné
+            prostředí <code>AZURE_AD_TENANT_ID</code>, <code>AZURE_AD_CLIENT_ID</code> a <code>AZURE_AD_CLIENT_SECRET</code> na
+            Vercelu. Do té doby se všichni přihlašují heslem.
+          </p>
+        )}
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <Label htmlFor="auth-microsoft">Přihlášení přes Microsoft 365</Label>
+            <p className="text-xs text-muted-foreground">Tlačítko „Přihlásit přes Microsoft 365“ na přihlašovací stránce.</p>
+          </div>
+          <Switch
+            id="auth-microsoft"
+            checked={auth.microsoftEnabled}
+            disabled={!auth.microsoftConfigured}
+            onCheckedChange={(checked) =>
+              save({ microsoftEnabled: checked }, checked ? "Přihlášení přes Microsoft zapnuto." : "Přihlášení přes Microsoft vypnuto.")
+            }
+          />
+        </div>
+        <div className="flex items-center justify-between gap-4 pt-2 border-t">
+          <div>
+            <Label htmlFor="auth-autocreate">Zakládat účty při prvním přihlášení</Label>
+            <p className="text-xs text-muted-foreground">
+              Vypnuto: přes Microsoft se přihlásí jen uživatelé, kteří už v systému jsou (např. z importu).
+              Zapnuto: komukoli ze školy se účet založí s výchozí rolí.
+            </p>
+          </div>
+          <Switch
+            id="auth-autocreate"
+            checked={auth.microsoftAutoCreate}
+            disabled={!auth.microsoftConfigured}
+            onCheckedChange={(checked) => save({ microsoftAutoCreate: checked }, "Nastavení uloženo.")}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-4 pt-2 border-t">
+          <div>
+            <Label htmlFor="auth-password">Kdo se smí přihlásit heslem</Label>
+            <p className="text-xs text-muted-foreground">
+              Platí jen při zapnutém Microsoft 365. Admin se heslem přihlásí vždy.
+            </p>
+          </div>
+          <Select
+            value={auth.passwordScope}
+            disabled={!auth.microsoftConfigured}
+            onValueChange={(value) => save({ passwordScope: value as PasswordLoginScope }, "Nastavení uloženo.")}
+          >
+            <SelectTrigger className="w-[200px]" id="auth-password">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(PASSWORD_SCOPE_LABELS) as PasswordLoginScope[]).map((scope) => (
+                <SelectItem key={scope} value={scope}>{PASSWORD_SCOPE_LABELS[scope]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

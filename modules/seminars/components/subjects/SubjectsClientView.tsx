@@ -86,7 +86,7 @@ export function SubjectsClientView({
       {/* HLAVIČKA */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Předměty</h1>
+          <h1 className="text-2xl font-semibold">Semináře</h1>
           <p className="text-sm text-muted-foreground">
             {isAllowed 
               ? "Seznam předmětů a jejich kódů." 

@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { EditEnrollmentDialog } from "@/modules/seminars/components/enrollment/EditEnrollmentDialog";
 import { User, EnrollmentWindowWithBlocks } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Calendar, Download, ChevronDown } from "lucide-react";
+import { Calendar, Download, ChevronDown, Users } from "lucide-react";
+import { targetGradesLabel } from "@/lib/school";
 
 import { EditBlockDialog } from "@/modules/seminars/components/blocks/EditBlockDialog";
 import { createBlock, getEnrollmentMatrixData, getEnrollmentDetails } from "@/modules/seminars/actions/windows";
@@ -83,12 +84,13 @@ export function EnrollmentHeader({
   const handleExportMatrix = async () => {
     try {
       const data = await getEnrollmentMatrixData(ew.id);
-      const headers = ["Příjmení", "Jméno", "Email", "Ročník", ...data.blocks.map(b => b.name)];
+      const headers = ["Příjmení", "Jméno", "Email", "Třída", "Ročník", ...data.blocks.map(b => b.name)];
       const rows = data.students.map(s => {
         const row = [
           s.lastName || "",
           s.firstName || "",
           s.email || "",
+          s.classLabel || "",
           s.cohort || "",
           ...data.blocks.map(b => {
              const ch = s.choices[b.id];
@@ -281,6 +283,10 @@ export function EnrollmentHeader({
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <span>Konec: {formatDateTime(ew.endsAt)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-muted-foreground" />
+                <span>Pro: {targetGradesLabel(ew.targetGrades ?? [])}</span>
               </div>
             </div>
 

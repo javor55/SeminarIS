@@ -24,7 +24,7 @@ export const seminarsModule = {
   },
   nav: [
     { label: "Zápisy", href: "/enrollments", permission: "seminars.windows.view", order: 10 },
-    { label: "Předměty", href: "/subjects", permission: "seminars.subjects.view", order: 20 },
+    { label: "Semináře", href: "/subjects", permission: "seminars.subjects.view", order: 20 },
   ],
   routes: [{ prefix: "/enrollments", permission: "seminars.windows.view" }],
 } as const satisfies ModuleManifest;

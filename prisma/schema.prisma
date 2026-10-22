@@ -22,24 +22,31 @@ enum Status {
 }
 
 model User {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   firstName    String
   lastName     String
-  email        String   @unique
+  email        String    @unique
   passwordHash String?
-  role         Role     @default(GUEST)
-  isActive     Boolean  @default(true)
+  role         Role      @default(GUEST)
+  isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  cohort       String?  // Nástupní/Aktuální ročník, např. "2023/2024"
+  cohort String? // Původní textový ročník, např. "2023/2024" (nahrazuje ho třída)
+
+  // Třída studenta (null = není zařazen / není student)
+  classGroupId String?
+  classGroup   ClassGroup? @relation(fields: [classGroupId], references: [id], onDelete: SetNull)
+
+  // Úvazky učitele (kdo co učí)
+  teachingAssignments TeachingAssignment[]
 
   // ====== zpětné relace ======
-  // Subject
-  subjectsCreated  Subject[] @relation("SubjectCreatedBy")
-  subjectsUpdated  Subject[] @relation("SubjectUpdatedBy")
+  // Seminar
+  subjectsCreated Seminar[] @relation("SubjectCreatedBy")
+  subjectsUpdated Seminar[] @relation("SubjectUpdatedBy")
 
   // EnrollmentWindow
   enrollmentWindowsCreated EnrollmentWindow[] @relation("EnrollmentWindowCreatedBy")
@@ -51,37 +58,44 @@ model User {
   blocksDeleted Block[] @relation("BlockDeletedBy")
 
   // SubjectOccurrence
-  subjectOccurrencesTaught   SubjectOccurrence[] @relation("SubjectOccurrenceTeacher")
-  subjectOccurrencesCreated  SubjectOccurrence[] @relation("SubjectOccurrenceCreatedBy")
-  subjectOccurrencesUpdated  SubjectOccurrence[] @relation("SubjectOccurrenceUpdatedBy")
-  subjectOccurrencesDeleted  SubjectOccurrence[] @relation("SubjectOccurrenceDeletedBy")
+  subjectOccurrencesTaught  SubjectOccurrence[] @relation("SubjectOccurrenceTeacher")
+  subjectOccurrencesCreated SubjectOccurrence[] @relation("SubjectOccurrenceCreatedBy")
+  subjectOccurrencesUpdated SubjectOccurrence[] @relation("SubjectOccurrenceUpdatedBy")
+  subjectOccurrencesDeleted SubjectOccurrence[] @relation("SubjectOccurrenceDeletedBy")
 
   // StudentEnrollment
-  studentEnrollments         StudentEnrollment[] @relation("EnrollmentStudent")
-  studentEnrollmentsCreated  StudentEnrollment[] @relation("EnrollmentCreatedBy")
-  studentEnrollmentsUpdated  StudentEnrollment[] @relation("EnrollmentUpdatedBy")
-  studentEnrollmentsDeleted  StudentEnrollment[] @relation("EnrollmentDeletedBy")
+  studentEnrollments        StudentEnrollment[] @relation("EnrollmentStudent")
+  studentEnrollmentsCreated StudentEnrollment[] @relation("EnrollmentCreatedBy")
+  studentEnrollmentsUpdated StudentEnrollment[] @relation("EnrollmentUpdatedBy")
+  studentEnrollmentsDeleted StudentEnrollment[] @relation("EnrollmentDeletedBy")
 }
 
-model Subject {
-  id          String   @id @default(cuid())
+// =====================================================================
+// MODUL SEMINÁŘE
+// =====================================================================
+
+// Seminář (volitelný předmět do vyššího ročníku). V DB historicky tabulka "Subject".
+model Seminar {
+  id          String  @id @default(cuid())
   name        String
   code        String?
   description String?
   syllabus    String
-  isActive    Boolean  @default(true)
+  isActive    Boolean @default(true)
 
   createdById String
-  createdBy   User     @relation("SubjectCreatedBy", fields: [createdById], references: [id])
+  createdBy   User   @relation("SubjectCreatedBy", fields: [createdById], references: [id])
 
   updatedById String?
-  updatedBy   User?    @relation("SubjectUpdatedBy", fields: [updatedById], references: [id])
+  updatedBy   User?   @relation("SubjectUpdatedBy", fields: [updatedById], references: [id])
 
   // výskyty tohoto předmětu
   subjectOccurrences SubjectOccurrence[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("Subject")
 }
 
 model EnrollmentWindow {
@@ -92,99 +106,101 @@ model EnrollmentWindow {
   startsAt          DateTime
   endsAt            DateTime
   visibleToStudents Boolean  @default(false)
+  // Ročníky (1–4), pro které je zápis určen; prázdné = všichni studenti
+  targetGrades      Int[]    @default([])
 
-  createdById       String
-  createdBy         User     @relation("EnrollmentWindowCreatedBy", fields: [createdById], references: [id])
+  createdById String
+  createdBy   User   @relation("EnrollmentWindowCreatedBy", fields: [createdById], references: [id])
 
-  updatedById       String?
-  updatedBy         User?    @relation("EnrollmentWindowUpdatedBy", fields: [updatedById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("EnrollmentWindowUpdatedBy", fields: [updatedById], references: [id])
 
-  blocks            Block[]
+  blocks Block[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Block {
-  id                 String   @id @default(cuid())
-  name               String
-  order              Int
-  description        String?
+  id          String  @id @default(cuid())
+  name        String
+  order       Int
+  description String?
 
   enrollmentWindowId String
   enrollmentWindow   EnrollmentWindow @relation(fields: [enrollmentWindowId], references: [id], onDelete: Cascade)
 
-  createdById        String
-  createdBy          User     @relation("BlockCreatedBy", fields: [createdById], references: [id])
+  createdById String
+  createdBy   User   @relation("BlockCreatedBy", fields: [createdById], references: [id])
 
-  updatedById        String?
-  updatedBy          User?    @relation("BlockUpdatedBy", fields: [updatedById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("BlockUpdatedBy", fields: [updatedById], references: [id])
 
   subjectOccurrences SubjectOccurrence[]
 
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  deletedAt          DateTime?
-  deletedById        String?
-  deletedBy          User?    @relation("BlockDeletedBy", fields: [deletedById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+  deletedBy   User?     @relation("BlockDeletedBy", fields: [deletedById], references: [id])
 
-  @@index([enrollmentWindowId])
   @@unique([enrollmentWindowId, order])
+  @@index([enrollmentWindowId])
 }
 
 model SubjectOccurrence {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  subjectId   String
-  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Seminar @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
-  blockId     String
-  block       Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  blockId String
+  block   Block  @relation(fields: [blockId], references: [id], onDelete: Cascade)
 
-  teacherId   String?
-  teacher     User?    @relation("SubjectOccurrenceTeacher", fields: [teacherId], references: [id])
+  teacherId String?
+  teacher   User?   @relation("SubjectOccurrenceTeacher", fields: [teacherId], references: [id])
 
-  subCode     String?
-  capacity    Int?     // null = neomezená kapacita
+  subCode  String?
+  capacity Int? // null = neomezená kapacita
 
   createdById String
-  createdBy   User     @relation("SubjectOccurrenceCreatedBy", fields: [createdById], references: [id])
+  createdBy   User   @relation("SubjectOccurrenceCreatedBy", fields: [createdById], references: [id])
 
   updatedById String?
-  updatedBy   User?    @relation("SubjectOccurrenceUpdatedBy", fields: [updatedById], references: [id])
+  updatedBy   User?   @relation("SubjectOccurrenceUpdatedBy", fields: [updatedById], references: [id])
 
   studentEnrollments StudentEnrollment[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
   deletedById String?
-  deletedBy   User?    @relation("SubjectOccurrenceDeletedBy", fields: [deletedById], references: [id])
+  deletedBy   User?     @relation("SubjectOccurrenceDeletedBy", fields: [deletedById], references: [id])
 
   @@index([subjectId])
   @@index([blockId])
 }
 
 model StudentEnrollment {
-  id                  String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  studentId           String
-  student             User     @relation("EnrollmentStudent", fields: [studentId], references: [id])
+  studentId String
+  student   User   @relation("EnrollmentStudent", fields: [studentId], references: [id])
 
   subjectOccurrenceId String
   subjectOccurrence   SubjectOccurrence @relation(fields: [subjectOccurrenceId], references: [id], onDelete: Cascade)
 
-  createdById         String
-  createdBy           User     @relation("EnrollmentCreatedBy", fields: [createdById], references: [id])
+  createdById String
+  createdBy   User   @relation("EnrollmentCreatedBy", fields: [createdById], references: [id])
 
-  updatedById         String?
-  updatedBy           User?    @relation("EnrollmentUpdatedBy", fields: [updatedById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("EnrollmentUpdatedBy", fields: [updatedById], references: [id])
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  deletedAt           DateTime?
-  deletedById         String?
-  deletedBy           User?    @relation("EnrollmentDeletedBy", fields: [deletedById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+  deletedBy   User?     @relation("EnrollmentDeletedBy", fields: [deletedById], references: [id])
 
   @@index([studentId])
   @@index([subjectOccurrenceId])
@@ -195,4 +211,74 @@ model SystemSetting {
   value String
 }
 
+// =====================================================================
+// JÁDRO – ŠKOLA (sdílené všemi moduly)
+// =====================================================================
 
+// Školní rok, např. startYear 2026 = 2026/27. Právě jeden je aktuální.
+model SchoolYear {
+  id        String  @id @default(cuid())
+  startYear Int     @unique
+  isCurrent Boolean @default(false)
+
+  teachingAssignments TeachingAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Třída. Ročník se dopočítává z roku nástupu a aktuálního školního roku
+// (entryYear 2024 + letter "A" je ve školním roce 2026/27 třída 3.A).
+model ClassGroup {
+  id         String @id @default(cuid())
+  letter     String
+  // startYear školního roku, ve kterém byla třída v 1. ročníku
+  entryYear  Int
+  studyYears Int    @default(4)
+
+  students            User[]
+  teachingAssignments TeachingAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([entryYear, letter])
+}
+
+// Školní předmět (Matematika, Čeština, …)
+model Subject {
+  id       String  @id @default(cuid())
+  name     String
+  code     String  @unique
+  isActive Boolean @default(true)
+
+  teachingAssignments TeachingAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("SchoolSubject")
+}
+
+// Úvazek: učitel učí předmět ve třídě v daném školním roce
+model TeachingAssignment {
+  id String @id @default(cuid())
+
+  teacherId String
+  teacher   User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  classGroupId String
+  classGroup   ClassGroup @relation(fields: [classGroupId], references: [id], onDelete: Cascade)
+
+  schoolYearId String
+  schoolYear   SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([teacherId, subjectId, classGroupId, schoolYearId])
+  @@index([schoolYearId, classGroupId])
+  @@index([subjectId])
+}

@@ -27,10 +27,11 @@ export function ImportUsersDialog({ open, onOpenChange, onSuccess }: ImportUsers
   const [file, setFile] = React.useState<File | null>(null);
   const [templateSize, setTemplateSize] = React.useState(10);
   const [isImporting, setIsImporting] = React.useState(false);
-  const [importResult, setImportResult] = React.useState<{ created: number; updated: number; errors: number } | null>(null);
+  const [importResult, setImportResult] = React.useState<{ created: number; updated: number; errors: number; messages?: string[] } | null>(null);
 
   const handleDownloadTemplate = () => {
-    const headers = ["firstName", "lastName", "email", "cohort", "role", "isActive", "password"];
+    const headers = ["firstName", "lastName", "email", "class", "role", "isActive", "password"];
+    const classes = ["1.A", "2.B", "3.C"];
     const rows = [headers];
 
     for (let i = 1; i <= templateSize; i++) {
@@ -39,7 +40,7 @@ export function ImportUsersDialog({ open, onOpenChange, onSuccess }: ImportUsers
         `Student${i}`,
         `Testovací`,
         `student${i}@example.cz`,
-        "2023/2024",
+        classes[i % classes.length],
         "STUDENT",
         "TRUE",
         password
@@ -85,7 +86,7 @@ export function ImportUsersDialog({ open, onOpenChange, onSuccess }: ImportUsers
           return obj;
         });
 
-        const res = await importUsers(json as Array<{ firstName?: string, lastName?: string, email: string, cohort?: string, role?: string, isActive?: boolean | string | number, password?: string }>);
+        const res = await importUsers(json as Array<{ firstName?: string, lastName?: string, email: string, cohort?: string, class?: string, role?: string, isActive?: boolean | string | number, password?: string }>);
         setImportResult(res);
         toast.success("Import dokončen");
         onSuccess();
@@ -144,6 +145,8 @@ export function ImportUsersDialog({ open, onOpenChange, onSuccess }: ImportUsers
             </div>
             <p className="text-[10px] text-muted-foreground mt-2 italic">
               Šablona obsahuje náhodně vygenerovaná hesla studentů, které jim pak můžete předat.
+              Sloupec <code>class</code> je třída v aktuálním školním roce (např. 3.A); chybějící třídy se založí.
+              Starší sloupec <code>cohort</code> lze dál použít.
             </p>
           </div>
 
@@ -170,8 +173,13 @@ export function ImportUsersDialog({ open, onOpenChange, onSuccess }: ImportUsers
                 <AlertTitle className="mb-0">Výsledek importu</AlertTitle>
               </div>
               <AlertDescription className="text-sm">
-                Úspěšně zpracováno: <strong>{importResult.created}</strong><br />
+                Nově vytvořeno: <strong>{importResult.created}</strong>, aktualizováno: <strong>{importResult.updated}</strong><br />
                 Chyb: <strong>{importResult.errors}</strong>
+                {importResult.messages && importResult.messages.length > 0 && (
+                  <ul className="mt-2 list-disc pl-4 text-xs">
+                    {importResult.messages.map((m) => <li key={m}>{m}</li>)}
+                  </ul>
+                )}
               </AlertDescription>
             </Alert>
           )}

@@ -35,10 +35,13 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { updateEnrollmentWindow, createEnrollmentWindow, deleteEnrollmentWindow } from "@/modules/seminars/actions/windows";
+import { DEFAULT_STUDY_YEARS } from "@/lib/school";
+
+const GRADES = Array.from({ length: DEFAULT_STUDY_YEARS }, (_, i) => i + 1);
 import { EnrollmentStatus, EnrollmentWindowWithBlocks } from "@/lib/types";
 
 type EditEnrollmentDialogProps = {
-  enrollment: Partial<EnrollmentWindowWithBlocks> & { id?: string; name?: string; description?: string | null; status?: EnrollmentStatus; startsAt?: string | Date; endsAt?: string | Date; visibleToStudents?: boolean };
+  enrollment: Partial<EnrollmentWindowWithBlocks> & { id?: string; name?: string; description?: string | null; status?: EnrollmentStatus; startsAt?: string | Date; endsAt?: string | Date; visibleToStudents?: boolean; targetGrades?: number[] };
   onOpenChange: (open: boolean) => void;
 };
 
@@ -67,6 +70,10 @@ export function EditEnrollmentDialog({
   const [visibleToStudents, setVisibleToStudents] = React.useState(
     enrollment.visibleToStudents ?? false
   );
+  // Prázdné = zápis pro všechny ročníky
+  const [targetGrades, setTargetGrades] = React.useState<number[]>(
+    enrollment.targetGrades ?? []
+  );
   const [startsAt, setStartsAt] = React.useState<Date>(
     new Date(enrollment.startsAt ?? Date.now())
   );
@@ -85,6 +92,7 @@ export function EditEnrollmentDialog({
         description,
         status,
         visibleToStudents,
+        targetGrades,
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
       };
@@ -192,6 +200,34 @@ export function EditEnrollmentDialog({
             >
               Viditelné pro studenty
             </Label>
+          </div>
+          <div className="space-y-1 pt-2">
+            <Label className="text-sm font-medium">Pro ročníky</Label>
+            <div className="flex flex-wrap gap-2" id="targetGrades">
+              {GRADES.map((g) => {
+                const active = targetGrades.includes(g);
+                return (
+                  <button
+                    key={g}
+                    type="button"
+                    data-grade={g}
+                    onClick={() =>
+                      setTargetGrades((prev) =>
+                        active ? prev.filter((x) => x !== g) : [...prev, g].sort((a, b) => a - b)
+                      )
+                    }
+                    className={`rounded-md border px-3 py-1 text-sm ${active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
+                  >
+                    {g}. ročník
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {targetGrades.length === 0
+                ? "Nevybráno nic = zápis vidí a mohou se zapsat studenti všech ročníků."
+                : "Zápis uvidí jen studenti zařazení do tříd vybraných ročníků (Uživatelé → Třída)."}
+            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
             <div className="space-y-1">

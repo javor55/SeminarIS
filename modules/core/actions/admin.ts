@@ -8,6 +8,7 @@ import { MODULES } from "@/modules/registry";
 import { MODULE_SERVERS } from "@/modules/server-registry";
 import type { AdminStat } from "@/modules/server-types";
 import { getDefaultRole, getGlobalCohort, isRegistrationEnabled } from "@/modules/core/settings";
+import { AUTH_SETTING_KEYS, PASSWORD_SCOPES, getAuthSettings, type PasswordLoginScope } from "@/lib/auth-settings";
 
 export type AdminModuleInfo = {
   id: string;
@@ -30,10 +31,11 @@ export async function getAdminOverview() {
     )
   );
 
-  const [cohort, registrationEnabled, defaultRole] = await Promise.all([
+  const [cohort, registrationEnabled, defaultRole, auth] = await Promise.all([
     getGlobalCohort(),
     isRegistrationEnabled(),
     getDefaultRole(),
+    getAuthSettings(),
   ]);
 
   const modules: AdminModuleInfo[] = MODULES.map((m) => ({
@@ -44,7 +46,7 @@ export async function getAdminOverview() {
     enabled: enabledIds.includes(m.id),
   }));
 
-  return { stats: statGroups.flat(), cohort, registrationEnabled, defaultRole, modules };
+  return { stats: statGroups.flat(), cohort, registrationEnabled, defaultRole, modules, auth };
 }
 
 export async function setGlobalCohort(cohort: string) {
@@ -66,6 +68,26 @@ export async function setDefaultRole(role: "GUEST" | "STUDENT") {
 export async function setModuleEnabledAction(moduleId: string, enabled: boolean) {
   await requirePermission("core.admin");
   await setModuleEnabled(moduleId, enabled);
+}
+
+/** Nastavení přihlašování (Microsoft 365 / heslo). Přístupové údaje k Microsoftu jsou v env. */
+export async function setAuthSettings(data: {
+  microsoftEnabled?: boolean;
+  microsoftAutoCreate?: boolean;
+  passwordScope?: PasswordLoginScope;
+}) {
+  await requirePermission("core.admin");
+  if (data.microsoftEnabled !== undefined) {
+    await setSetting(AUTH_SETTING_KEYS.microsoftEnabled, data.microsoftEnabled ? "true" : "false");
+  }
+  if (data.microsoftAutoCreate !== undefined) {
+    await setSetting(AUTH_SETTING_KEYS.microsoftAutoCreate, data.microsoftAutoCreate ? "true" : "false");
+  }
+  if (data.passwordScope !== undefined) {
+    if (!PASSWORD_SCOPES.includes(data.passwordScope)) throw new Error("Neplatná volba.");
+    await setSetting(AUTH_SETTING_KEYS.passwordScope, data.passwordScope);
+  }
+  return getAuthSettings();
 }
 
 let isColdStart = true;

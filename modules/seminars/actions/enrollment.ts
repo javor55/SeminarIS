@@ -6,6 +6,8 @@ import { computeEnrollmentStatus } from "@/lib/utils";
 import { requirePermission } from "@/lib/session";
 import { can } from "@/modules/registry";
 import { syncEnrollmentWindowStatus } from "@/modules/seminars/window-status";
+import { isWindowForGrade } from "@/modules/seminars/eligibility";
+import { getStudentGrade } from "@/modules/core/school";
 
 export async function enrollStudent(studentId: string, subjectOccurrenceId: string) {
   try {
@@ -33,6 +35,14 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
       });
 
       if (!targetOcc || targetOcc.deletedAt) throw new Error("Seminář nenalezen.");
+
+      // 0. Zápis musí být určen pro ročník studenta (učitel/admin může zapsat kohokoliv)
+      if (!can(user.role, "seminars.enroll.others")) {
+        const grade = await getStudentGrade(studentId);
+        if (!isWindowForGrade(targetOcc.block.enrollmentWindow.targetGrades, grade)) {
+          throw new Error("Tento zápis není určen pro váš ročník.");
+        }
+      }
 
       // 1. Kontrola kapacity
       if (targetOcc.capacity !== null && targetOcc.studentEnrollments.length >= targetOcc.capacity) {

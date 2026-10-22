@@ -7,16 +7,30 @@ import type { EnrollmentStatus } from "@/lib/types";
 import { requireAuth, requireModule, requirePermission } from "@/lib/session";
 import { can } from "@/modules/registry";
 import { syncEnrollmentWindowStatus } from "@/modules/seminars/window-status";
+import { getViewerGrade, isWindowForGrade, sanitizeTargetGrades, windowsForGradeWhere } from "@/modules/seminars/eligibility";
+import { getCurrentSchoolYear, studentsInGradesWhere } from "@/modules/core/school";
+import { classLabel } from "@/lib/school";
+
+/** Aktivní studenti, pro které je okno určeno (všichni, nebo jen cílové ročníky). */
+async function eligibleStudentsWhere(targetGrades: number[]) {
+  const base = { role: "STUDENT" as const, isActive: true };
+  if (targetGrades.length === 0) return base;
+  const { startYear } = await getCurrentSchoolYear();
+  return { ...base, ...studentsInGradesWhere(targetGrades, startYear) };
+}
 
 // === ČTENÍ DAT ===
 
 export async function getEnrollmentWindowsVisible() {
-  await requireAuth();
+  const user = await requireAuth();
   await requireModule("seminars");
+  // Studenti vidí jen okna určená pro jejich ročník
+  const grade = await getViewerGrade(user);
   const windows = await prisma.enrollmentWindow.findMany({
     where: {
       visibleToStudents: true,
       status: { not: "DRAFT" },
+      ...(grade !== undefined ? windowsForGradeWhere(grade) : {}),
     },
     orderBy: { startsAt: "desc" },
   });
@@ -39,10 +53,12 @@ export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = fal
   await requireModule("seminars");
   // Skrytá okna a koncepty vidí jen učitelé a admini, bez ohledu na parametr
   if (!can(user.role, "seminars.windows.view")) visibleOnly = true;
+  const grade = await getViewerGrade(user);
 
-  const whereFilter = visibleOnly
-    ? { visibleToStudents: true, status: { not: "DRAFT" as EnrollmentStatus } }
-    : {};
+  const whereFilter = {
+    ...(visibleOnly ? { visibleToStudents: true, status: { not: "DRAFT" as EnrollmentStatus } } : {}),
+    ...(grade !== undefined ? windowsForGradeWhere(grade) : {}),
+  };
 
   const ews = await prisma.enrollmentWindow.findMany({
     where: whereFilter,
@@ -121,8 +137,9 @@ export async function getEnrollmentWindowByIdWithBlocks(id: string) {
   });
 
   if (!ew) return undefined;
-  if (!can(user.role, "seminars.windows.view") && (!ew.visibleToStudents || ew.status === "DRAFT")) {
-    return undefined;
+  if (!can(user.role, "seminars.windows.view")) {
+    if (!ew.visibleToStudents || ew.status === "DRAFT") return undefined;
+    if (!isWindowForGrade(ew.targetGrades, (await getViewerGrade(user)) ?? null)) return undefined;
   }
 
   // Sync stavu – pouze pokud se stav změní, refetchneme
@@ -186,12 +203,11 @@ export async function getEnrollmentMatrixData(windowId: string) {
 
   if (!window) throw new Error("Zápisové okno nenalezeno.");
 
-  // 2. Získáme všechny aktivní studenty
+  // 2. Získáme aktivní studenty, pro které je okno určeno
+  const { startYear } = await getCurrentSchoolYear();
   const students = await prisma.user.findMany({
-    where: {
-      role: "STUDENT",
-      isActive: true,
-    },
+    where: await eligibleStudentsWhere(window.targetGrades),
+    include: { classGroup: true },
     orderBy: [
       { lastName: "asc" },
       { firstName: "asc" }
@@ -238,6 +254,7 @@ export async function getEnrollmentMatrixData(windowId: string) {
     lastName: s.lastName,
     email: s.email,
     cohort: s.cohort,
+    classLabel: s.classGroup ? classLabel(s.classGroup, startYear) : null,
     choices: enrollmentMap.get(s.id) || {}
   }));
 
@@ -277,9 +294,9 @@ export async function getEnrollmentDetails(windowId: string) {
 
     if (!window) throw new Error("Zápisové okno nenalezeno.");
 
-    // Také potřebujeme všechny studenty pro report nezapsaných
+    // Také potřebujeme všechny studenty (cílových ročníků) pro report nezapsaných
     const allStudents = await prisma.user.findMany({
-        where: { role: "STUDENT", isActive: true },
+        where: await eligibleStudentsWhere(window.targetGrades),
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }]
     });
 
@@ -373,7 +390,7 @@ export async function createBlock(enrollmentWindowId: string, name: string, desc
 
 
 // === ZÁPISOVÁ OKNA (EnrollmentWindow) ===
-export async function createEnrollmentWindow(data: { name: string; description?: string; status: EnrollmentStatus; startsAt: string | Date; endsAt: string | Date; visibleToStudents: boolean }) {
+export async function createEnrollmentWindow(data: { name: string; description?: string; status: EnrollmentStatus; startsAt: string | Date; endsAt: string | Date; visibleToStudents: boolean; targetGrades?: number[] }) {
   const admin = await requirePermission("seminars.windows.manage");
   const created = await prisma.enrollmentWindow.create({
     data: {
@@ -383,6 +400,7 @@ export async function createEnrollmentWindow(data: { name: string; description?:
       startsAt: new Date(data.startsAt),
       endsAt: new Date(data.endsAt),
       visibleToStudents: data.visibleToStudents,
+      targetGrades: sanitizeTargetGrades(data.targetGrades),
       createdById: admin.id,
     },
   });
@@ -391,7 +409,7 @@ export async function createEnrollmentWindow(data: { name: string; description?:
 }
 
 
-export async function updateEnrollmentWindow(windowId: string, data: { name: string; description?: string; status: EnrollmentStatus; startsAt: string | Date; endsAt: string | Date; visibleToStudents: boolean }) {
+export async function updateEnrollmentWindow(windowId: string, data: { name: string; description?: string; status: EnrollmentStatus; startsAt: string | Date; endsAt: string | Date; visibleToStudents: boolean; targetGrades?: number[] }) {
   const admin = await requirePermission("seminars.windows.manage");
   const updated = await prisma.enrollmentWindow.update({
     where: { id: windowId },
@@ -402,6 +420,7 @@ export async function updateEnrollmentWindow(windowId: string, data: { name: str
       startsAt: new Date(data.startsAt),
       endsAt: new Date(data.endsAt),
       visibleToStudents: data.visibleToStudents,
+      targetGrades: sanitizeTargetGrades(data.targetGrades),
       updatedById: admin.id,
     },
   });

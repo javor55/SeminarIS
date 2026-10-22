@@ -14,6 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateUserProfile } from "@/modules/core/actions/users";
+import { getClassOptions, type ClassOption } from "@/modules/core/actions/school";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const NO_CLASS = "__none";
 import { toast } from "sonner";
 import { UserRow } from "./users-columns";
 import { Pencil } from "lucide-react";
@@ -33,6 +37,8 @@ export function EditUserDialog({ user, onSuccess }: EditUserDialogProps) {
   const [lastName, setLastName] = useState(user.lastName ?? "");
   const [email, setEmail] = useState(user.email ?? "");
   const [cohort, setCohort] = useState(user.cohort ?? "");
+  const [classGroupId, setClassGroupId] = useState(user.classGroupId ?? NO_CLASS);
+  const [classOptions, setClassOptions] = useState<ClassOption[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Reset hodnot při otevření dialogu
@@ -42,7 +48,11 @@ export function EditUserDialog({ user, onSuccess }: EditUserDialogProps) {
       setLastName(user.lastName ?? "");
       setEmail(user.email ?? "");
       setCohort(user.cohort ?? "");
+      setClassGroupId(user.classGroupId ?? NO_CLASS);
       setError(null);
+      getClassOptions()
+        .then(setClassOptions)
+        .catch(() => setClassOptions([]));
     }
   }, [open, user]);
 
@@ -59,6 +69,7 @@ export function EditUserDialog({ user, onSuccess }: EditUserDialogProps) {
         lastName,
         email,
         cohort: cohort || null,
+        classGroupId: classGroupId === NO_CLASS ? null : classGroupId,
       });
       toast.success(`Profil uživatele ${firstName} ${lastName} byl uložen.`);
       setOpen(false);
@@ -127,7 +138,24 @@ export function EditUserDialog({ user, onSuccess }: EditUserDialogProps) {
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="edit-cohort">Ročník</Label>
+              <Label htmlFor="edit-class">Třída</Label>
+              <Select value={classGroupId} onValueChange={setClassGroupId}>
+                <SelectTrigger id="edit-class">
+                  <SelectValue placeholder="Bez třídy" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CLASS}>Bez třídy</SelectItem>
+                  {classOptions
+                    .filter((c) => c.status !== "graduated" || c.id === user.classGroupId)
+                    .map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="edit-cohort">Ročník (původní)</Label>
               <Input
                 id="edit-cohort"
                 value={cohort}
