@@ -86,7 +86,7 @@ export function ImportUsersDialog({ open, onOpenChange, onSuccess }: ImportUsers
           return obj;
         });
 
-        const res = await importUsers(json as Array<{ firstName?: string, lastName?: string, email: string, cohort?: string, class?: string, role?: string, isActive?: boolean | string | number, password?: string }>);
+        const res = await importUsers(json as Array<{ firstName?: string, lastName?: string, email: string, class?: string, role?: string, isActive?: boolean | string | number, password?: string }>);
         setImportResult(res);
         toast.success("Import dokončen");
         onSuccess();
@@ -146,7 +146,6 @@ export function ImportUsersDialog({ open, onOpenChange, onSuccess }: ImportUsers
             <p className="text-[10px] text-muted-foreground mt-2 italic">
               Šablona obsahuje náhodně vygenerovaná hesla studentů, které jim pak můžete předat.
               Sloupec <code>class</code> je třída v aktuálním školním roce (např. 3.A); chybějící třídy se založí.
-              Starší sloupec <code>cohort</code> lze dál použít.
             </p>
           </div>
 

@@ -17,8 +17,8 @@ modules/
     manifest.ts
     server.ts           statistiky do administrace
     settings.ts         globální nastavení (ročník, registrace, výchozí role)
-    school.ts           dotazy nad školou pro všechny moduly (aktuální školní rok, ročník studenta, …)
-    actions/            server actions: users.ts, admin.ts, profile.ts, school.ts
+    school.ts           dotazy nad školou pro všechny moduly (aktuální rok, ročník studenta, setStudentClass, …)
+    actions/            server actions: users.ts (vč. stavu studia), admin.ts, profile.ts, school.ts (vč. uzavření roku)
     components/         users/, admin/, school/
   seminars/             zápis seminářů
     manifest.ts
@@ -34,7 +34,7 @@ lib/
   prisma.ts             Prisma klient (passwordHash se nikdy nevrací bez výslovného omit: false)
   auth.ts               NextAuth (heslo + Microsoft 365); role a aktivita se při každém ověření načtou z DB
   auth-settings.ts      nastavení přihlašování (M365 zapnuto, kdo smí heslem, zakládání účtů)
-  school.ts             čisté výpočty: školní rok, ročník a označení třídy („3.A“)
+  school.ts             čisté výpočty: školní rok, ročník, označení třídy („3.A“), popisy stavu studia
 app/                    stránky (URL zůstaly beze změny)
 components/             sdílené UI (shadcn/ui, editor, topbar)
 ```
@@ -47,28 +47,57 @@ Všechny moduly sdílí tato data (správa: menu **Škola**, jen admin):
 |---|---|
 | `SchoolYear` | školní rok (`startYear` 2026 = 2026/27), právě jeden je aktuální |
 | `ClassGroup` | třída = písmeno + rok nástupu (`entryYear`) + délka studia (4) |
-| `Subject` (tabulka `SchoolSubject`) | školní předmět (Matematika, M) |
+| `Subject` | školní předmět (Matematika, M) |
 | `TeachingAssignment` | úvazek: učitel × předmět × třída × školní rok |
-| `User.classGroupId` | třída studenta |
+| `User.classGroupId` | aktuální třída studenta (u absolventů a ukončených poslední) |
+| `ClassMembership` | historie: třída a ročník studenta v každém školním roce + důvod (zařazen, postup, opakuje, přeřazen) |
+| `User.studyStatus` | stav studia: studuje / absolvoval / ukončil (+ důvod, datum, poznámka) |
 
 Ročník se **nepřepisuje**, dopočítá se (`lib/school.ts`): třída s nástupem 2024 je ve
-školním roce 2026/27 třída 3.A. Po přepnutí aktuálního školního roku se ročníky posunou
-samy a třídy po 4. ročníku se stanou absolventy. Na začátku roku tedy stačí:
+školním roce 2026/27 třída 3.A. Třídu studenta mění jen `setStudentClass()`
+(`modules/core/school.ts`), která současně zapisuje historii.
 
-1. Škola → Školní rok → nastavit nový rok jako aktuální,
-2. Škola → Třídy → založit nové 1. ročníky (A, B, C),
-3. naimportovat nové studenty (sloupec `class`, např. `1.A`) a upravit úvazky.
+Do modulů se počítají jen **studující** studenti (`activeStudentsWhere`). Absolventi a
+ukončení mají deaktivovaný účet, jejich data (zápisy, historie) zůstávají.
+
+### Uzavření školního roku (Škola → Uzavřít školní rok…)
+
+Jednou ročně, typicky na konci srpna. Průvodce ukáže všechny studující se třídou a výchozí
+výsledek: **postoupí** (1.–3. ročník), nebo **absolvuje** (4. ročník). Výjimky se nastaví u
+konkrétních studentů:
+
+- **Opakuje ročník** (libovolný ročník 1–4): student přejde do třídy o rok mladší, která bude
+  v novém roce ve stejném ročníku (ze 2.A do nové 2.A = dnešní 1.A). Písmeno lze změnit, a
+  pokud cílová třída neexistuje, založí se.
+- **Ukončí studium:** přestup, zanechání, vyloučení, jiný důvod.
+
+Potvrzením se v jedné transakci:
+- zapíše historie (postup / opakování),
+- absolventům a odcházejícím se nastaví stav a **deaktivují účty**,
+- založí se nové 1. ročníky (výchozí A, B, C),
+- volitelně se převezmou úvazky do nového roku (kromě absolvujících tříd),
+- aktuálním rokem se stane následující školní rok.
+
+Akce se nedá vrátit. Jednotlivé studenty jde ale opravit ručně (přeřazení do třídy,
+obnovení studia).
+
+### Během roku (Uživatelé)
+
+- **Přeřazení do třídy:** úprava uživatele, nebo hromadně. V historii se zapíše jako „přeřazen“.
+- **Ukončit studium** (ikona čepice u studenta): důvod, datum, poznámka. Účet se deaktivuje.
+  Stejnou ikonou se studium obnoví.
+
+Ruční nastavení aktuálního roku (Škola → Školní rok) je k dispozici jen při prvním nastavení
+systému, dokud nikdo není zařazen do třídy. Potom se rok mění jen uzavřením.
 
 Pro moduly jsou připravené funkce v `modules/core/school.ts`: `getCurrentSchoolYear()`,
-`getStudentGrade(userId)`, `studentsInGradesWhere(grades, startYear)`, `findOrCreateClass(...)`.
+`getStudentGrade(userId)`, `activeStudentsWhere`, `studentsInGradesWhere(grades, startYear)`,
+`setStudentClass(...)`, `findOrCreateClass(...)`.
 
-Semináře (dřív model `Subject`) jsou teď model `Seminar`. V databázi je to pořád tabulka
-`"Subject"` (`@@map`), data se nepřesouvala. Zápisové okno má `targetGrades`
-(prázdné = všichni). Studenti jiných ročníků okno nevidí a nemůžou se do něj zapsat.
-Exporty obsahují jen studenty cílových ročníků.
-
-Původní textový „ročník“ (`User.cohort`, nastavení „Aktuální ročník studentů“) zůstává kvůli
-kompatibilitě. Nově se má používat třída.
+Semináře jsou model `Seminar` (v kódu seminářů se pro ně historicky používá název
+„subject“, např. `SubjectOccurrence.subjectId`, v DB sloupec `seminarId`). Zápisové okno
+má `targetGrades` (prázdné = všichni studující). Studenti jiných ročníků okno nevidí a
+nemůžou se do něj zapsat. Exporty obsahují jen studenty cílových ročníků.
 
 ## Přihlášení přes Microsoft 365
 
@@ -184,43 +213,26 @@ Migrace se do produkce aplikují **ručně** příkazem `npm run db:migrate` s p
 preview nasazení větví na Vercelu obvykle sdílejí produkční databázi a migrovala by ji každá
 větev.
 
-### Jednorázový přechod produkce na migrace (baseline)
+### Nasazení verze 10/2026 (nová databáze)
 
-Migrace `20261022120000_sync_db_push_drift` dorovnává historii migrací se stavem, který
-na produkci vznikl přes `db push`. Na produkci se **nesmí spustit**, jen se označí jako
-aplikovaná:
+Zpětná kompatibilita se starými daty se nezachovává. Historie migrací začíná jednou čistou
+migrací `20261024000000_init` a produkční databáze se založí znovu:
 
-```bash
-# 1) Ověřit, že produkce odpovídá schématu (výstup musí být „No difference detected.“)
-DATABASE_URL="<produkční URL>" npx prisma migrate diff \
-  --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma
+1. **Záloha** současné DB, pokud z ní chcete něco mít (Neon → Backup / branch).
+2. Vyprázdnit produkční databázi. V Neonu nejjednodušeji: smazat a znovu vytvořit databázi
+   (nebo nový branch) a aktualizovat `DATABASE_URL` na Vercelu, nebo v SQL editoru
+   `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`.
+3. `DATABASE_URL="<produkční URL>" npm run db:migrate`, založí všechny tabulky.
+4. Merge do `main` a nasazení na Vercel.
+5. Naplnění:
+   - první registrovaný uživatel se stane adminem,
+   - Škola: zkontrolovat školní rok, založit třídy,
+   - Uživatelé: import studentů se sloupcem `class` a učitelů,
+   - Škola: předměty a úvazky,
+   - Semináře: zápisová okna.
 
-# 2) Zjistit stav migrací
-DATABASE_URL="<produkční URL>" npm run db:status
-
-# 3) Označit jako aplikované ty, které status hlásí jako neaplikované
-#    (pokud produkce vznikla celá přes db push, týká se to i init migrace)
-DATABASE_URL="<produkční URL>" npx prisma migrate resolve --applied 20251108190324_init
-DATABASE_URL="<produkční URL>" npx prisma migrate resolve --applied 20261022120000_sync_db_push_drift
-
-# 4) Kontrola: „Database schema is up to date!“
-DATABASE_URL="<produkční URL>" npm run db:status
-```
-
-Pokud krok 1 ukáže rozdíly, produkce se od schématu v repozitáři liší. Nic neoznačujte a
-rozdíl nejdřív vyřešte. Před krokem 3 doporučujeme zálohu nebo branch databáze v Neonu.
-
-### Pořadí nasazení verze se školními daty (10/2026)
-
-Tato verze přidává tabulky (migrace `20261023090000_core_school_structure`) a kód je
-používá. Proto **nejdřív databáze, potom kód**:
-
-1. baseline produkce podle postupu výše (jednorázově),
-2. `DATABASE_URL="<produkční URL>" npm run db:migrate`, migrace jen přidává tabulky a sloupce,
-3. teprve pak merge do `main` / nasazení na Vercel.
-
-Kdyby se kód nasadil dřív, stránky používající třídy a školní rok by padaly na chybějící
-tabulky.
+Do budoucna platí: každá změna schématu = nová migrace (`npx prisma migrate dev`), na
+produkci `npm run db:migrate` **před** nasazením kódu.
 
 ## Bezpečnostní opravy provedené při refaktoringu
 

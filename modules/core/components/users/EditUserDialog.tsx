@@ -36,7 +36,6 @@ export function EditUserDialog({ user, onSuccess }: EditUserDialogProps) {
   const [firstName, setFirstName] = useState(user.firstName ?? "");
   const [lastName, setLastName] = useState(user.lastName ?? "");
   const [email, setEmail] = useState(user.email ?? "");
-  const [cohort, setCohort] = useState(user.cohort ?? "");
   const [classGroupId, setClassGroupId] = useState(user.classGroupId ?? NO_CLASS);
   const [classOptions, setClassOptions] = useState<ClassOption[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +46,6 @@ export function EditUserDialog({ user, onSuccess }: EditUserDialogProps) {
       setFirstName(user.firstName ?? "");
       setLastName(user.lastName ?? "");
       setEmail(user.email ?? "");
-      setCohort(user.cohort ?? "");
       setClassGroupId(user.classGroupId ?? NO_CLASS);
       setError(null);
       getClassOptions()
@@ -68,7 +66,6 @@ export function EditUserDialog({ user, onSuccess }: EditUserDialogProps) {
         firstName,
         lastName,
         email,
-        cohort: cohort || null,
         classGroupId: classGroupId === NO_CLASS ? null : classGroupId,
       });
       toast.success(`Profil uživatele ${firstName} ${lastName} byl uložen.`);
@@ -152,16 +149,6 @@ export function EditUserDialog({ user, onSuccess }: EditUserDialogProps) {
                     ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="edit-cohort">Ročník (původní)</Label>
-              <Input
-                id="edit-cohort"
-                value={cohort}
-                onChange={(e) => setCohort(e.target.value)}
-                placeholder="např. 2024/2025"
-              />
             </div>
 
             {error && (

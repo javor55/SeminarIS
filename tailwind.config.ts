@@ -7,6 +7,8 @@ const config: Config = {
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
     "./app/**/*.{ts,tsx}",
+    // komponenty modulů (modules/<id>/components)
+    "./modules/**/*.{ts,tsx}",
   ],
   theme: {
   	extend: {

@@ -7,7 +7,7 @@ import { requirePermission } from "@/lib/session";
 import { MODULES } from "@/modules/registry";
 import { MODULE_SERVERS } from "@/modules/server-registry";
 import type { AdminStat } from "@/modules/server-types";
-import { getDefaultRole, getGlobalCohort, isRegistrationEnabled } from "@/modules/core/settings";
+import { getDefaultRole, isRegistrationEnabled } from "@/modules/core/settings";
 import { AUTH_SETTING_KEYS, PASSWORD_SCOPES, getAuthSettings, type PasswordLoginScope } from "@/lib/auth-settings";
 
 export type AdminModuleInfo = {
@@ -31,8 +31,7 @@ export async function getAdminOverview() {
     )
   );
 
-  const [cohort, registrationEnabled, defaultRole, auth] = await Promise.all([
-    getGlobalCohort(),
+  const [registrationEnabled, defaultRole, auth] = await Promise.all([
     isRegistrationEnabled(),
     getDefaultRole(),
     getAuthSettings(),
@@ -46,12 +45,7 @@ export async function getAdminOverview() {
     enabled: enabledIds.includes(m.id),
   }));
 
-  return { stats: statGroups.flat(), cohort, registrationEnabled, defaultRole, modules, auth };
-}
-
-export async function setGlobalCohort(cohort: string) {
-  await requirePermission("core.admin");
-  return await setSetting("current_cohort", cohort);
+  return { stats: statGroups.flat(), registrationEnabled, defaultRole, modules, auth };
 }
 
 export async function setRegistrationEnabled(enabled: boolean) {

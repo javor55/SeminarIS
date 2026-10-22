@@ -66,3 +66,31 @@ export function targetGradesLabel(grades: readonly number[]): string {
   if (sorted.length === 1) return `${sorted[0]} ročník`;
   return `${sorted.slice(0, -1).join(", ")} a ${sorted[sorted.length - 1]} ročník`;
 }
+
+// === Stav studia ===
+
+export type StudyStatusValue = "ACTIVE" | "GRADUATED" | "LEFT";
+export type StudyEndReasonValue = "GRADUATED" | "TRANSFER" | "WITHDRAWAL" | "EXPULSION" | "OTHER";
+export type ClassChangeReasonValue = "ASSIGNED" | "PROMOTED" | "REPEATED" | "MOVED";
+
+export const STUDY_END_REASON_LABELS: Record<StudyEndReasonValue, string> = {
+  GRADUATED: "absolvoval",
+  TRANSFER: "přestup",
+  WITHDRAWAL: "zanechání studia",
+  EXPULSION: "vyloučení",
+  OTHER: "jiný důvod",
+};
+
+export const CLASS_CHANGE_REASON_LABELS: Record<ClassChangeReasonValue, string> = {
+  ASSIGNED: "zařazen",
+  PROMOTED: "postup",
+  REPEATED: "opakuje ročník",
+  MOVED: "přeřazen",
+};
+
+/** Krátký popis stavu studia: "absolvent", "ukončil (přestup)"; u studujících null. */
+export function studyStatusLabel(status: StudyStatusValue, reason?: StudyEndReasonValue | null): string | null {
+  if (status === "GRADUATED") return "absolvent";
+  if (status === "LEFT") return `ukončil${reason ? ` (${STUDY_END_REASON_LABELS[reason]})` : ""}`;
+  return null;
+}

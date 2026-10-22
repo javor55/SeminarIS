@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Trash2, Plus, Archive, ArchiveRestore } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,33 +83,44 @@ function SchoolYearCard({ overview, busy, run }: CardProps) {
       <CardHeader>
         <CardTitle>Školní rok</CardTitle>
         <CardDescription>
-          Aktuální rok: <strong>{overview.currentYear.label}</strong>. Po přepnutí na další rok se
-          třídy samy posunou o ročník a {DEFAULT_STUDY_YEARS}. ročníky se stanou absolventy.
+          Aktuální rok: <strong>{overview.currentYear.label}</strong>. Na konci roku ho uzavřete: třídy
+          postoupí, {DEFAULT_STUDY_YEARS}. ročníky absolvují a lze vyřešit opakování ročníku a odchody.
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex gap-2">
-        <Select value={selected} onValueChange={setSelected}>
-          <SelectTrigger className="w-[180px]" id="school-year">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {overview.years.map((y) => (
-              <SelectItem key={y.startYear} value={String(y.startYear)}>
-                {y.label}
-                {y.isCurrent ? " (aktuální)" : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <ConfirmAction
-          title="Přepnout školní rok?"
-          description={`Aktuální školní rok bude ${overview.years.find((y) => String(y.startYear) === selected)?.label}. Ročníky všech tříd se podle toho přepočítají.`}
-          actionLabel="Přepnout"
-          onConfirm={async () => { await run(() => setCurrentSchoolYear(Number(selected)), "Školní rok přepnut."); }}
-          trigger={
-            <Button disabled={!changed || busy}>Nastavit jako aktuální</Button>
-          }
-        />
+      <CardContent className="space-y-3">
+        <Button asChild>
+          <Link href="/school/close-year">Uzavřít školní rok {overview.currentYear.label}…</Link>
+        </Button>
+        {overview.canSetYearManually && (
+          <div className="space-y-1 pt-2 border-t">
+            <Label htmlFor="school-year">Počáteční nastavení roku</Label>
+            <p className="text-xs text-muted-foreground">
+              Jen dokud nejsou studenti zařazení do tříd; potom se rok mění uzavřením.
+            </p>
+            <div className="flex gap-2">
+              <Select value={selected} onValueChange={setSelected}>
+                <SelectTrigger className="w-[180px]" id="school-year">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {overview.years.map((y) => (
+                    <SelectItem key={y.startYear} value={String(y.startYear)}>
+                      {y.label}
+                      {y.isCurrent ? " (aktuální)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                disabled={!changed || busy}
+                onClick={() => run(() => setCurrentSchoolYear(Number(selected)), "Školní rok nastaven.")}
+              >
+                Nastavit
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -14,6 +14,29 @@ enum Role {
   ADMIN
 }
 
+// Stav studia studenta (u učitelů a adminů se nepoužívá)
+enum StudyStatus {
+  ACTIVE // studuje
+  GRADUATED // absolvoval (po posledním ročníku)
+  LEFT // ukončil studium jinak (viz StudyEndReason)
+}
+
+enum StudyEndReason {
+  GRADUATED // absolvování
+  TRANSFER // přestup na jinou školu
+  WITHDRAWAL // zanechání studia
+  EXPULSION // vyloučení
+  OTHER
+}
+
+// Proč je student v daném roce v dané třídě
+enum ClassChangeReason {
+  ASSIGNED // první zařazení (import, ruční přiřazení)
+  PROMOTED // postup do dalšího ročníku
+  REPEATED // opakuje ročník
+  MOVED // přeřazení během roku
+}
+
 enum Status {
   DRAFT
   SCHEDULED
@@ -34,11 +57,17 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  cohort String? // Původní textový ročník, např. "2023/2024" (nahrazuje ho třída)
+  // Aktuální (u absolventů a ukončených poslední) třída studenta; null = není zařazen / není student.
+  // Historie po letech je v ClassMembership – mění se vždy společně (modules/core/school.ts).
+  classGroupId     String?
+  classGroup       ClassGroup?       @relation(fields: [classGroupId], references: [id], onDelete: SetNull)
+  classMemberships ClassMembership[]
 
-  // Třída studenta (null = není zařazen / není student)
-  classGroupId String?
-  classGroup   ClassGroup? @relation(fields: [classGroupId], references: [id], onDelete: SetNull)
+  // Stav studia (jen u studentů)
+  studyStatus    StudyStatus     @default(ACTIVE)
+  studyEndedAt   DateTime?
+  studyEndReason StudyEndReason?
+  studyEndNote   String?
 
   // Úvazky učitele (kdo co učí)
   teachingAssignments TeachingAssignment[]
@@ -74,7 +103,7 @@ model User {
 // MODUL SEMINÁŘE
 // =====================================================================
 
-// Seminář (volitelný předmět do vyššího ročníku). V DB historicky tabulka "Subject".
+// Seminář (volitelný předmět do vyššího ročníku)
 model Seminar {
   id          String  @id @default(cuid())
   name        String
@@ -94,8 +123,6 @@ model Seminar {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@map("Subject")
 }
 
 model EnrollmentWindow {
@@ -151,7 +178,8 @@ model Block {
 model SubjectOccurrence {
   id String @id @default(cuid())
 
-  subjectId String
+  // seminář (v kódu historicky "subject")
+  subjectId String  @map("seminarId")
   subject   Seminar @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
   blockId String
@@ -222,6 +250,7 @@ model SchoolYear {
   isCurrent Boolean @default(false)
 
   teachingAssignments TeachingAssignment[]
+  classMemberships    ClassMembership[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -238,6 +267,7 @@ model ClassGroup {
 
   students            User[]
   teachingAssignments TeachingAssignment[]
+  classMemberships    ClassMembership[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -256,8 +286,6 @@ model Subject {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@map("SchoolSubject")
 }
 
 // Úvazek: učitel učí předmět ve třídě v daném školním roce
@@ -281,4 +309,28 @@ model TeachingAssignment {
   @@unique([teacherId, subjectId, classGroupId, schoolYearId])
   @@index([schoolYearId, classGroupId])
   @@index([subjectId])
+}
+
+// Historie zařazení: v jaké třídě a ročníku byl student v daném školním roce
+model ClassMembership {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  classGroupId String
+  classGroup   ClassGroup @relation(fields: [classGroupId], references: [id], onDelete: Cascade)
+
+  schoolYearId String
+  schoolYear   SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+
+  // Ročník v tom roce (uložený, aby historie nezávisela na pozdějších změnách tříd)
+  grade  Int
+  reason ClassChangeReason @default(ASSIGNED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, schoolYearId])
+  @@index([schoolYearId, classGroupId])
 }

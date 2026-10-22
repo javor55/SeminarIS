@@ -2,7 +2,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getAllUsers } from "@/modules/core/actions/users";
-import { getGlobalCohort } from "@/modules/core/settings";
 import { UsersClientView } from "@/modules/core/components/users/UsersClientView";
 import { User } from "@/lib/types";
 import { UserRow } from "@/modules/core/components/users/users-columns";
@@ -26,15 +25,11 @@ export default async function UsersPage() {
     );
   }
 
-  const [dbUsers, cohort] = await Promise.all([
-    getAllUsers(),
-    getGlobalCohort()
-  ]);
+  const dbUsers = await getAllUsers();
 
   return (
     <UsersClientView 
       users={dbUsers as unknown as UserRow[]} 
-      globalCohortInitial={cohort} 
       currentUser={currentUser} 
     />
   );

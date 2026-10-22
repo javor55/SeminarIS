@@ -1,9 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "@/lib/utils";
-import { updateUserRole, toggleUserActive, updateUsersCohort, deleteUserPermanently } from "@/modules/core/actions/users";
-import { setGlobalCohort } from "@/modules/core/actions/admin";
+import { updateUserRole, toggleUserActive, setUsersClass, deleteUserPermanently } from "@/modules/core/actions/users";
+import { getClassOptions, type ClassOption } from "@/modules/core/actions/school";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
 import { usersColumns, UserRow } from "@/modules/core/components/users/users-columns";
@@ -12,8 +11,7 @@ import { Download, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -35,22 +33,21 @@ import {
 } from "@/components/ui/select";
 import { User } from "@/lib/types";
 
+const NO_CLASS = "__none";
+
 export function UsersClientView({
   users,
-  globalCohortInitial,
   currentUser,
 }: {
   users: UserRow[];
-  globalCohortInitial: string;
   currentUser: User;
 }) {
   const router = useRouter();
-  const [globalCohort, setGlobalCohortState] = React.useState(globalCohortInitial);
   const [showImport, setShowImport] = React.useState(false);
   // Removed unused loading state
 
   const handleExport = () => {
-    const headers = ["Jméno", "Příjmení", "Email", "Registrace", "Poslední přihlášení", "Aktivní", "Role", "Zápisy"];
+    const headers = ["Jméno", "Příjmení", "Email", "Třída", "Stav studia", "Registrace", "Poslední přihlášení", "Aktivní", "Role", "Zápisy"];
     const rows = users.map(u => {
       const enrollments = u.studentEnrollments
         ?.map((e: { subjectOccurrence?: { subject?: { name: string } } }) => e.subjectOccurrence?.subject?.name)
@@ -61,6 +58,8 @@ export function UsersClientView({
         u.firstName,
         u.lastName,
         u.email,
+        u.classLabel ?? "",
+        u.studyLabel ?? "",
         u.createdAt ? new Date(u.createdAt).toLocaleString("cs-CZ") : "",
         u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("cs-CZ") : "nikdy",
         u.isActive ? "ANO" : "NE",
@@ -81,17 +80,6 @@ export function UsersClientView({
     toast.success("Export dokončen.");
   };
 
-  const handleUpdateGlobalCohort = async () => {
-    try {
-      await setGlobalCohort(globalCohort);
-      toast.success("Výchozí ročník byl uložen.");
-      router.refresh();
-    } catch (e: unknown) {
-      const error = e as Error;
-      toast.error("Chyba při ukládání: " + error.message);
-    }
-  };
-
   const roleFilterOptions = [
     { label: "Admin", value: "ADMIN" },
     { label: "Učitel", value: "TEACHER" },
@@ -104,14 +92,24 @@ export function UsersClientView({
     { label: "Neaktivní", value: "inactive" },
   ];
 
-  const cohortOptions = Array.from(new Set(users.map(u => u.cohort).filter(Boolean)))
-    .sort()
-    .map(c => ({ label: String(c), value: String(c) }));
+  const classFilterOptions = [
+    ...Array.from(new Set(users.map(u => u.classLabel).filter(Boolean)))
+      .sort((a, b) => String(a).localeCompare(String(b), "cs"))
+      .map(c => ({ label: String(c), value: String(c) })),
+    { label: "Bez třídy", value: NO_CLASS },
+  ];
+
+  // Studenti, kteří právě studují (ne absolventi / ukončení)
+  const studying = users.filter(u => u.role === "STUDENT" && u.isActive !== false && !u.studyLabel);
 
   function BulkActionsPanel({ filteredRows, forceRefresh }: { filteredRows: UserRow[], forceRefresh: () => void }) {
     const router = useRouter(); // Moved router here
     const [selectedRole, setSelectedRole] = React.useState<string | null>(null);
-    const [selectedCohort, setSelectedCohort] = React.useState("");
+    const [selectedClass, setSelectedClass] = React.useState<string>("");
+    const [classOptions, setClassOptions] = React.useState<ClassOption[]>([]);
+    React.useEffect(() => {
+      getClassOptions().then(setClassOptions).catch(() => setClassOptions([]));
+    }, []);
     const [loading, setLoading] = React.useState(false); // New loading state for bulk actions
 
     const handleBulkSetRole = async () => {
@@ -130,17 +128,17 @@ export function UsersClientView({
       }
     };
 
-    const handleBulkSetCohort = async () => {
-      if (!selectedCohort) return;
+    const handleBulkSetClass = async () => {
+      if (!selectedClass) return;
       setLoading(true);
       try {
-        await Promise.all(filteredRows.map(u => updateUsersCohort([u.id], selectedCohort)));
-        toast.success(`Ročník byl změněn pro ${filteredRows.length} uživatelů.`);
+        await setUsersClass(filteredRows.map(u => u.id), selectedClass === NO_CLASS ? null : selectedClass);
+        toast.success(`Třída byla změněna pro ${filteredRows.length} uživatelů.`);
         router.refresh();
         forceRefresh();
       } catch (e: unknown) {
         const error = e as Error;
-        toast.error("Chyba při hromadné změně ročníku: " + error.message);
+        toast.error("Chyba při hromadné změně třídy: " + error.message);
       } finally {
         setLoading(false);
       }
@@ -224,15 +222,20 @@ export function UsersClientView({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs">Hromadná změna ročníku</Label>
+            <Label className="text-xs">Přeřadit do třídy</Label>
             <div className="flex gap-2">
-              <Input
-                className="h-8"
-                placeholder="2024/25"
-                value={selectedCohort}
-                onChange={(e) => setSelectedCohort(e.target.value)}
-              />
-              <Button size="sm" className="h-8 shadow-none" onClick={handleBulkSetCohort} disabled={!selectedCohort || loading}>OK</Button>
+              <Select value={selectedClass} onValueChange={setSelectedClass}>
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="Třída..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CLASS}>Bez třídy</SelectItem>
+                  {classOptions.filter(c => c.status !== "graduated").map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button size="sm" className="h-8 shadow-none" onClick={handleBulkSetClass} disabled={!selectedClass || loading}>OK</Button>
             </div>
           </div>
         </div>
@@ -292,7 +295,7 @@ export function UsersClientView({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Správa uživatelů</h1>
-          <p className="text-sm text-muted-foreground">Komplexní správa rolí, ročníků a stavů zápisů.</p>
+          <p className="text-sm text-muted-foreground">Správa rolí, tříd, stavu studia a zápisů.</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -309,62 +312,41 @@ export function UsersClientView({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {currentUser.role === "ADMIN" && (
-          <Card className="md:col-span-1 border-emerald-500/20 bg-emerald-500/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-md">Systémový ročník</CardTitle>
-              <CardDescription className="text-xs text-balance">Výchozí hodnota pro nově registrované uživatele.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Input
-                  id="cohort"
-                  placeholder="např. 2024/2025"
-                  value={globalCohort}
-                  onChange={(e) => setGlobalCohortState(e.target.value)}
-                  className="bg-background"
-                />
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-md">Statistiky a přehled</CardTitle>
+        </CardHeader>
+        <CardContent>
+           <div className="flex gap-8 text-center items-center h-full pt-2 overflow-x-auto no-scrollbar">
+              <div className="flex-shrink-0">
+                <p className="text-2xl font-bold">{studying.length}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Studujících</p>
               </div>
-              <Button className="w-full" size="sm" onClick={handleUpdateGlobalCohort}>Aktualizovat globálně</Button>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card className={cn("md:col-span-2", currentUser.role !== "ADMIN" && "md:col-span-3")}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-md">Statistiky a přehled</CardTitle>
-          </CardHeader>
-          <CardContent>
-             <div className="flex gap-8 text-center items-center h-full pt-2 overflow-x-auto no-scrollbar">
-                <div className="flex-shrink-0">
-                  <p className="text-2xl font-bold">
-                    {users.filter(u => u.role === "STUDENT" && u.cohort === globalCohort && u.isActive !== false).length}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Studentů v ročníku</p>
-                </div>
-                <div className="border-l pl-8 flex-shrink-0">
-                  <p className="text-2xl font-bold text-orange-600">
-                    {users.filter(u => u.role === "GUEST" && u.cohort === globalCohort && u.isActive !== false).length}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Čeká na schválení</p>
-                </div>
-                <div className="border-l pl-8 flex-shrink-0">
-                  <p className="text-2xl font-bold text-emerald-600">
-                    {users.filter(u => u.role === "STUDENT" && u.cohort === globalCohort && u.isActive !== false && (u.studentEnrollments?.length ?? 0) > 0).length}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Zapsaní v ročníku</p>
-                </div>
-                <div className="border-l pl-8 flex-shrink-0">
-                  <p className="text-2xl font-bold text-rose-600">
-                    {users.filter(u => u.role === "STUDENT" && u.cohort === globalCohort && u.isActive !== false && (u.studentEnrollments?.length ?? 0) === 0).length}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Nezapsaní v ročníku</p>
-                </div>
-             </div>
-          </CardContent>
-        </Card>
-      </div>
+              <div className="border-l pl-8 flex-shrink-0">
+                <p className="text-2xl font-bold text-amber-600">{studying.filter(u => !u.classLabel).length}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Bez třídy</p>
+              </div>
+              <div className="border-l pl-8 flex-shrink-0">
+                <p className="text-2xl font-bold text-orange-600">
+                  {users.filter(u => u.role === "GUEST" && u.isActive !== false).length}
+                </p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Čeká na schválení</p>
+              </div>
+              <div className="border-l pl-8 flex-shrink-0">
+                <p className="text-2xl font-bold text-emerald-600">
+                  {studying.filter(u => (u.studentEnrollments?.length ?? 0) > 0).length}
+                </p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Se zápisem</p>
+              </div>
+              <div className="border-l pl-8 flex-shrink-0">
+                <p className="text-2xl font-bold text-rose-600">
+                  {studying.filter(u => (u.studentEnrollments?.length ?? 0) === 0).length}
+                </p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Bez zápisu</p>
+              </div>
+           </div>
+        </CardContent>
+      </Card>
 
       <ImportUsersDialog
         open={showImport}
@@ -409,9 +391,9 @@ export function UsersClientView({
               options: activeFilterOptions,
             },
             {
-              columnId: "cohort",
-              label: "Ročník",
-              options: cohortOptions,
+              columnId: "classLabel",
+              label: "Třída",
+              options: classFilterOptions,
             },
             {
               columnId: "enrollmentStatus",

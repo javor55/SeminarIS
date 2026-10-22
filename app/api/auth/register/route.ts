@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { getGlobalCohort, isRegistrationEnabled, getDefaultRole } from "@/modules/core/settings";
+import { isRegistrationEnabled, getDefaultRole } from "@/modules/core/settings";
 
 export async function POST(req: Request) {
   try {
@@ -46,8 +46,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Získání aktuálně nastaveného ročníku a výchozí role
-    const currentCohort = await getGlobalCohort();
+    // Výchozí role nového uživatele
     const defaultRole = await getDefaultRole();
 
     // Zahešování nového hesla
@@ -61,7 +60,6 @@ export async function POST(req: Request) {
         firstName,
         lastName,
         isActive: true,
-        cohort: currentCohort || null,
         role: isFirstUser ? "ADMIN" : defaultRole,
       },
     });

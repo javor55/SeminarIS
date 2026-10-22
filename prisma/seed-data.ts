@@ -53,7 +53,6 @@ async function main() {
         email: `student${i}@skola.cz`,
         passwordHash: await bcrypt.hash("heslo", 10),
         role: "STUDENT",
-        cohort: "2024/2025"
       }
     });
     students.push(s);
@@ -177,13 +176,6 @@ async function main() {
       });
     }
   }
-
-  // 9. Nastavit systémový ročník (global cohort)
-  await prisma.systemSetting.upsert({
-    where: { key: "current_cohort" },
-    update: { value: "2024/2025" },
-    create: { key: "current_cohort", value: "2024/2025" }
-  });
 
   console.log("Seeding kompletní!");
   console.log("Vytvořeno celkem 3 učitelé, 30 studentů, 4 předměty, 2 zápisová okna, 3 bloky, 6 výskytů.");

@@ -11,7 +11,7 @@ import {
   isMicrosoftConfigured,
   isPasswordLoginAllowed,
 } from "@/lib/auth-settings";
-import { getDefaultRole, getGlobalCohort } from "@/modules/core/settings";
+import { getDefaultRole } from "@/modules/core/settings";
 
 export const MICROSOFT_PROVIDER_ID = "azure-ad";
 
@@ -118,13 +118,12 @@ export const authOptions: NextAuthOptions = {
       let dbUser = await prisma.user.findUnique({ where: { email } });
       if (!dbUser) {
         if (!settings.microsoftAutoCreate) return "/login?error=MicrosoftNotRegistered";
-        const [role, cohort] = await Promise.all([getDefaultRole(), getGlobalCohort()]);
+        const role = await getDefaultRole();
         dbUser = await prisma.user.create({
           data: {
             email,
             ...splitName(user.name, email),
             role,
-            cohort: cohort || null,
             // Bez hesla – účet se přihlašuje přes Microsoft (heslo může nastavit admin)
             passwordHash: null,
           },

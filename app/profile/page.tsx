@@ -88,8 +88,6 @@ export default function ProfilePage() {
             <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="text-muted-foreground">Role:</div>
                 <div className="font-medium text-slate-800">{user.role}</div>
-                <div className="text-muted-foreground">Ročník:</div>
-                <div className="font-medium text-slate-800">{user.cohort ?? "—"}</div>
                 <div className="text-muted-foreground">ID systému:</div>
                 <div className="font-mono text-[10px] text-slate-400 truncate">{user.id}</div>
             </div>

@@ -84,14 +84,13 @@ export function EnrollmentHeader({
   const handleExportMatrix = async () => {
     try {
       const data = await getEnrollmentMatrixData(ew.id);
-      const headers = ["Příjmení", "Jméno", "Email", "Třída", "Ročník", ...data.blocks.map(b => b.name)];
+      const headers = ["Příjmení", "Jméno", "Email", "Třída", ...data.blocks.map(b => b.name)];
       const rows = data.students.map(s => {
         const row = [
           s.lastName || "",
           s.firstName || "",
           s.email || "",
           s.classLabel || "",
-          s.cohort || "",
           ...data.blocks.map(b => {
              const ch = s.choices[b.id];
              if (!ch) return "—";
@@ -113,8 +112,8 @@ export function EnrollmentHeader({
 
   const handleExportStudentList = async () => {
     try {
-      const { window } = await getEnrollmentDetails(ew.id);
-      const headers = ["Příjmení", "Jméno", "Email", "Ročník", "Blok", "Předmět", "Kód semináře", "Vyučující", "Zapsáno dne"];
+      const { window, classLabels } = await getEnrollmentDetails(ew.id);
+      const headers = ["Příjmení", "Jméno", "Email", "Třída", "Blok", "Předmět", "Kód semináře", "Vyučující", "Zapsáno dne"];
       const rows: string[][] = [];
 
       window.blocks.forEach(b => {
@@ -124,7 +123,7 @@ export function EnrollmentHeader({
               en.student.lastName,
               en.student.firstName,
               en.student.email,
-              en.student.cohort || "",
+              classLabels[en.studentId] || "",
               b.name,
               occ.subject.name,
               occ.subCode || "",
@@ -176,8 +175,8 @@ export function EnrollmentHeader({
 
   const handleExportTeacherReports = async () => {
     try {
-      const { window } = await getEnrollmentDetails(ew.id);
-      const headers = ["Učitel", "Blok", "Předmět", "Kód", "Student", "Email", "Ročník"];
+      const { window, classLabels } = await getEnrollmentDetails(ew.id);
+      const headers = ["Učitel", "Blok", "Předmět", "Kód", "Student", "Email", "Třída"];
       const rows: string[][] = [];
 
       window.blocks.forEach(b => {
@@ -191,7 +190,7 @@ export function EnrollmentHeader({
               occ.subCode || "",
               `${en.student.lastName} ${en.student.firstName}`,
               en.student.email,
-              en.student.cohort || ""
+              classLabels[en.studentId] || ""
             ]);
           });
         });
@@ -210,7 +209,7 @@ export function EnrollmentHeader({
 
   const handleExportMissingEnrollments = async () => {
     try {
-      const { window, allStudents } = await getEnrollmentDetails(ew.id);
+      const { window, allStudents, classLabels } = await getEnrollmentDetails(ew.id);
       const blockCount = window.blocks.length;
 
       // Spočítat kolik má kdo zápisů v tomto okně
@@ -223,7 +222,7 @@ export function EnrollmentHeader({
         });
       });
 
-      const headers = ["Příjmení", "Jméno", "Email", "Ročník", "Počet zápisů", "Stav"];
+      const headers = ["Příjmení", "Jméno", "Email", "Třída", "Počet zápisů", "Stav"];
       const rows: string[][] = [];
 
       allStudents.forEach(s => {
@@ -233,7 +232,7 @@ export function EnrollmentHeader({
             s.lastName,
             s.firstName,
             s.email,
-            s.cohort || "",
+            classLabels[s.id] || "",
             count.toString(),
             count === 0 ? "ABSENCE" : "NEÚPLNÉ"
           ]);

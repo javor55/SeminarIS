@@ -2,14 +2,6 @@ import { getSetting } from "@/lib/settings";
 
 // Globální nastavení jádra. Interní funkce bez autorizace (používá je i veřejná registrace).
 
-export async function getGlobalCohort(): Promise<string> {
-  try {
-    return (await getSetting("current_cohort")) || "";
-  } catch {
-    return "";
-  }
-}
-
 export async function isRegistrationEnabled(): Promise<boolean> {
   try {
     const value = await getSetting("registration_enabled");

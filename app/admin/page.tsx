@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
-import { getAdminOverview, setGlobalCohort, setRegistrationEnabled, setDefaultRole, setModuleEnabledAction, setAuthSettings, type AdminModuleInfo } from "@/modules/core/actions/admin";
+import { getAdminOverview, setRegistrationEnabled, setDefaultRole, setModuleEnabledAction, setAuthSettings, type AdminModuleInfo } from "@/modules/core/actions/admin";
 import type { AuthSettings, PasswordLoginScope } from "@/lib/auth-settings";
 import type { AdminStat } from "@/modules/server-types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -13,11 +13,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Users, BookOpen, Calendar, Save } from "lucide-react";
+import { Users, BookOpen, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { PerformanceBenchmarks } from "@/modules/core/components/admin/PerformanceBenchmarks";
 import { can } from "@/modules/registry";
@@ -34,8 +32,6 @@ export default function AdminPage() {
   const [stats, setStats] = useState<AdminStat[] | null>(null);
   const [modules, setModules] = useState<AdminModuleInfo[]>([]);
   const [auth, setAuth] = useState<AuthSettings | null>(null);
-  const [cohort, setCohort] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [regEnabled, setRegEnabled] = useState(true);
   const [defaultRole, setDefaultRoleState] = useState<"GUEST" | "STUDENT">("GUEST");
 
@@ -50,7 +46,6 @@ export default function AdminPage() {
     try {
       const overview = await getAdminOverview();
       setStats(overview.stats);
-      setCohort(overview.cohort);
       setRegEnabled(overview.registrationEnabled);
       setDefaultRoleState(overview.defaultRole);
       setModules(overview.modules);
@@ -60,17 +55,7 @@ export default function AdminPage() {
     }
   }
 
-  async function handleSaveCohort() {
-    setIsSaving(true);
-    try {
-      await setGlobalCohort(cohort);
-      toast.success("Globální ročník byl úspěšně aktualizován.");
-    } catch {
-      toast.error("Chyba při ukládání ročníku.");
-    } finally {
-      setIsSaving(false);
-    }
-  }
+
 
   if (isLoading || !user || !can(user.role, "core.admin")) return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -124,25 +109,7 @@ export default function AdminPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="cohort">Aktuální ročník studentů</Label>
-              <div className="flex gap-2">
-                <Input 
-                  id="cohort" 
-                  placeholder="např. 2024/2025" 
-                  value={cohort}
-                  onChange={(e) => setCohort(e.target.value)}
-                />
-                <Button variant="default" onClick={handleSaveCohort} disabled={isSaving}>
-                  {isSaving ? "Ukládám..." : <><Save className="w-4 h-4 mr-2" /> Uložit</>}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Tato hodnota se používá jako výchozí filtr při importu studentů a v přehledech.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t">
+            <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="registration">Registrace nových uživatelů</Label>
                 <p className="text-xs text-muted-foreground">

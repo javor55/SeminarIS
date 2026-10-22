@@ -7,8 +7,20 @@ import { revalidatePath } from "next/cache";
 import { requireAuth, requirePermission } from "@/lib/session";
 import { can } from "@/modules/registry";
 import { MODULE_SERVERS } from "@/modules/server-registry";
-import { ensureCurrentSchoolYear, findOrCreateClass, getCurrentSchoolYear } from "@/modules/core/school";
-import { classLabel as formatClassLabel, parseClassLabel, DEFAULT_STUDY_YEARS } from "@/lib/school";
+import { ensureCurrentSchoolYear, findOrCreateClass, setStudentClass } from "@/modules/core/school";
+import {
+  classLabel as formatClassLabel,
+  parseClassLabel,
+  schoolYearLabel,
+  studyStatusLabel,
+  DEFAULT_STUDY_YEARS,
+  type StudyEndReasonValue,
+} from "@/lib/school";
+
+function lastClassLabel(memberships: { grade: number; classGroup: { letter: string } }[]): string | null {
+  const last = memberships[memberships.length - 1];
+  return last ? `${last.grade}.${last.classGroup.letter}` : null;
+}
 
 const ROLES: readonly Role[] = ["GUEST", "STUDENT", "TEACHER", "ADMIN"];
 
@@ -44,7 +56,6 @@ export async function importUsers(data: Array<{
   firstName?: string, 
   lastName?: string, 
   email: string, 
-  cohort?: string, 
   // Třída v aktuálním školním roce, např. "3.A" (prázdné = beze změny)
   class?: string,
   role?: string, 
@@ -58,7 +69,8 @@ export async function importUsers(data: Array<{
     let errors = 0;
     // Popis chyb pro admina (první desítky řádků)
     const messages: string[] = [];
-    const { startYear } = await ensureCurrentSchoolYear();
+    const schoolYear = await ensureCurrentSchoolYear();
+    const { startYear } = schoolYear;
 
     for (const [index, row] of data.entries()) {
       // +2: číslování od 1 a řádek s hlavičkou
@@ -98,14 +110,13 @@ export async function importUsers(data: Array<{
         const payload = {
           firstName: row.firstName || "",
           lastName: row.lastName || "",
-          cohort: row.cohort || null,
           role: parseRole(row.role, "STUDENT"),
           isActive: isActiveValue,
-          ...(classGroupId ? { classGroupId } : {}),
         };
 
         const passwordHash = row.password ? await bcrypt.hash(row.password, 10) : undefined;
 
+        let userId: string;
         if (existing) {
           await prisma.user.update({
             where: { id: existing.id },
@@ -114,16 +125,21 @@ export async function importUsers(data: Array<{
               ...(passwordHash ? { passwordHash } : {})
             }
           });
+          userId = existing.id;
           updated++;
         } else {
-          await prisma.user.create({
+          const createdUser = await prisma.user.create({
             data: {
               ...payload,
               email,
               passwordHash: passwordHash || await bcrypt.hash(Math.random().toString(36), 10),
             }
           });
+          userId = createdUser.id;
           created++;
+        }
+        if (classGroupId) {
+          await setStudentClass(prisma, { userId, classGroupId, schoolYear });
         }
       } catch (e) {
         // eslint-disable-next-line no-console
@@ -141,16 +157,20 @@ export async function importUsers(data: Array<{
   }
 }
 
-// Rozšířené získání uživatelů vcetne historie zapisů (seminářů – zatím vazba jádra na modul seminars)
+// Rozšířené získání uživatelů vcetne historie tříd a zapisů (seminářů – zatím vazba jádra na modul seminars)
 export async function getAllUsers() {
   try {
     await requirePermission("core.users.view");
-    const { startYear } = await getCurrentSchoolYear();
+    const { startYear } = await ensureCurrentSchoolYear();
     
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       include: {
         classGroup: true,
+        classMemberships: {
+          include: { classGroup: true, schoolYear: true },
+          orderBy: { schoolYear: { startYear: "asc" } },
+        },
         studentEnrollments: {
           where: { deletedAt: null },
           include: {
@@ -170,9 +190,20 @@ export async function getAllUsers() {
     });
     
     // Převod na prostý objekt pro bezpečnou serializaci přes Next.js Server Actions
-    const withClass = users.map((u) => ({
+    const withClass = users.map(({ classMemberships, ...u }) => ({
       ...u,
-      classLabel: u.classGroup ? formatClassLabel(u.classGroup, startYear) : null,
+      // U absolventů a ukončených poslední třída, ne dopočítaný „budoucí“ ročník
+      classLabel: u.classGroup
+        ? u.studyStatus === "ACTIVE"
+          ? formatClassLabel(u.classGroup, startYear)
+          : lastClassLabel(classMemberships) ?? formatClassLabel(u.classGroup, startYear)
+        : null,
+      studyLabel: u.role === "STUDENT" ? studyStatusLabel(u.studyStatus, u.studyEndReason) : null,
+      classHistory: classMemberships.map((m) => ({
+        yearLabel: schoolYearLabel(m.schoolYear.startYear),
+        classLabel: `${m.grade}.${m.classGroup.letter}`,
+        reason: m.reason,
+      })),
     }));
     return JSON.parse(JSON.stringify(withClass));
   } catch (err) {
@@ -202,7 +233,7 @@ export async function updateUserRole(userId: string, role: string) {
 export async function updateUserProfile(
   userId: string,
   // classGroupId: undefined = beze změny, null = bez třídy
-  data: { firstName: string; lastName: string; email: string; cohort?: string | null; classGroupId?: string | null }
+  data: { firstName: string; lastName: string; email: string; classGroupId?: string | null }
 ) {
   await requirePermission("core.users.manage");
 
@@ -223,10 +254,11 @@ export async function updateUserProfile(
       firstName: data.firstName.trim(),
       lastName: data.lastName.trim(),
       email: data.email.trim().toLowerCase(),
-      cohort: data.cohort?.trim() || null,
-      ...(data.classGroupId !== undefined ? { classGroupId: data.classGroupId } : {}),
     },
   });
+  if (data.classGroupId !== undefined && data.classGroupId !== target.classGroupId) {
+    await setStudentClass(prisma, { userId, classGroupId: data.classGroupId, schoolYear: await ensureCurrentSchoolYear() });
+  }
 
   revalidatePath("/", "layout");
   return updated;
@@ -257,12 +289,52 @@ export async function resetUserPassword(userId: string, newPasswordRaw: string) 
   });
 }
 
-export async function updateUsersCohort(userIds: string[], cohort: string) {
+/** Hromadné přeřazení do třídy v aktuálním školním roce (null = vyřadit ze třídy). */
+export async function setUsersClass(userIds: string[], classGroupId: string | null) {
   await requirePermission("core.users.manage");
-  return await prisma.user.updateMany({
-    where: { id: { in: userIds } },
-    data: { cohort },
+  const schoolYear = await ensureCurrentSchoolYear();
+  await prisma.$transaction(async (tx) => {
+    for (const userId of userIds) {
+      await setStudentClass(tx, { userId, classGroupId, schoolYear });
+    }
   });
+  revalidatePath("/users");
+}
+
+// === STAV STUDIA ===
+
+/**
+ * Ukončí studium během roku (přestup, zanechání, vyloučení …). Účet se deaktivuje,
+ * třída a historie zůstávají; data v modulech (zápisy) se nemažou.
+ */
+export async function endStudy(userId: string, data: { reason: StudyEndReasonValue; note?: string; endedAt?: string }) {
+  await requirePermission("core.users.manage");
+  const target = await prisma.user.findUnique({ where: { id: userId } });
+  if (!target) throw new Error("Uživatel nenalezen.");
+  if (target.role !== "STUDENT") throw new Error("Studium lze ukončit jen studentovi.");
+  const reasons: StudyEndReasonValue[] = ["GRADUATED", "TRANSFER", "WITHDRAWAL", "EXPULSION", "OTHER"];
+  if (!reasons.includes(data.reason)) throw new Error("Neplatný důvod.");
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      studyStatus: data.reason === "GRADUATED" ? "GRADUATED" : "LEFT",
+      studyEndReason: data.reason,
+      studyEndedAt: data.endedAt ? new Date(data.endedAt) : new Date(),
+      studyEndNote: data.note?.trim() || null,
+      isActive: false,
+    },
+  });
+  revalidatePath("/", "layout");
+}
+
+/** Vrátí ukončení studia (omyl, návrat ke studiu). Účet se znovu aktivuje. */
+export async function restoreStudy(userId: string) {
+  await requirePermission("core.users.manage");
+  await prisma.user.update({
+    where: { id: userId },
+    data: { studyStatus: "ACTIVE", studyEndReason: null, studyEndedAt: null, studyEndNote: null, isActive: true },
+  });
+  revalidatePath("/", "layout");
 }
 
 /**

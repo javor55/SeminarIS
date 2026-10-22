@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { CLASS_CHANGE_REASON_LABELS } from "@/lib/school";
 import { UserRow } from "./users-columns";
 import {
   Dialog,
@@ -58,19 +59,41 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
             <div className="space-y-3">
               <div className="flex flex-col">
                 <span className="text-xs text-muted-foreground uppercase font-semibold flex items-center gap-1">
-                  <GraduationCap className="w-3 h-3" /> Role a Ročník
+                  <GraduationCap className="w-3 h-3" /> Role a třída
                 </span>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
                     {user.role}
                   </Badge>
-                  {user.cohort && (
+                  {user.classLabel && (
                     <Badge variant="secondary">
-                      {user.cohort}
+                      {user.classLabel}
                     </Badge>
                   )}
+                  {user.studyLabel && (
+                    <Badge variant="outline">{user.studyLabel}</Badge>
+                  )}
                 </div>
+                {user.studyLabel && (user.studyEndedAt || user.studyEndNote) && (
+                  <span className="text-xs text-muted-foreground mt-1">
+                    {user.studyEndedAt ? new Date(user.studyEndedAt).toLocaleDateString("cs-CZ") : ""}
+                    {user.studyEndNote ? ` – ${user.studyEndNote}` : ""}
+                  </span>
+                )}
               </div>
+              {user.classHistory && user.classHistory.length > 0 && (
+                <div className="flex flex-col">
+                  <span className="text-xs text-muted-foreground uppercase font-semibold">Historie tříd</span>
+                  <ul className="text-sm mt-1 space-y-0.5" data-testid="class-history">
+                    {user.classHistory.map((h) => (
+                      <li key={h.yearLabel}>
+                        {h.yearLabel}: <strong>{h.classLabel}</strong>
+                        <span className="text-muted-foreground"> ({CLASS_CHANGE_REASON_LABELS[h.reason]})</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="flex flex-col">
                 <span className="text-xs text-muted-foreground uppercase font-semibold flex items-center gap-1">
                   <Calendar className="w-3 h-3" /> Registrace

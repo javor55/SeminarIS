@@ -7,7 +7,6 @@ export type User = {
   email: string;
   role: Role;
   isActive: boolean;
-  cohort?: string | null;
   classGroupId?: string | null;
   lastLoginAt?: string | Date | null;
   createdAt: string | Date;

@@ -199,6 +199,29 @@ async function main() {
     skipDuplicates: true,
   });
 
+  // 7) Škola: aktuální školní rok, třídy 3.A a 3.B, studenti zařazení (včetně historie)
+  const now = new Date();
+  const startYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  const year = await prisma.schoolYear.upsert({
+    where: { startYear },
+    update: { isCurrent: true },
+    create: { startYear, isCurrent: true },
+  });
+  const entryYear = startYear - 2; // 3. ročník
+  for (const [userId, letter] of [[student1Id, "A"], [student2Id, "B"]] as const) {
+    const cls = await prisma.classGroup.upsert({
+      where: { entryYear_letter: { entryYear, letter } },
+      update: {},
+      create: { entryYear, letter },
+    });
+    await prisma.user.update({ where: { id: userId }, data: { classGroupId: cls.id } });
+    await prisma.classMembership.upsert({
+      where: { userId_schoolYearId: { userId, schoolYearId: year.id } },
+      update: {},
+      create: { userId, classGroupId: cls.id, schoolYearId: year.id, grade: 3 },
+    });
+  }
+
   console.log("✅ Seed hotov.");
 }
 

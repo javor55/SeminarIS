@@ -16,6 +16,8 @@ import { ConfirmAction } from "./ConfirmAction";
 import { ResetPasswordDialog } from "./ResetPasswordDialog";
 import { UserDetailsDialog } from "./UserDetailsDialog";
 import { EditUserDialog } from "./EditUserDialog";
+import { StudyStatusDialog } from "./StudyStatusDialog";
+import type { ClassChangeReasonValue, StudyStatusValue } from "@/lib/school";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +34,12 @@ export type UserRow = User & {
   classGroupId?: string | null;
   // Např. "3.A", dopočítané na serveru podle aktuálního školního roku
   classLabel?: string | null;
+  studyStatus?: StudyStatusValue;
+  // "absolvent", "ukončil (přestup)"; u studujících a nestudentů null
+  studyLabel?: string | null;
+  studyEndedAt?: string | null;
+  studyEndNote?: string | null;
+  classHistory?: { yearLabel: string; classLabel: string; reason: ClassChangeReasonValue }[];
   lastLoginAt?: string;
   studentEnrollments?: Array<{
     id: string;
@@ -192,6 +200,10 @@ const ActionsCell = ({ row }: { row: Row<UserRow> }) => {
         <EditUserDialog user={u} />
       )}
 
+      {isAdmin && u.role === "STUDENT" && (
+        <StudyStatusDialog user={u} />
+      )}
+
       {isAdmin && (
         <ResetPasswordDialog userId={u.id} userName={`${u.firstName} ${u.lastName}`} />
       )}
@@ -262,12 +274,19 @@ export const usersColumns: ColumnDef<UserRow>[] = [
   {
     accessorKey: "classLabel",
     header: "Třída",
-    cell: ({ row }) => row.original.classLabel || "—",
-  },
-  {
-    accessorKey: "cohort",
-    header: "Ročník (původní)",
-    cell: ({ row }) => row.original.cohort || "—",
+    cell: ({ row }) => (
+      <span className="whitespace-nowrap">
+        {row.original.classLabel || "—"}
+        {row.original.studyLabel && (
+          <span className="ml-1 text-xs text-muted-foreground">· {row.original.studyLabel}</span>
+        )}
+      </span>
+    ),
+    filterFn: (row, id, value) => {
+      if (!value || value.length === 0) return true;
+      const v = row.getValue(id) as string | null;
+      return value.includes(v ?? "__none");
+    },
   },
   {
     accessorKey: "createdAt",

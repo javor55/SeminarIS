@@ -8,15 +8,14 @@ import { requireAuth, requireModule, requirePermission } from "@/lib/session";
 import { can } from "@/modules/registry";
 import { syncEnrollmentWindowStatus } from "@/modules/seminars/window-status";
 import { getViewerGrade, isWindowForGrade, sanitizeTargetGrades, windowsForGradeWhere } from "@/modules/seminars/eligibility";
-import { getCurrentSchoolYear, studentsInGradesWhere } from "@/modules/core/school";
+import { activeStudentsWhere, getCurrentSchoolYear, studentsInGradesWhere } from "@/modules/core/school";
 import { classLabel } from "@/lib/school";
 
 /** Aktivní studenti, pro které je okno určeno (všichni, nebo jen cílové ročníky). */
 async function eligibleStudentsWhere(targetGrades: number[]) {
-  const base = { role: "STUDENT" as const, isActive: true };
-  if (targetGrades.length === 0) return base;
+  if (targetGrades.length === 0) return activeStudentsWhere;
   const { startYear } = await getCurrentSchoolYear();
-  return { ...base, ...studentsInGradesWhere(targetGrades, startYear) };
+  return studentsInGradesWhere(targetGrades, startYear);
 }
 
 // === ČTENÍ DAT ===
@@ -253,7 +252,6 @@ export async function getEnrollmentMatrixData(windowId: string) {
     firstName: s.firstName,
     lastName: s.lastName,
     email: s.email,
-    cohort: s.cohort,
     classLabel: s.classGroup ? classLabel(s.classGroup, startYear) : null,
     choices: enrollmentMap.get(s.id) || {}
   }));
@@ -282,7 +280,7 @@ export async function getEnrollmentDetails(windowId: string) {
                             studentEnrollments: {
                                 where: { deletedAt: null },
                                 include: {
-                                    student: true
+                                    student: { include: { classGroup: true } }
                                 }
                             }
                         }
@@ -297,12 +295,25 @@ export async function getEnrollmentDetails(windowId: string) {
     // Také potřebujeme všechny studenty (cílových ročníků) pro report nezapsaných
     const allStudents = await prisma.user.findMany({
         where: await eligibleStudentsWhere(window.targetGrades),
+        include: { classGroup: true },
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }]
     });
 
+    // Třída každého studenta ("3.A") pro exporty
+    const { startYear } = await getCurrentSchoolYear();
+    const classLabels: Record<string, string> = {};
+    const students = [
+        ...allStudents,
+        ...window.blocks.flatMap(b => b.subjectOccurrences.flatMap(o => o.studentEnrollments.map(e => e.student))),
+    ];
+    for (const s of students) {
+        if (s.classGroup) classLabels[s.id] = classLabel(s.classGroup, startYear);
+    }
+
     return {
         window,
-        allStudents
+        allStudents,
+        classLabels
     };
 }
 
