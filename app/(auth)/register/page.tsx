@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { NativeSelect } from "@/components/ui/native-select";
 import { AlertCircle } from "lucide-react";
 
 export default function RegisterPage() {
@@ -28,8 +29,23 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
 
+  const [classGroupId, setClassGroupId] = React.useState("");
+  // Výběr třídy při registraci nastavuje admin (vypnuto / volitelný / povinný)
+  const [classMode, setClassMode] = React.useState<"off" | "optional" | "required">("off");
+  const [classes, setClasses] = React.useState<{ id: string; label: string }[]>([]);
+
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    fetch("/api/auth/register")
+      .then((res) => res.json())
+      .then((data) => {
+        setClassMode(data.classMode ?? "off");
+        setClasses(data.classes ?? []);
+      })
+      .catch(() => {});
+  }, []);
   
   // Efekt pro přesměrování již přihlášených uživatelů
   React.useEffect(() => {
@@ -48,7 +64,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, firstName, lastName }),
+        body: JSON.stringify({ email, password, firstName, lastName, classGroupId: classGroupId || undefined }),
       });
 
       const data = await res.json();
@@ -135,6 +151,23 @@ export default function RegisterPage() {
               />
             </div>
             
+            {classMode !== "off" && classes.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="classGroupId">Třída{classMode === "required" ? "" : " (nepovinné)"}</Label>
+                <NativeSelect
+                  id="classGroupId"
+                  value={classGroupId}
+                  onChange={(e) => setClassGroupId(e.target.value)}
+                  required={classMode === "required"}
+                >
+                  <option value="">— vyberte třídu —</option>
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </NativeSelect>
+              </div>
+            )}
+
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="password">Heslo</Label>

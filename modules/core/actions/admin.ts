@@ -8,7 +8,15 @@ import { requirePermission } from "@/lib/session";
 import { MODULES } from "@/modules/registry";
 import { MODULE_SERVERS } from "@/modules/server-registry";
 import type { AdminStat } from "@/modules/server-types";
-import { getDefaultRole, isRegistrationEnabled } from "@/modules/core/settings";
+import {
+  REGISTRATION_CLASS_MODES,
+  REGISTRATION_CLASS_MODE_KEY,
+  getDefaultRole,
+  getRegistrationClassMode,
+  isRegistrationEnabled,
+  type RegistrationClassMode,
+} from "@/modules/core/settings";
+import { getSchoolYearInfo } from "@/modules/core/school";
 import { AUTH_SETTING_KEYS, PASSWORD_SCOPES, getAuthSettings, type PasswordLoginScope } from "@/lib/auth-settings";
 
 export type AdminModuleInfo = {
@@ -32,10 +40,12 @@ export async function getAdminOverview() {
     )
   );
 
-  const [registrationEnabled, defaultRole, auth] = await Promise.all([
+  const [registrationEnabled, defaultRole, classMode, auth, schoolYear] = await Promise.all([
     isRegistrationEnabled(),
     getDefaultRole(),
+    getRegistrationClassMode(),
     getAuthSettings(),
+    getSchoolYearInfo(),
   ]);
 
   const modules: AdminModuleInfo[] = MODULES.map((m) => ({
@@ -46,7 +56,7 @@ export async function getAdminOverview() {
     enabled: enabledIds.includes(m.id),
   }));
 
-  return { stats: statGroups.flat(), registrationEnabled, defaultRole, modules, auth };
+  return { stats: statGroups.flat(), registrationEnabled, defaultRole, classMode, modules, auth, schoolYear };
 }
 
 export async function setRegistrationEnabled(enabled: boolean) {
@@ -61,6 +71,15 @@ export async function setDefaultRole(role: "GUEST" | "STUDENT") {
     await requirePermission("core.admin");
     if (role !== "GUEST" && role !== "STUDENT") throw new Error("Neplatná role.");
     return await setSetting("default_user_role", role);
+  });
+}
+
+/** Výběr třídy při registraci: vypnuto / volitelný / povinný. */
+export async function setRegistrationClassMode(mode: RegistrationClassMode) {
+  return safeAction(async () => {
+    await requirePermission("core.admin");
+    if (!REGISTRATION_CLASS_MODES.includes(mode)) throw new Error("Neplatná volba.");
+    return await setSetting(REGISTRATION_CLASS_MODE_KEY, mode);
   });
 }
 
