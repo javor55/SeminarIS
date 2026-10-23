@@ -40,7 +40,7 @@ export function seedSubjects() {
     `insert into "Subject"(id,name,code,"updatedAt") values ('sm','Matematika','M',now()),('scj','Čeština','CJ',now()),('sf','Fyzika','F',now())`
   );
   sql(
-    `insert into "TeachingAssignment"(id,"teacherId","subjectId","classGroupId","schoolYearId") select 'ta1','usr_teacher','sm',c.id,y.id from "ClassGroup" c, "SchoolYear" y where c.letter='A' and y."isCurrent"`
+    `insert into "TeachingAssignment"(id,"teacherId","subjectId","classGroupId","schoolYearId") select 'ta1','usr_teacher','sm',c.id,y.id from "ClassGroup" c, "SchoolYear" y where c.grade=3 and c.letter='A' and y."isCurrent"`
   );
 }
 
