@@ -9,7 +9,9 @@ Cíl: upozornění nastavitelná z administrace tak, aby se nevyčerpal free lim
 
 ### Odesílání
 - Resend přes REST API (`fetch`, bez SDK), klíč v env `RESEND_API_KEY`. Bez klíče se nic
-  neposílá a administrace to ukáže.
+  neposílá a administrace to ukáže. Doména je ověřená v Resendu, nic dalšího není potřeba.
+- Odesílatel: env `EMAIL_FROM` (např. `Školní IS <noreply@domena.cz>`) a volitelně
+  `EMAIL_REPLY_TO`; administrace je může přepsat (prázdné pole = hodnota z env).
 - Vše přes jednu funkci (`lib/email/`): kontrola zapnutí, události, limitů a odhlášení
   příjemce → odeslání (u více příjemců batch API po max. 100) → zápis do `EmailLog`.
 - Chyba odeslání nesmí shodit akci, která ho vyvolala (zaloguje se, akce proběhne).
@@ -17,7 +19,7 @@ Cíl: upozornění nastavitelná z administrace tak, aby se nevyčerpal free lim
   SKIPPED_DISABLED), chyba, čas. Slouží i k počítání limitů.
 
 ### Administrace → „Upozornění“
-- Hlavní vypínač, jméno a adresa odesílatele, reply-to.
+- Hlavní vypínač, odesílatel a reply-to (přepíše env, prázdné = env).
 - Limity: denní (výchozí 90) a měsíční (výchozí 2 900); při dosažení se další e-maily
   neposílají (SKIPPED_LIMIT) a admin to vidí. Ukazatel „dnes X / měsíc Y“.
 - Seznam událostí, u každé: zapnuto/vypnuto, předmět a text šablony s proměnnými
