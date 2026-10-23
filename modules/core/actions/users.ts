@@ -18,11 +18,6 @@ import {
   type StudyEndReasonValue,
 } from "@/lib/school";
 
-function lastClassLabel(memberships: { grade: number; classGroup: { letter: string } }[]): string | null {
-  const last = memberships[memberships.length - 1];
-  return last ? `${last.grade}.${last.classGroup.letter}` : null;
-}
-
 const ROLES: readonly Role[] = ["GUEST", "STUDENT", "TEACHER", "ADMIN"];
 
 function parseRole(value: string | undefined, fallback?: Role): Role {
@@ -72,7 +67,6 @@ export async function importUsers(data: Array<{
       // Popis chyb pro admina (první desítky řádků)
       const messages: string[] = [];
       const schoolYear = await ensureCurrentSchoolYear();
-      const { startYear } = schoolYear;
 
       for (const [index, row] of data.entries()) {
         // +2: číslování od 1 a řádek s hlavičkou
@@ -95,7 +89,7 @@ export async function importUsers(data: Array<{
               messages.push(`Řádek ${line} (${email}): neplatná třída „${classText}“, očekává se např. 3.A.`);
               continue;
             }
-            classGroupId = (await findOrCreateClass(parsed.grade, parsed.letter, startYear)).id;
+            classGroupId = (await findOrCreateClass(parsed.grade, parsed.letter)).id;
           }
 
           const existing = await prisma.user.findUnique({ where: { email } });
@@ -164,12 +158,13 @@ export async function importUsers(data: Array<{
 export async function getAllUsers() {
   try {
     await requirePermission("core.users.view");
-    const { startYear } = await ensureCurrentSchoolYear();
-    
+
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       include: {
         classGroup: true,
+        requestedClassGroup: true,
+        _count: { select: { teachingAssignments: { where: { schoolYear: { isCurrent: true } } } } },
         classMemberships: {
           include: { classGroup: true, schoolYear: true },
           orderBy: { schoolYear: { startYear: "asc" } },
@@ -193,14 +188,13 @@ export async function getAllUsers() {
     });
     
     // Převod na prostý objekt pro bezpečnou serializaci přes Next.js Server Actions
-    const withClass = users.map(({ classMemberships, ...u }) => ({
+    const withClass = users.map(({ classMemberships, _count, ...u }) => ({
       ...u,
-      // U absolventů a ukončených poslední třída, ne dopočítaný „budoucí“ ročník
-      classLabel: u.classGroup
-        ? u.studyStatus === "ACTIVE"
-          ? formatClassLabel(u.classGroup, startYear)
-          : lastClassLabel(classMemberships) ?? formatClassLabel(u.classGroup, startYear)
-        : null,
+      // U absolventů a ukončených poslední třída
+      classLabel: u.classGroup ? formatClassLabel(u.classGroup) : null,
+      requestedClassLabel: u.requestedClassGroup ? formatClassLabel(u.requestedClassGroup) : null,
+      // Úvazky učitele v aktuálním školním roce
+      assignmentCount: _count.teachingAssignments,
       studyLabel: u.role === "STUDENT" ? studyStatusLabel(u.studyStatus, u.studyEndReason) : null,
       classHistory: classMemberships.map((m) => ({
         yearLabel: schoolYearLabel(m.schoolYear.startYear),
@@ -227,9 +221,11 @@ export async function updateUserRole(userId: string, role: string) {
     if (isSelf) {
       throw new Error("Nemůžete změnit roli sami sobě (prevence ztráty přístupu).");
     }
+    const newRole = parseRole(role);
     return await prisma.user.update({
       where: { id: userId },
-      data: { role: parseRole(role) },
+      // žádost o třídu má smysl jen u hosta čekajícího na schválení
+      data: { role: newRole, ...(newRole !== "GUEST" ? { requestedClassGroupId: null } : {}) },
     });
   });
 }

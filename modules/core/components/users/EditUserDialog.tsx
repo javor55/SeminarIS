@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateUserProfile } from "@/modules/core/actions/users";
-import { getClassOptions, type ClassOption } from "@/modules/core/actions/school";
+import { getClassOptions, type ClassOption } from "@/modules/core/actions/classes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const NO_CLASS = "__none";
@@ -143,11 +143,9 @@ export function EditUserDialog({ user, onSuccess }: EditUserDialogProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_CLASS}>Bez třídy</SelectItem>
-                  {classOptions
-                    .filter((c) => c.status !== "graduated" || c.id === user.classGroupId)
-                    .map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                    ))}
+                  {classOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

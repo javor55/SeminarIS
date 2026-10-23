@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma";
 import type { User } from "@/lib/types";
 import { requirePermission } from "@/lib/session";
 import { formatMinutes, formatTimeRange } from "@/lib/datetime";
-import { getCurrentSchoolYear } from "@/modules/core/school";
 import {
   changeDeadlineOf,
   findStudentConflict,
@@ -67,10 +66,9 @@ export async function getMyRegistrations(): Promise<{ registrations: MyRegistrat
     }),
     getStudentSubjectIds(user.id),
   ]);
-  const { startYear } = await getCurrentSchoolYear();
   return {
     registrations: rows.map((r) => ({
-      ...toRegistrationItem(r, startYear),
+      ...toRegistrationItem(r),
       session: toSessionItem(r.session, user, r.id),
     })),
     mySubjectIds,

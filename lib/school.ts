@@ -2,10 +2,11 @@
 
 export const DEFAULT_STUDY_YEARS = 4;
 
+export const GRADES: readonly number[] = Array.from({ length: DEFAULT_STUDY_YEARS }, (_, i) => i + 1);
+
 export type ClassGroupLike = {
+  grade: number;
   letter: string;
-  entryYear: number;
-  studyYears?: number | null;
 };
 
 /** Školní rok začíná 1. září: 15. 10. 2026 → 2026 (2026/27), 15. 3. 2027 → 2026. */
@@ -18,36 +19,14 @@ export function schoolYearLabel(startYear: number): string {
   return `${startYear}/${String((startYear + 1) % 100).padStart(2, "0")}`;
 }
 
-/** Ročník třídy v daném školním roce (může být < 1 nebo > počet let studia). */
-export function gradeOf(cls: ClassGroupLike, currentStartYear: number): number {
-  return currentStartYear - cls.entryYear + 1;
+/** "3.A" */
+export function classLabel(cls: ClassGroupLike): string {
+  return `${cls.grade}.${cls.letter}`;
 }
 
-export type ClassStatus = "future" | "active" | "graduated";
-
-export function classStatus(cls: ClassGroupLike, currentStartYear: number): ClassStatus {
-  const grade = gradeOf(cls, currentStartYear);
-  if (grade < 1) return "future";
-  if (grade > (cls.studyYears ?? DEFAULT_STUDY_YEARS)) return "graduated";
-  return "active";
-}
-
-/** "3.A"; absolventi "4.A (abs. 2027)". */
-export function classLabel(cls: ClassGroupLike, currentStartYear: number): string {
-  const studyYears = cls.studyYears ?? DEFAULT_STUDY_YEARS;
-  const status = classStatus(cls, currentStartYear);
-  if (status === "graduated") {
-    return `${studyYears}.${cls.letter} (abs. ${cls.entryYear + studyYears})`;
-  }
-  if (status === "future") {
-    return `1.${cls.letter} (od ${schoolYearLabel(cls.entryYear)})`;
-  }
-  return `${gradeOf(cls, currentStartYear)}.${cls.letter}`;
-}
-
-/** Rok nástupu třídy, která je v daném školním roce v ročníku `grade`. */
-export function entryYearForGrade(grade: number, currentStartYear: number): number {
-  return currentStartYear - grade + 1;
+/** Řazení tříd: podle ročníku, pak písmene. */
+export function compareClasses(a: ClassGroupLike, b: ClassGroupLike): number {
+  return a.grade - b.grade || a.letter.localeCompare(b.letter, "cs");
 }
 
 /** "3.A" / "3. A" / "3a" → { grade: 3, letter: "A" }, jinak null. */
@@ -57,6 +36,36 @@ export function parseClassLabel(label: string): { grade: number; letter: string 
   const grade = parseInt(m[1], 10);
   if (grade < 1) return null;
   return { grade, letter: m[2].toUpperCase() };
+}
+
+/** Písmena tříd z textu "A, B C" → ["A","B","C"]; jinak vyhodí chybu. */
+export function parseLetters(letters: string): string[] {
+  const list = letters
+    .split(/[\s,;]+/)
+    .map((l) => l.trim().toUpperCase())
+    .filter(Boolean);
+  if (list.length === 0 || list.some((l) => !/^[A-Z]$/.test(l))) {
+    throw new Error("Zadejte písmena tříd, např. „A, B, C“.");
+  }
+  return [...new Set(list)];
+}
+
+/** Platný ročník předmětu / zápisu: celá čísla 1–4, bez duplicit, seřazená. */
+export function sanitizeGrades(grades: unknown): number[] {
+  if (!Array.isArray(grades)) return [];
+  const valid = grades.map((g) => Number(g)).filter((g) => Number.isInteger(g) && g >= 1 && g <= DEFAULT_STUDY_YEARS);
+  return [...new Set(valid)].sort((a, b) => a - b);
+}
+
+/** Vyučuje se předmět v daném ročníku? (prázdné `grades` = ve všech) */
+export function subjectInGrade(grades: readonly number[], grade: number): boolean {
+  return grades.length === 0 || grades.includes(grade);
+}
+
+/** [] → "všechny ročníky", [2,3] → "2., 3." */
+export function subjectGradesLabel(grades: readonly number[]): string {
+  if (grades.length === 0) return "všechny ročníky";
+  return [...grades].sort((a, b) => a - b).map((g) => `${g}.`).join(", ");
 }
 
 /** Popis cílových ročníků zápisu: [] → "všechny ročníky", [3] → "3. ročník", [2,3] → "2. a 3. ročník". */

@@ -1,11 +1,6 @@
 import type { ClassChangeReason } from "@prisma/client";
 import { prisma, type TxClient } from "@/lib/prisma";
-import {
-  DEFAULT_STUDY_YEARS,
-  entryYearForGrade,
-  gradeOf,
-  schoolYearStartForDate,
-} from "@/lib/school";
+import { DEFAULT_STUDY_YEARS, classLabel, compareClasses, schoolYearLabel, schoolYearStartForDate } from "@/lib/school";
 
 // Serverové dotazy nad školní strukturou pro jádro i ostatní moduly.
 // Bez autorizace – volající server action ji řeší sama.
@@ -29,17 +24,42 @@ export async function ensureCurrentSchoolYear() {
   });
 }
 
+export type SchoolYearInfo = {
+  currentYear: { startYear: number; label: string };
+  // Rok lze nastavit ručně jen před prvním zařazením studentů (pak jen uzavřením roku)
+  canSetYearManually: boolean;
+  years: { startYear: number; label: string; isCurrent: boolean }[];
+};
+
+/** Aktuální školní rok pro administraci, včetně nabídky sousedních let pro počáteční nastavení. */
+export async function getSchoolYearInfo(): Promise<SchoolYearInfo> {
+  const current = await ensureCurrentSchoolYear();
+  const [years, membershipCount] = await Promise.all([
+    prisma.schoolYear.findMany({ orderBy: { startYear: "desc" } }),
+    prisma.classMembership.count(),
+  ]);
+  // Nabídka sousedních školních let pro přepnutí, i když ještě nejsou v DB
+  const yearSet = new Map(years.map((y) => [y.startYear, y.isCurrent]));
+  for (const y of [current.startYear - 1, current.startYear, current.startYear + 1]) {
+    if (!yearSet.has(y)) yearSet.set(y, false);
+  }
+  return {
+    currentYear: { startYear: current.startYear, label: schoolYearLabel(current.startYear) },
+    canSetYearManually: membershipCount === 0,
+    years: [...yearSet.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([y, isCurrent]) => ({ startYear: y, label: schoolYearLabel(y), isCurrent })),
+  };
+}
+
 /** Ročník studenta v aktuálním školním roce, nebo null (bez třídy / mimo studium). */
-export async function getStudentGrade(userId: string, currentStartYear?: number): Promise<number | null> {
+export async function getStudentGrade(userId: string): Promise<number | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { classGroup: true, studyStatus: true },
   });
   if (!user?.classGroup || user.studyStatus !== "ACTIVE") return null;
-  const startYear = currentStartYear ?? (await getCurrentSchoolYear()).startYear;
-  const grade = gradeOf(user.classGroup, startYear);
-  const studyYears = user.classGroup.studyYears ?? DEFAULT_STUDY_YEARS;
-  return grade >= 1 && grade <= studyYears ? grade : null;
+  return user.classGroup.grade;
 }
 
 /** Podmínka pro `prisma.user.findMany`: aktivní (studující) studenti. */
@@ -50,10 +70,10 @@ export const activeStudentsWhere = {
 };
 
 /** Podmínka pro `prisma.user.findMany`: studující studenti tříd v daných ročnících. */
-export function studentsInGradesWhere(grades: readonly number[], currentStartYear: number) {
+export function studentsInGradesWhere(grades: readonly number[]) {
   return {
     ...activeStudentsWhere,
-    classGroup: { entryYear: { in: grades.map((g) => entryYearForGrade(g, currentStartYear)) } },
+    classGroup: { grade: { in: [...grades] } },
   };
 }
 
@@ -67,7 +87,7 @@ export async function setStudentClass(
   args: {
     userId: string;
     classGroupId: string | null;
-    schoolYear: { id: string; startYear: number };
+    schoolYear: { id: string };
     reason?: ClassChangeReason;
   }
 ) {
@@ -80,7 +100,7 @@ export async function setStudentClass(
 
   const cls = await db.classGroup.findUnique({ where: { id: classGroupId } });
   if (!cls) throw new Error("Třída nenalezena.");
-  const grade = gradeOf(cls, schoolYear.startYear);
+  const grade = cls.grade;
 
   const existing = await db.classMembership.findUnique({
     where: { userId_schoolYearId: { userId, schoolYearId: schoolYear.id } },
@@ -96,12 +116,20 @@ export async function setStudentClass(
   await db.user.update({ where: { id: userId }, data: { classGroupId } });
 }
 
-/** Třída podle ročníku a písmene v aktuálním školním roce; založí ji, pokud neexistuje. */
-export async function findOrCreateClass(grade: number, letter: string, currentStartYear: number) {
-  const entryYear = entryYearForGrade(grade, currentStartYear);
-  return prisma.classGroup.upsert({
-    where: { entryYear_letter: { entryYear, letter } },
+/** Třída podle ročníku a písmene; založí ji, pokud neexistuje. */
+export async function findOrCreateClass(grade: number, letter: string, db: TxClient = prisma) {
+  if (!Number.isInteger(grade) || grade < 1 || grade > DEFAULT_STUDY_YEARS) {
+    throw new Error(`Ročník musí být 1–${DEFAULT_STUDY_YEARS}.`);
+  }
+  return db.classGroup.upsert({
+    where: { grade_letter: { grade, letter } },
     update: {},
-    create: { entryYear, letter, studyYears: DEFAULT_STUDY_YEARS },
+    create: { grade, letter },
   });
+}
+
+/** Třídy nabízené při registraci a ve výzvě na dashboardu (bez autorizace – jen ročník a písmeno). */
+export async function getPublicClassOptions(): Promise<{ id: string; label: string; grade: number; letter: string }[]> {
+  const classes = await prisma.classGroup.findMany();
+  return classes.sort(compareClasses).map((c) => ({ id: c.id, label: classLabel(c), grade: c.grade, letter: c.letter }));
 }

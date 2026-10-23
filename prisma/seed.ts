@@ -57,12 +57,12 @@ async function main() {
     skipDuplicates: true,
   });
 
-  // 2) Subjects
+  // 2) Předměty (volitelné semináře; do zápisu lze zařadit jakýkoli aktivní předmět)
   const subjProgId = "subj_prog";
   const subjAjId = "subj_aj";
   const subjIoTId = "subj_iot";
 
-  await prisma.seminar.createMany({
+  await prisma.subject.createMany({
     data: [
       {
         id: subjProgId,
@@ -199,7 +199,7 @@ async function main() {
     skipDuplicates: true,
   });
 
-  // 7) Škola: aktuální školní rok, třídy 3.A a 3.B, studenti zařazení (včetně historie)
+  // 7) Škola: aktuální školní rok, pevné třídy 3.A a 3.B, studenti zařazení (včetně historie)
   const now = new Date();
   const startYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
   const year = await prisma.schoolYear.upsert({
@@ -207,12 +207,11 @@ async function main() {
     update: { isCurrent: true },
     create: { startYear, isCurrent: true },
   });
-  const entryYear = startYear - 2; // 3. ročník
   for (const [userId, letter] of [[student1Id, "A"], [student2Id, "B"]] as const) {
     const cls = await prisma.classGroup.upsert({
-      where: { entryYear_letter: { entryYear, letter } },
+      where: { grade_letter: { grade: 3, letter } },
       update: {},
-      create: { entryYear, letter },
+      create: { grade: 3, letter },
     });
     await prisma.user.update({ where: { id: userId }, data: { classGroupId: cls.id } });
     await prisma.classMembership.upsert({
