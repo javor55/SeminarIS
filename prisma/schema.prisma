@@ -54,6 +54,9 @@ model User {
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
 
+  // Nepovinná e-mailová upozornění (připomínky, souhrny); povinná chodí vždy
+  receiveOptionalEmails Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -122,6 +125,13 @@ model EnrollmentWindow {
   visibleToStudents Boolean  @default(false)
   // Ročníky (1–4), pro které je zápis určen; prázdné = všichni studenti
   targetGrades      Int[]    @default([])
+
+  // Automatická připomínka nezapsaným N dní před koncem (null = ne); provádí denní cron
+  reminderDaysBefore Int?
+  // Datum (Europe/Prague, RRRR-MM-DD), kdy se automatická připomínka odeslala; null = ještě ne
+  reminderSentOn     String?
+  // Kdy se odeslalo upozornění „zápis otevřen“ (null = ještě ne)
+  openedNotifiedAt   DateTime?
 
   createdById String
   createdBy   User   @relation("EnrollmentWindowCreatedBy", fields: [createdById], references: [id])
@@ -223,6 +233,62 @@ model StudentEnrollment {
 model SystemSetting {
   key   String @id
   value String
+}
+
+// =====================================================================
+// JÁDRO – E-MAILY A HISTORIE ZMĚN
+// =====================================================================
+
+enum EmailLogStatus {
+  SENT // odesláno (u EMAIL_TRANSPORT=log jen zapsáno)
+  FAILED // odeslání selhalo (viz error)
+  SKIPPED_LIMIT // nad denním/měsíčním limitem
+  SKIPPED_DISABLED // vypnuté upozornění nebo příjemce odhlášen z nepovinných
+}
+
+// Každý pokus o odeslání e-mailu; slouží i k počítání limitů (stav SENT)
+model EmailLog {
+  id              String         @id @default(cuid())
+  recipient       String
+  // bez relace: záznam přežije smazání uživatele
+  recipientUserId String?
+  // id události (lib/email/events.ts), např. makeup.session.cancelled
+  event           String
+  subject         String
+  status          EmailLogStatus
+  error           String?
+  // id zprávy u Resendu
+  providerId      String?
+  createdAt       DateTime       @default(now())
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([event, createdAt])
+  @@index([recipientUserId])
+}
+
+// Historie změn: kdo, co a kdy změnil. Zapisuje se ve stejné transakci jako změna.
+// Bez relací na User, aby záznamy přežily smazání uživatele (jméno je uložené v actorName).
+model AuditLog {
+  id             String   @id @default(cuid())
+  actorId        String?
+  actorName      String?
+  // admin, který v režimu „zobrazit jako“ jednal za actorId
+  impersonatorId String?
+  // oblast.entita.akce, např. makeup.registration.remove
+  action         String
+  entityType     String
+  entityId       String?
+  // čitelný popis česky
+  summary        String
+  // před/po
+  data           Json?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action])
 }
 
 // =====================================================================
