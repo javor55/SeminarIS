@@ -1,7 +1,7 @@
 "use client";
 
 import { unwrap } from "@/lib/action-result";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { KeyRound, ShieldCheck, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
-import { changeOwnPassword } from "@/modules/core/actions/profile";
+import { changeOwnPassword, getMyPreferences, setReceiveOptionalEmails } from "@/modules/core/actions/profile";
+import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/page-header";
 
 export default function ProfilePage() {
@@ -19,6 +20,25 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isChanging, setIsChanging] = useState(false);
+  // Nepovinná e-mailová upozornění (připomínky, souhrny); null = ještě se načítá
+  const [optionalEmails, setOptionalEmails] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    getMyPreferences()
+      .then((p) => setOptionalEmails(p.receiveOptionalEmails))
+      .catch(() => undefined);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function changeOptionalEmails(value: boolean) {
+    try {
+      unwrap(await setReceiveOptionalEmails(value));
+      setOptionalEmails(value);
+      toast.success(value ? "Nepovinná upozornění zapnuta." : "Nepovinná upozornění vypnuta.");
+    } catch (err) {
+      toast.error((err as Error).message || "Nastavení se nepodařilo uložit.");
+    }
+  }
 
   async function handlePasswordChange(e: React.FormEvent) {
     e.preventDefault();
@@ -149,6 +169,27 @@ export default function ProfilePage() {
           </form>
         </Card>
       </div>
+
+      {/* E-MAILOVÁ UPOZORNĚNÍ */}
+      <Card className="shadow-sm" data-testid="notification-prefs">
+        <CardHeader>
+          <CardTitle>E-mailová upozornění</CardTitle>
+          <CardDescription>
+            Důležité zprávy (zrušení nebo změna termínu, schválení účtu) chodí vždy. Připomínky a denní souhrny si můžete vypnout.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4">
+            <Label htmlFor="optional-emails">Dostávat nepovinná upozornění</Label>
+            <Switch
+              id="optional-emails"
+              checked={optionalEmails ?? true}
+              disabled={optionalEmails === null}
+              onCheckedChange={changeOptionalEmails}
+            />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

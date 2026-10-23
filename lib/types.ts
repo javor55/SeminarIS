@@ -29,6 +29,8 @@ export type EnrollmentWindow = {
   visibleToStudents: boolean;
   // Cílové ročníky; prázdné = všichni
   targetGrades?: number[];
+  // Automatická připomínka nezapsaným N dní před koncem (null = ne)
+  reminderDaysBefore?: number | null;
   createdById: string;
   updatedById?: string;
   createdAt: string | Date;

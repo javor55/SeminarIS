@@ -42,7 +42,7 @@ const GRADES = Array.from({ length: DEFAULT_STUDY_YEARS }, (_, i) => i + 1);
 import { EnrollmentStatus, EnrollmentWindowWithBlocks } from "@/lib/types";
 
 type EditEnrollmentDialogProps = {
-  enrollment: Partial<EnrollmentWindowWithBlocks> & { id?: string; name?: string; description?: string | null; status?: EnrollmentStatus; startsAt?: string | Date; endsAt?: string | Date; visibleToStudents?: boolean; targetGrades?: number[] };
+  enrollment: Partial<EnrollmentWindowWithBlocks> & { id?: string; name?: string; description?: string | null; status?: EnrollmentStatus; startsAt?: string | Date; endsAt?: string | Date; visibleToStudents?: boolean; targetGrades?: number[]; reminderDaysBefore?: number | null };
   onOpenChange: (open: boolean) => void;
 };
 
@@ -75,6 +75,10 @@ export function EditEnrollmentDialog({
   const [targetGrades, setTargetGrades] = React.useState<number[]>(
     enrollment.targetGrades ?? []
   );
+  // Prázdné = automatická připomínka nezapsaným se neposílá
+  const [reminderDays, setReminderDays] = React.useState<string>(
+    enrollment.reminderDaysBefore != null ? String(enrollment.reminderDaysBefore) : ""
+  );
   const [startsAt, setStartsAt] = React.useState<Date>(
     new Date(enrollment.startsAt ?? Date.now())
   );
@@ -94,6 +98,7 @@ export function EditEnrollmentDialog({
         status,
         visibleToStudents,
         targetGrades,
+        reminderDaysBefore: reminderDays.trim() === "" ? null : Number(reminderDays),
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
       };
@@ -134,7 +139,7 @@ export function EditEnrollmentDialog({
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isExisting ? "Upravit zápis" : "Vytvořit nový zápis"}
@@ -228,6 +233,25 @@ export function EditEnrollmentDialog({
               {targetGrades.length === 0
                 ? "Nevybráno nic = zápis vidí a mohou se zapsat studenti všech ročníků."
                 : "Zápis uvidí jen studenti zařazení do tříd vybraných ročníků (Uživatelé → Třída)."}
+            </p>
+          </div>
+          <div className="space-y-1 pt-2">
+            <Label className="text-sm font-medium" htmlFor="reminderDaysBefore">
+              Připomenout nezapsaným (dní před koncem)
+            </Label>
+            <Input
+              id="reminderDaysBefore"
+              type="number"
+              min={1}
+              max={60}
+              className="w-32"
+              value={reminderDays}
+              onChange={(e) => setReminderDays(e.target.value)}
+              placeholder="ne"
+            />
+            <p className="text-xs text-muted-foreground">
+              Prázdné = bez automatické připomínky. Jinak denní úloha pošle nezapsaným studentům jeden e-mail (pokud je
+              upozornění „Připomínka nezapsaným“ zapnuté v Administraci → Upozornění).
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">

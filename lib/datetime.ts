@@ -115,3 +115,10 @@ export function startOfSchoolMonth(d: Date = new Date()): Date {
 export function formatDayShort(d: Date | string): string {
   return new Intl.DateTimeFormat("cs-CZ", { timeZone: SCHOOL_TIME_ZONE, weekday: "short", day: "numeric", month: "numeric" }).format(new Date(d));
 }
+
+/** "2026-10-23" + 3 → "2026-10-26" (kalendářní posun klíče dne, bez vlivu časového pásma) */
+export function addDaysToDayKey(key: string, days: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + days));
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
+}

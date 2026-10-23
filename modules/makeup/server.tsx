@@ -5,8 +5,12 @@ import { can } from "@/modules/registry";
 import type { ModuleServer } from "@/modules/server-types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getMakeupEmailEstimates, runMakeupDailyJob } from "@/modules/makeup/notifications";
 
 export const makeupServer: ModuleServer = {
+  runDailyJob: runMakeupDailyJob,
+  getEmailEstimates: () => getMakeupEmailEstimates(),
+
   async getDashboardWidget(user) {
     const now = new Date();
 

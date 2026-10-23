@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getEnrollmentWindowByIdWithBlocks } from "@/modules/seminars/actions/windows";
 import { EnrollmentView } from "@/modules/seminars/components/enrollment/EnrollmentView";
+import { EnrollmentDetailTabs } from "@/modules/seminars/components/enrollment/EnrollmentDetailTabs";
 import { User } from "@/lib/types";
 import { can } from "@/modules/registry";
 
@@ -45,5 +46,9 @@ export default async function EnrollmentDetailPage({
     );
   }
 
-  return <EnrollmentView enrollmentWindow={ew} currentUser={user} />;
+  return (
+    <EnrollmentDetailTabs windowId={ew.id} windowName={ew.name} canRemind={can(user.role, "seminars.windows.manage")}>
+      <EnrollmentView enrollmentWindow={ew} currentUser={user} />
+    </EnrollmentDetailTabs>
+  );
 }

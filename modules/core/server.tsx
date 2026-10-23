@@ -7,8 +7,12 @@ import { Button } from "@/components/ui/button";
 import { getPublicClassOptions } from "@/modules/core/school";
 import { getRegistrationClassMode } from "@/modules/core/settings";
 import { ClassRequestCard } from "@/modules/core/components/users/ClassRequestCard";
+import { getCoreEmailEstimates, runCoreDailyJob } from "@/modules/core/notifications";
 
 export const coreServer: ModuleServer = {
+  runDailyJob: runCoreDailyJob,
+  getEmailEstimates: getCoreEmailEstimates,
+
   async getDashboardWidget(user) {
     // Host čekající na schválení: výzva k výběru třídy (když je zapnutý výběr třídy)
     if (user.role === "GUEST") {
