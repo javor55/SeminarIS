@@ -15,6 +15,8 @@ export const coreModule = {
     "core.users.manage": ["ADMIN"],
     // Administrační centrum a globální nastavení
     "core.admin": ["ADMIN"],
+    // Zobrazit aplikaci jako jiný uživatel (jen pro čtení)
+    "core.impersonate": ["ADMIN"],
     // Školní rok (uzavření roku) a úvazky učitelů
     "core.school.manage": ["ADMIN"],
     // Předměty: katalog, úpravy a archivace/smazání

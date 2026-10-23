@@ -7,11 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { updateUserRole, toggleUserActive, deleteUserPermanently } from "@/modules/core/actions/users";
+import { startImpersonation } from "@/modules/core/actions/impersonation";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { toast } from "sonner";
-import { Eye, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Eye, History, Trash2, UserRoundSearch } from "lucide-react";
 import { cn, computeEnrollmentStatus } from "@/lib/utils";
 import { can } from "@/modules/registry";
 import { formatDateTime } from "@/lib/datetime";
@@ -190,6 +192,7 @@ const ActionsCell = ({ row }: { row: Row<UserRow> }) => {
   const [showDetails, setShowDetails] = React.useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [impersonating, setImpersonating] = React.useState(false);
   const router = useRouter();
   
   return (
@@ -211,6 +214,39 @@ const ActionsCell = ({ row }: { row: Row<UserRow> }) => {
       
       {isAdmin && (
         <EditUserDialog user={u} />
+      )}
+
+      {isAdmin && (
+        <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0" title="Historie změn">
+          <Link href={`/admin/history?user=${u.id}`} data-testid="user-history" aria-label={`Historie – ${u.firstName} ${u.lastName}`}>
+            <History className="w-4 h-4" />
+          </Link>
+        </Button>
+      )}
+
+      {can(currentUser?.role, "core.impersonate") && !currentUser?.impersonatedBy && !isSelf && u.role !== "ADMIN" && u.isActive && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0"
+          title="Zobrazit jako tento uživatel (jen pro čtení)"
+          aria-label={`Zobrazit jako ${u.firstName} ${u.lastName}`}
+          data-testid="impersonate"
+          disabled={impersonating}
+          onClick={async () => {
+            setImpersonating(true);
+            try {
+              unwrap(await startImpersonation(u.id));
+              // Celá aplikace (menu, session) se načte znovu jako zobrazovaný uživatel
+              window.location.assign("/dashboard");
+            } catch (err) {
+              toast.error((err as Error).message || "Náhled se nepodařilo spustit.");
+              setImpersonating(false);
+            }
+          }}
+        >
+          <UserRoundSearch className="w-4 h-4" />
+        </Button>
       )}
 
       {isAdmin && u.role === "STUDENT" && (

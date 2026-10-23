@@ -8,6 +8,7 @@ import React, {
 import { useRouter } from "next/navigation";
 import { User } from "@/lib/types";
 import { SessionProvider, useSession, signIn, signOut } from "next-auth/react";
+import { stopImpersonation } from "@/modules/core/actions/impersonation";
 
 type AuthContextValue = {
   user: User | null;
@@ -58,6 +59,8 @@ function AuthContextWrapper({ children }: { children: ReactNode }) {
 
   // 🚪 Odhlášení
   async function logout() {
+    // Náhled „zobrazit jako“ skončí odhlášením (cookie se smaže a zapíše se do historie)
+    if (user?.impersonatedBy) await stopImpersonation().catch(() => undefined);
     await signOut({ redirect: false });
     router.push("/");
   }

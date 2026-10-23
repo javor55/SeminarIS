@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { isRegistrationEnabled, getDefaultRole, getRegistrationClassMode } from "@/modules/core/settings";
 import { getPublicClassOptions } from "@/modules/core/school";
+import { PREVIEW_READONLY_MESSAGE, isImpersonating } from "@/lib/session";
 
 /** Nastavení registračního formuláře: zda se vybírá třída a které třídy jsou k dispozici. */
 export async function GET() {
@@ -17,6 +18,11 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // Režim „zobrazit jako“ je jen pro čtení (registrace je přímá změna dat mimo safeAction)
+    if (await isImpersonating()) {
+      return NextResponse.json({ message: PREVIEW_READONLY_MESSAGE }, { status: 403 });
+    }
+
     const userCount = await prisma.user.count();
     const isFirstUser = userCount === 0;
 
