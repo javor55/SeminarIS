@@ -5,6 +5,7 @@ import { User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
+import { getNavItems } from "@/modules/registry";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 // 🔥 Importy pro responzivní menu
@@ -18,38 +19,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-// Definice odkazů (stejná jako ve vašem souboru)
-const linksByRole: Record<string, Array<{ label: string; href: string }>> = {
-  ADMIN: [
-    { label: "Dashboard", href: "/" },
-    { label: "Zápisy", href: "/enrollments" },
-    { label: "Předměty", href: "/subjects" },
-    { label: "Uživatelé", href: "/users" },
-    { label: "Administrace", href: "/admin" },
-    { label: "Můj Profil", href: "/profile" },
-  ],
-  TEACHER: [
-    { label: "Dashboard", href: "/" },
-    { label: "Zápisy", href: "/enrollments" },
-    { label: "Předměty", href: "/subjects" },
-    { label: "Uživatelé", href: "/users" },
-    { label: "Můj Profil", href: "/profile" },
-  ],
-  STUDENT: [
-    { label: "Dashboard", href: "/" },
-    { label: "Předměty", href: "/subjects" },
-    { label: "Můj Profil", href: "/profile" },
-  ],
-
-  GUEST: [],
-};
+import { APP_NAME } from "@/lib/app-config";
 
 export function AppTopbar({ user }: { user?: User }) {
   const pathname = usePathname();
-  const { logout } = useAuth();
-  const role = user?.role ?? "GUEST";
-  const links = linksByRole[role] ?? [];
+  const { logout, enabledModules } = useAuth();
+  // Menu skládají zapnuté moduly podle oprávnění role (viz modules/*/manifest.ts)
+  const links = getNavItems(user?.role, enabledModules);
 
   return (
     <header className="border-b bg-background">
@@ -57,7 +33,7 @@ export function AppTopbar({ user }: { user?: User }) {
         <div className="flex items-center gap-4">
           {/* Logo/Název - Vždy viditelné */}
           <Link href="/" className="font-semibold">
-            Zápis seminářů
+            {APP_NAME}
           </Link>
 
           {/* 🔥 DESKTOP Navigace: Skrytá na mobilu (hidden), viditelná od 'md' (md:flex) */}

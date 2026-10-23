@@ -1,0 +1,226 @@
+"use client";
+
+import { ColumnDef } from "@tanstack/react-table";
+import { Button } from "@/components/ui/button";
+import {
+  SubjectOccurrence,
+  SubjectOccurrenceWithRelations,
+  Block,
+  EnrollmentWindowWithBlocks,
+  User,
+  StudentEnrollment,
+} from "@/lib/types";
+import React from "react";
+
+// typ řádku – univerzální, volitelná metadata
+export type OccurrenceRow = SubjectOccurrence & {
+  subject?: {
+    id: string;
+    name: string;
+    code?: string | null;
+  };
+
+  blockName: string;
+  block: Block & { occurrences?: SubjectOccurrenceWithRelations[] };
+  enrollmentWindow?: EnrollmentWindowWithBlocks;
+  enrollmentName: string;
+  statusLabel: string;
+  capacityText: string;
+  hasStudents: boolean;  
+  fullCode?: string;
+  teacherName?: string;
+  searchText?: string;
+  /** doplňkové flagy pro zápis */
+  isFull?: boolean;
+  enrolledByMe?: boolean;
+  enrollments?: StudentEnrollment[];
+  isWindowOpen?: boolean;
+};
+
+// props pro generování sloupců
+export function getOccurrenceColumns(opts: {
+  currentUser: User | null;
+  onStudents: (_: OccurrenceRow) => void;
+  onEdit: (_: OccurrenceRow) => void;
+  onDelete: (_: OccurrenceRow) => void;
+  onEnroll?: (_: OccurrenceRow) => void;
+  onUnenroll?: (_: OccurrenceRow) => void;
+  /** možnost skrýt některé sloupce podle kontextu */
+  showSubjectName?: boolean;
+  showEnrollmentName?: boolean;
+  showStatus?: boolean;
+  showBlockName?: boolean;
+}): ColumnDef<OccurrenceRow>[] {
+  const {
+    currentUser,
+    onStudents,
+    onEdit,
+    onDelete,
+    onEnroll,
+    onUnenroll,
+    showSubjectName = true,
+    showEnrollmentName = true,
+    showStatus = true,
+    showBlockName = true,
+  } = opts;
+
+  const cols: ColumnDef<OccurrenceRow>[] = [];
+
+  // PŘEDMĚT
+  if (showSubjectName) {
+    cols.push({
+    id: "subject",
+    header: "Seminář",
+    cell: ({ row }) => {
+      const occ = row.original;
+      if (!occ.subject) return null;
+      return (
+        <a
+          href={`/subjects/${occ.subject.id}`}
+          className="font-medium hover:underline"
+        >
+          {occ.subject.name}
+        </a>
+      );
+    },
+  });
+  }
+
+  // ZÁPIS
+  if (showEnrollmentName) {
+    cols.push({
+      accessorKey: "enrollmentName",
+      header: "Zápis",
+      cell: ({ row: _row }) => _row.original.enrollmentName ?? "",
+    });
+  }
+
+  // STAV
+  if (showStatus) {
+    cols.push({
+      accessorKey: "statusLabel",
+      header: "Stav",
+      cell: ({ row: _row }) =>
+        _row.original.statusLabel ? (
+          <span className="inline-flex rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+            {_row.original.statusLabel}
+          </span>
+        ) : null,
+    });
+  }
+
+  // BLOK
+  if (showBlockName) {
+    cols.push({
+      accessorKey: "blockName",
+      header: "Blok",
+      cell: ({ row: _row }) => _row.original.blockName ?? "",
+    });
+  }
+
+  // KÓD VÝSKYTU
+  cols.push({
+    accessorKey: "fullCode",
+    header: "Kód výskytu",
+    cell: ({ row: _row }) => (
+      <span className="font-mono text-xs text-muted-foreground">
+        {_row.original.fullCode ?? ""}
+      </span>
+    ),
+  });
+
+  // UČITEL
+  cols.push({
+    accessorKey: "teacherName",
+    header: "Učitel",
+    cell: ({ row: _row }) => _row.original.teacherName ?? "",
+  });
+
+  // OBSAZENOST
+  cols.push({
+    accessorKey: "capacityText",
+    header: "Obsaz.",
+    cell: ({ row: _row }) => (
+      <span className="text-muted-foreground text-center block">
+        {_row.original.capacityText ?? ""}
+      </span>
+    ),
+  });
+
+  // AKCE
+  cols.push({
+    id: "actions",
+    header: "Akce",
+    cell: ({ row }) => {
+      const occ = row.original;
+      const hasStudents = occ.hasStudents ?? false;
+      const enrolledByMe = occ.enrolledByMe ?? false;
+      const isFull = occ.isFull ?? false;
+
+      return (
+        <div className="flex gap-2 justify-end flex-wrap">
+          {/* STUDENT – zápis / odepsání */}
+          {currentUser?.role === "STUDENT" && (
+            <>
+              {enrolledByMe ? (
+                onUnenroll && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={occ.isWindowOpen === false}
+                    onClick={() => onUnenroll(occ)}
+                  >
+                    Odepsat
+                  </Button>
+                )
+              ) : (
+                onEnroll && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    disabled={isFull || occ.isWindowOpen === false}
+                    onClick={() => onEnroll(occ)}
+                  >
+                    Zapsat
+                  </Button>
+                )
+              )}
+            </>
+          )}
+
+          {/* ADMIN + TEACHER */}
+          {(currentUser?.role === "ADMIN" ||
+            currentUser?.role === "TEACHER") && (
+            <Button size="sm" variant="outline" onClick={() => onStudents(occ)}>
+              Studenti
+            </Button>
+          )}
+
+          {/* ADMIN pouze */}
+          {currentUser?.role === "ADMIN" && (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onEdit(occ)}
+              >
+                Upravit
+              </Button>
+
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={hasStudents}
+                onClick={() => onDelete(occ)}
+              >
+                Smazat
+              </Button>
+            </>
+          )}
+        </div>
+      );
+    },
+  });
+
+  return cols;
+}

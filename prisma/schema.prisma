@@ -14,6 +14,29 @@ enum Role {
   ADMIN
 }
 
+// Stav studia studenta (u učitelů a adminů se nepoužívá)
+enum StudyStatus {
+  ACTIVE // studuje
+  GRADUATED // absolvoval (po posledním ročníku)
+  LEFT // ukončil studium jinak (viz StudyEndReason)
+}
+
+enum StudyEndReason {
+  GRADUATED // absolvování
+  TRANSFER // přestup na jinou školu
+  WITHDRAWAL // zanechání studia
+  EXPULSION // vyloučení
+  OTHER
+}
+
+// Proč je student v daném roce v dané třídě
+enum ClassChangeReason {
+  ASSIGNED // první zařazení (import, ruční přiřazení)
+  PROMOTED // postup do dalšího ročníku
+  REPEATED // opakuje ročník
+  MOVED // přeřazení během roku
+}
+
 enum Status {
   DRAFT
   SCHEDULED
@@ -22,24 +45,42 @@ enum Status {
 }
 
 model User {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   firstName    String
   lastName     String
-  email        String   @unique
+  email        String    @unique
   passwordHash String?
-  role         Role     @default(GUEST)
-  isActive     Boolean  @default(true)
+  role         Role      @default(GUEST)
+  isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  cohort       String?  // Nástupní/Aktuální ročník, např. "2023/2024"
+  // Aktuální (u absolventů a ukončených poslední) třída studenta; null = není zařazen / není student.
+  // Historie po letech je v ClassMembership – mění se vždy společně (modules/core/school.ts).
+  classGroupId     String?
+  classGroup       ClassGroup?       @relation(fields: [classGroupId], references: [id], onDelete: SetNull)
+  classMemberships ClassMembership[]
+
+  // Stav studia (jen u studentů)
+  studyStatus    StudyStatus     @default(ACTIVE)
+  studyEndedAt   DateTime?
+  studyEndReason StudyEndReason?
+  studyEndNote   String?
+
+  // Úvazky učitele (kdo co učí)
+  teachingAssignments TeachingAssignment[]
+
+  // Modul Dopisování
+  makeupSessionsSupervised MakeupSession[]             @relation("MakeupSessionTeacher")
+  makeupRegistrations      MakeupRegistration[]        @relation("MakeupRegistrationStudent")
+  makeupSubjectsTaught     MakeupRegistrationSubject[] @relation("MakeupSubjectTeacher")
 
   // ====== zpětné relace ======
-  // Subject
-  subjectsCreated  Subject[] @relation("SubjectCreatedBy")
-  subjectsUpdated  Subject[] @relation("SubjectUpdatedBy")
+  // Seminar
+  subjectsCreated Seminar[] @relation("SubjectCreatedBy")
+  subjectsUpdated Seminar[] @relation("SubjectUpdatedBy")
 
   // EnrollmentWindow
   enrollmentWindowsCreated EnrollmentWindow[] @relation("EnrollmentWindowCreatedBy")
@@ -51,37 +92,42 @@ model User {
   blocksDeleted Block[] @relation("BlockDeletedBy")
 
   // SubjectOccurrence
-  subjectOccurrencesTaught   SubjectOccurrence[] @relation("SubjectOccurrenceTeacher")
-  subjectOccurrencesCreated  SubjectOccurrence[] @relation("SubjectOccurrenceCreatedBy")
-  subjectOccurrencesUpdated  SubjectOccurrence[] @relation("SubjectOccurrenceUpdatedBy")
-  subjectOccurrencesDeleted  SubjectOccurrence[] @relation("SubjectOccurrenceDeletedBy")
+  subjectOccurrencesTaught  SubjectOccurrence[] @relation("SubjectOccurrenceTeacher")
+  subjectOccurrencesCreated SubjectOccurrence[] @relation("SubjectOccurrenceCreatedBy")
+  subjectOccurrencesUpdated SubjectOccurrence[] @relation("SubjectOccurrenceUpdatedBy")
+  subjectOccurrencesDeleted SubjectOccurrence[] @relation("SubjectOccurrenceDeletedBy")
 
   // StudentEnrollment
-  studentEnrollments         StudentEnrollment[] @relation("EnrollmentStudent")
-  studentEnrollmentsCreated  StudentEnrollment[] @relation("EnrollmentCreatedBy")
-  studentEnrollmentsUpdated  StudentEnrollment[] @relation("EnrollmentUpdatedBy")
-  studentEnrollmentsDeleted  StudentEnrollment[] @relation("EnrollmentDeletedBy")
+  studentEnrollments        StudentEnrollment[] @relation("EnrollmentStudent")
+  studentEnrollmentsCreated StudentEnrollment[] @relation("EnrollmentCreatedBy")
+  studentEnrollmentsUpdated StudentEnrollment[] @relation("EnrollmentUpdatedBy")
+  studentEnrollmentsDeleted StudentEnrollment[] @relation("EnrollmentDeletedBy")
 }
 
-model Subject {
-  id          String   @id @default(cuid())
+// =====================================================================
+// MODUL SEMINÁŘE
+// =====================================================================
+
+// Seminář (volitelný předmět do vyššího ročníku)
+model Seminar {
+  id          String  @id @default(cuid())
   name        String
   code        String?
   description String?
   syllabus    String
-  isActive    Boolean  @default(true)
+  isActive    Boolean @default(true)
 
   createdById String
-  createdBy   User     @relation("SubjectCreatedBy", fields: [createdById], references: [id])
+  createdBy   User   @relation("SubjectCreatedBy", fields: [createdById], references: [id])
 
   updatedById String?
-  updatedBy   User?    @relation("SubjectUpdatedBy", fields: [updatedById], references: [id])
+  updatedBy   User?   @relation("SubjectUpdatedBy", fields: [updatedById], references: [id])
 
   // výskyty tohoto předmětu
   subjectOccurrences SubjectOccurrence[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model EnrollmentWindow {
@@ -92,99 +138,102 @@ model EnrollmentWindow {
   startsAt          DateTime
   endsAt            DateTime
   visibleToStudents Boolean  @default(false)
+  // Ročníky (1–4), pro které je zápis určen; prázdné = všichni studenti
+  targetGrades      Int[]    @default([])
 
-  createdById       String
-  createdBy         User     @relation("EnrollmentWindowCreatedBy", fields: [createdById], references: [id])
+  createdById String
+  createdBy   User   @relation("EnrollmentWindowCreatedBy", fields: [createdById], references: [id])
 
-  updatedById       String?
-  updatedBy         User?    @relation("EnrollmentWindowUpdatedBy", fields: [updatedById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("EnrollmentWindowUpdatedBy", fields: [updatedById], references: [id])
 
-  blocks            Block[]
+  blocks Block[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Block {
-  id                 String   @id @default(cuid())
-  name               String
-  order              Int
-  description        String?
+  id          String  @id @default(cuid())
+  name        String
+  order       Int
+  description String?
 
   enrollmentWindowId String
   enrollmentWindow   EnrollmentWindow @relation(fields: [enrollmentWindowId], references: [id], onDelete: Cascade)
 
-  createdById        String
-  createdBy          User     @relation("BlockCreatedBy", fields: [createdById], references: [id])
+  createdById String
+  createdBy   User   @relation("BlockCreatedBy", fields: [createdById], references: [id])
 
-  updatedById        String?
-  updatedBy          User?    @relation("BlockUpdatedBy", fields: [updatedById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("BlockUpdatedBy", fields: [updatedById], references: [id])
 
   subjectOccurrences SubjectOccurrence[]
 
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  deletedAt          DateTime?
-  deletedById        String?
-  deletedBy          User?    @relation("BlockDeletedBy", fields: [deletedById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+  deletedBy   User?     @relation("BlockDeletedBy", fields: [deletedById], references: [id])
 
-  @@index([enrollmentWindowId])
   @@unique([enrollmentWindowId, order])
+  @@index([enrollmentWindowId])
 }
 
 model SubjectOccurrence {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  subjectId   String
-  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  // seminář (v kódu historicky "subject")
+  subjectId String  @map("seminarId")
+  subject   Seminar @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
-  blockId     String
-  block       Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  blockId String
+  block   Block  @relation(fields: [blockId], references: [id], onDelete: Cascade)
 
-  teacherId   String?
-  teacher     User?    @relation("SubjectOccurrenceTeacher", fields: [teacherId], references: [id])
+  teacherId String?
+  teacher   User?   @relation("SubjectOccurrenceTeacher", fields: [teacherId], references: [id])
 
-  subCode     String?
-  capacity    Int?     // null = neomezená kapacita
+  subCode  String?
+  capacity Int? // null = neomezená kapacita
 
   createdById String
-  createdBy   User     @relation("SubjectOccurrenceCreatedBy", fields: [createdById], references: [id])
+  createdBy   User   @relation("SubjectOccurrenceCreatedBy", fields: [createdById], references: [id])
 
   updatedById String?
-  updatedBy   User?    @relation("SubjectOccurrenceUpdatedBy", fields: [updatedById], references: [id])
+  updatedBy   User?   @relation("SubjectOccurrenceUpdatedBy", fields: [updatedById], references: [id])
 
   studentEnrollments StudentEnrollment[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
   deletedById String?
-  deletedBy   User?    @relation("SubjectOccurrenceDeletedBy", fields: [deletedById], references: [id])
+  deletedBy   User?     @relation("SubjectOccurrenceDeletedBy", fields: [deletedById], references: [id])
 
   @@index([subjectId])
   @@index([blockId])
 }
 
 model StudentEnrollment {
-  id                  String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  studentId           String
-  student             User     @relation("EnrollmentStudent", fields: [studentId], references: [id])
+  studentId String
+  student   User   @relation("EnrollmentStudent", fields: [studentId], references: [id])
 
   subjectOccurrenceId String
   subjectOccurrence   SubjectOccurrence @relation(fields: [subjectOccurrenceId], references: [id], onDelete: Cascade)
 
-  createdById         String
-  createdBy           User     @relation("EnrollmentCreatedBy", fields: [createdById], references: [id])
+  createdById String
+  createdBy   User   @relation("EnrollmentCreatedBy", fields: [createdById], references: [id])
 
-  updatedById         String?
-  updatedBy           User?    @relation("EnrollmentUpdatedBy", fields: [updatedById], references: [id])
+  updatedById String?
+  updatedBy   User?   @relation("EnrollmentUpdatedBy", fields: [updatedById], references: [id])
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  deletedAt           DateTime?
-  deletedById         String?
-  deletedBy           User?    @relation("EnrollmentDeletedBy", fields: [deletedById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+  deletedBy   User?     @relation("EnrollmentDeletedBy", fields: [deletedById], references: [id])
 
   @@index([studentId])
   @@index([subjectOccurrenceId])
@@ -195,4 +244,194 @@ model SystemSetting {
   value String
 }
 
+// =====================================================================
+// JÁDRO – ŠKOLA (sdílené všemi moduly)
+// =====================================================================
 
+// Školní rok, např. startYear 2026 = 2026/27. Právě jeden je aktuální.
+model SchoolYear {
+  id        String  @id @default(cuid())
+  startYear Int     @unique
+  isCurrent Boolean @default(false)
+
+  teachingAssignments TeachingAssignment[]
+  classMemberships    ClassMembership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Třída. Ročník se dopočítává z roku nástupu a aktuálního školního roku
+// (entryYear 2024 + letter "A" je ve školním roce 2026/27 třída 3.A).
+model ClassGroup {
+  id         String @id @default(cuid())
+  letter     String
+  // startYear školního roku, ve kterém byla třída v 1. ročníku
+  entryYear  Int
+  studyYears Int    @default(4)
+
+  students            User[]
+  teachingAssignments TeachingAssignment[]
+  classMemberships    ClassMembership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([entryYear, letter])
+}
+
+// Školní předmět (Matematika, Čeština, …)
+model Subject {
+  id       String  @id @default(cuid())
+  name     String
+  code     String  @unique
+  isActive Boolean @default(true)
+
+  teachingAssignments TeachingAssignment[]
+  makeupSessions      MakeupSessionSubject[]
+  makeupRegistrations MakeupRegistrationSubject[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Úvazek: učitel učí předmět ve třídě v daném školním roce
+model TeachingAssignment {
+  id String @id @default(cuid())
+
+  teacherId String
+  teacher   User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  classGroupId String
+  classGroup   ClassGroup @relation(fields: [classGroupId], references: [id], onDelete: Cascade)
+
+  schoolYearId String
+  schoolYear   SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([teacherId, subjectId, classGroupId, schoolYearId])
+  @@index([schoolYearId, classGroupId])
+  @@index([subjectId])
+}
+
+// Historie zařazení: v jaké třídě a ročníku byl student v daném školním roce
+model ClassMembership {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  classGroupId String
+  classGroup   ClassGroup @relation(fields: [classGroupId], references: [id], onDelete: Cascade)
+
+  schoolYearId String
+  schoolYear   SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+
+  // Ročník v tom roce (uložený, aby historie nezávisela na pozdějších změnách tříd)
+  grade  Int
+  reason ClassChangeReason @default(ASSIGNED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, schoolYearId])
+  @@index([schoolYearId, classGroupId])
+}
+
+// =====================================================================
+// MODUL DOPISOVÁNÍ PÍSEMEK
+// =====================================================================
+
+// Termín dopisování = čas a místo učitele (dozoru), na který se zapisují studenti
+model MakeupSession {
+  id String @id @default(cuid())
+
+  // dozor
+  teacherId String
+  teacher   User   @relation("MakeupSessionTeacher", fields: [teacherId], references: [id])
+
+  startsAt              DateTime
+  endsAt                DateTime
+  room                  String
+  capacity              Int
+  // Zápis, odhlášení i přepis jsou možné nejpozději tolik minut před začátkem
+  changeDeadlineMinutes Int      @default(60)
+  note                  String?
+
+  // Termíny vytvořené jako opakovaná řada sdílí seriesId
+  seriesId String?
+
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  subjects      MakeupSessionSubject[]
+  registrations MakeupRegistration[]
+
+  // kdo termín vytvořil (bez relace – historie, ne vazba)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([startsAt])
+  @@index([teacherId, startsAt])
+  @@index([seriesId])
+}
+
+// Předměty, které lze na termínu dopisovat
+model MakeupSessionSubject {
+  sessionId String
+  session   MakeupSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([sessionId, subjectId])
+}
+
+enum MakeupAttendance {
+  REGISTERED // zapsán, termín ještě neproběhl / docházka nezapsána
+  ATTENDED // dopsal(a)
+  NO_SHOW // nedostavil(a) se
+}
+
+// Zápis studenta na termín
+model MakeupRegistration {
+  id String @id @default(cuid())
+
+  sessionId String
+  session   MakeupSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  studentId String
+  student   User   @relation("MakeupRegistrationStudent", fields: [studentId], references: [id], onDelete: Cascade)
+
+  // volitelná poznámka studenta (např. které téma chce dopsat)
+  note       String?
+  attendance MakeupAttendance @default(REGISTERED)
+
+  subjects MakeupRegistrationSubject[]
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sessionId, studentId])
+  @@index([studentId])
+}
+
+// Předmět, který student na termínu dopisuje, a jeho vyučující dohledaný z úvazků
+model MakeupRegistrationSubject {
+  registrationId String
+  registration   MakeupRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  subjectId      String
+  subject        Subject            @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  // vyučující, kterému student písemku dopisuje (null = úvazek není zadaný)
+  subjectTeacherId String?
+  subjectTeacher   User?   @relation("MakeupSubjectTeacher", fields: [subjectTeacherId], references: [id], onDelete: SetNull)
+
+  @@id([registrationId, subjectId])
+  @@index([subjectTeacherId])
+}

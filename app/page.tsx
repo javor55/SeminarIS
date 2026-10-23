@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { APP_DESCRIPTION, APP_NAME } from "@/lib/app-config";
 
 export default function PublicHomePage() {
   const { user } = useAuth();
@@ -27,8 +28,9 @@ export default function PublicHomePage() {
 
   // 🔥 Toto uvidí pouze nepřihlášení uživatelé
   return (
-    <div className="container mx-auto max-w-3xl text-center py-20">
-      <h1 className="text-4xl font-bold mb-4">Zápis seminářů pro 4. ročníky</h1>
+    <div className="mx-auto max-w-3xl text-center py-20">
+      <h1 className="text-4xl font-bold mb-2">{APP_NAME}</h1>
+      <p className="text-muted-foreground mb-8">{APP_DESCRIPTION}</p>
       <div className="flex justify-center gap-4">
         <Button asChild size="lg">
           <Link href="/login">Přihlásit se</Link>
@@ -39,7 +41,7 @@ export default function PublicHomePage() {
       </div>
       <div className="mt-12 text-sm text-muted-foreground">
         <p>
-          Po přihlášení zde naleznete přehled všech předmětů k zapsání.
+          Po přihlášení uvidíte své zápisy, termíny a další agendu.
         </p>
       </div>
     </div>

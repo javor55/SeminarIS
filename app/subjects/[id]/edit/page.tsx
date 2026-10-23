@@ -1,16 +1,19 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import * as React from "react";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
-import { getSubjects, updateSubject, createSubject } from "@/lib/data";
+import { getSubjects, updateSubject, createSubject } from "@/modules/seminars/actions/subjects";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea"; 
 import { Button } from "@/components/ui/button";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
 import { Subject } from "@/lib/types";
 import { toast } from "sonner";
+import { can } from "@/modules/registry";
+import { PageHeader } from "@/components/page-header";
 
 function EditSubjectForm({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -69,16 +72,16 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
   if (!subject && params.id !== "new") {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Předmět nenalezen</h1>
+        <h1 className="text-2xl font-semibold">Seminář nenalezen</h1>
         <p className="text-muted-foreground">
-          Předmět s ID <code>{params.id}</code> nebyl nalezen.
+          Seminář s ID <code>{params.id}</code> nebyl nalezen.
         </p>
       </div>
     );
   }
 
-  if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) {
-    return <p>Nemáte oprávnění upravovat tento předmět.</p>;
+  if (!user || !can(user.role, "seminars.subjects.edit")) {
+    return <p>Nemáte oprávnění upravovat tento seminář.</p>;
   }
 
   async function handleSave() {
@@ -98,18 +101,18 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
       };
 
       if (isNew) {
-        ok = await createSubject(payload);
+        ok = unwrap(await createSubject(payload));
       } else if (subject) {
-        ok = await updateSubject({
+        ok = unwrap(await updateSubject({
           id: subject.id,
           ...payload,
-        });
+        }));
       }
 
       if (!ok) {
-        setError("Nepodařilo se uložit předmět.");
+        setError("Nepodařilo se uložit seminář.");
       } else {
-        toast.success(isNew ? "Předmět byl úspěšně vytvořen." : "Předmět byl úspěšně uložen.");
+        toast.success(isNew ? "Seminář byl úspěšně vytvořen." : "Seminář byl úspěšně uložen.");
         const redirectId = ok.id;
         router.push(`/subjects/${redirectId}`);
       }
@@ -123,10 +126,11 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">{params.id === "new" ? "Nový předmět" : "Upravit předmět"}</h1>
-        {subject && <p className="text-sm text-muted-foreground">{subject.name}</p>}
-      </div>
+      <PageHeader
+        back={{ href: params.id === "new" ? "/subjects" : `/subjects/${params.id}`, label: "Zpět" }}
+        title={params.id === "new" ? "Nový seminář" : "Upravit seminář"}
+        description={subject?.name}
+      />
 
       <div className="grid gap-4">
         <div className="space-y-1">
@@ -160,7 +164,7 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
             rows={4}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Krátký hlavičkový popis předmětu před sylabem..."
+            placeholder="Krátký hlavičkový popis semináře před sylabem..."
           />
         </div>
 

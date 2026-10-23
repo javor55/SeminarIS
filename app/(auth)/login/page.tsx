@@ -1,83 +1,23 @@
-"use client";
+import { getAuthSettings, isMicrosoftActive } from "@/lib/auth-settings";
+import { LoginForm } from "./LoginForm";
 
-import { useState } from "react";
-import { useAuth } from "@/components/auth/auth-provider";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import Link from "next/link";
+// Nastavení přihlašování se čte z DB při každém zobrazení
+export const dynamic = "force-dynamic";
 
-export default function LoginPage() {
-  const { login } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+const PASSWORD_NOTES = {
+  ALL: null,
+  STAFF: "Přihlášení heslem je určeno pro učitele a administrátory.",
+  ADMIN: "Přihlášení heslem je určeno jen pro administrátory.",
+} as const;
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      await login(email, password);
-    } catch (err: unknown) {
-      const error = err as Error;
-      setError(error.message ?? "Nepodařilo se přihlásit.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
+export default async function LoginPage({ searchParams }: { searchParams: { error?: string } }) {
+  const settings = await getAuthSettings();
+  const microsoftEnabled = isMicrosoftActive(settings);
   return (
-    <div className="min-h-[60vh] flex items-center justify-center">
-      <div className="w-full max-w-md space-y-6 rounded-lg border bg-card p-6 shadow-sm">
-        <div>
-          <h1 className="text-xl font-semibold">Přihlášení</h1>
-          <p className="text-sm text-muted-foreground">
-            Zadejte svůj e-mail a heslo pro přihlášení.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <Label htmlFor="email">E-mail</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="např. student@example.com"
-              required
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="password">Heslo</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Přihlašuji..." : "Přihlásit se"}
-          </Button>
-
-          <div className="text-center text-sm text-muted-foreground pt-2">
-            Nemáte ještě účet?{" "}
-            <Link href="/register" className="text-primary hover:underline">
-              Vytvořit účet
-            </Link>
-          </div>
-        </form>
-      </div>
-    </div>
+    <LoginForm
+      microsoftEnabled={microsoftEnabled}
+      passwordNote={microsoftEnabled ? PASSWORD_NOTES[settings.passwordScope] : null}
+      errorCode={searchParams.error ?? null}
+    />
   );
 }

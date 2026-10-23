@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import { useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -8,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { KeyRound, ShieldCheck, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
-import { changeOwnPassword } from "@/lib/data";
+import { changeOwnPassword } from "@/modules/core/actions/profile";
+import { PageHeader } from "@/components/page-header";
 
 export default function ProfilePage() {
   const { user, isLoading } = useAuth();
@@ -29,7 +31,7 @@ export default function ProfilePage() {
 
     setIsChanging(true);
     try {
-      await changeOwnPassword(currentPassword, newPassword);
+      unwrap(await changeOwnPassword(currentPassword, newPassword));
       toast.success("Heslo bylo úspěšně změněno.");
       setCurrentPassword("");
       setNewPassword("");
@@ -43,7 +45,7 @@ export default function ProfilePage() {
   }
 
   if (isLoading || !user) return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
         <div className="h-9 w-48 bg-muted animate-pulse rounded" />
         <div className="h-4 w-72 bg-muted animate-pulse rounded mt-2" />
@@ -66,13 +68,8 @@ export default function ProfilePage() {
   );
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground font-outfit">Můj profil</h1>
-        <p className="text-muted-foreground mt-1">
-          Správa osobních údajů a zabezpečení účtu.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Můj profil" description="Správa osobních údajů a zabezpečení účtu." />
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* INFO KARTA */}
@@ -88,8 +85,6 @@ export default function ProfilePage() {
             <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="text-muted-foreground">Role:</div>
                 <div className="font-medium text-slate-800">{user.role}</div>
-                <div className="text-muted-foreground">Ročník:</div>
-                <div className="font-medium text-slate-800">{user.cohort ?? "—"}</div>
                 <div className="text-muted-foreground">ID systému:</div>
                 <div className="font-mono text-[10px] text-slate-400 truncate">{user.id}</div>
             </div>

@@ -1,8 +1,9 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getUsersForFilters, getSubjects } from "@/lib/data";
-import { SubjectsClientView } from "@/components/subjects/SubjectsClientView";
+import { getUsersForFilters } from "@/modules/core/actions/users";
+import { getSubjects } from "@/modules/seminars/actions/subjects";
+import { SubjectsClientView } from "@/modules/seminars/components/subjects/SubjectsClientView";
 import { User } from "@/lib/types";
 
 export default async function SubjectsPage() {

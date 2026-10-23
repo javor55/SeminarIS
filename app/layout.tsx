@@ -6,10 +6,11 @@ import { AppShell } from "@/components/app-shell";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import { GoogleAnalytics } from "@next/third-parties/google";
+import { APP_DESCRIPTION, APP_NAME } from "@/lib/app-config";
 
 export const metadata = {
-  title: "Zápis seminářů",
-  description: "Informační systém pro zápis seminářů",
+  title: APP_NAME,
+  description: APP_DESCRIPTION,
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

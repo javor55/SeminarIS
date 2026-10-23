@@ -19,6 +19,8 @@ declare module "next-auth" {
       lastName: string;
       isActive: boolean;
     };
+    // Id zapnutých modulů (pro sestavení menu na klientovi)
+    enabledModules: string[];
   }
 }
 

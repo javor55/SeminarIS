@@ -12,7 +12,7 @@ dist/
 
 # Prisma
 prisma/dev.db
-prisma/migrations/
+# prisma/migrations/ se verzuje – migrace jsou součástí kódu
 
 # Logs
 npm-debug.log*
@@ -30,3 +30,7 @@ test-output.txt
 *-err.txt
 ts_errors*.txt
 tmp/
+
+# Playwright
+playwright-report/
+test-results/

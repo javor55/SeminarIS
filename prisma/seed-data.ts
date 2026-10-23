@@ -11,7 +11,7 @@ async function main() {
   await prisma.subjectOccurrence.deleteMany();
   await prisma.block.deleteMany();
   await prisma.enrollmentWindow.deleteMany();
-  await prisma.subject.deleteMany();
+  await prisma.seminar.deleteMany();
   
   // Nesmažeme admina, abychom ho nemigrovali a nerozbili přihlášení, ale smažeme vygenerované
   await prisma.user.deleteMany({
@@ -53,7 +53,6 @@ async function main() {
         email: `student${i}@skola.cz`,
         passwordHash: await bcrypt.hash("heslo", 10),
         role: "STUDENT",
-        cohort: "2024/2025"
       }
     });
     students.push(s);
@@ -61,7 +60,7 @@ async function main() {
 
   // 4. Vytvoříme předměty
   console.log(" - Předměty");
-  const sub1 = await prisma.subject.create({
+  const sub1 = await prisma.seminar.create({
     data: {
       name: "Základy programování v Pythonu",
       code: "INF/PRI",
@@ -71,7 +70,7 @@ async function main() {
     }
   });
 
-  const sub2 = await prisma.subject.create({
+  const sub2 = await prisma.seminar.create({
     data: {
       name: "Konverzační angličtina",
       code: "AJ/KON",
@@ -81,7 +80,7 @@ async function main() {
     }
   });
 
-  const sub3 = await prisma.subject.create({
+  const sub3 = await prisma.seminar.create({
     data: {
       name: "Matematický seminář",
       code: "MAT/SEM",
@@ -91,7 +90,7 @@ async function main() {
     }
   });
 
-  const sub4 = await prisma.subject.create({
+  const sub4 = await prisma.seminar.create({
     data: {
       name: "Psychologie pro každý den",
       code: "HV/PSY",
@@ -177,13 +176,6 @@ async function main() {
       });
     }
   }
-
-  // 9. Nastavit systémový ročník (global cohort)
-  await prisma.systemSetting.upsert({
-    where: { key: "current_cohort" },
-    update: { value: "2024/2025" },
-    create: { key: "current_cohort", value: "2024/2025" }
-  });
 
   console.log("Seeding kompletní!");
   console.log("Vytvořeno celkem 3 učitelé, 30 studentů, 4 předměty, 2 zápisová okna, 3 bloky, 6 výskytů.");

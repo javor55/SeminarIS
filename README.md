@@ -1,5 +1,10 @@
 # Dokumentace projektu – Systém zápisu seminářů
 
+> **Od 10/2026:** aplikace je rozdělená na jádro a moduly a schéma databáze se mění jen migracemi.
+> Popis architektury, školních dat (třídy, uzavření roku), postup přidání modulu a nasazení jsou
+> v [Dokumentace/architektura-moduly.md](Dokumentace/architektura-moduly.md). Ukázky kódu níže
+> (např. `lib/data.ts`, middleware) odpovídají původní verzi.
+
 ## 1. Úvod
 
 **Název projektu:** SeminarIS — Online systém pro zápisy seminářů  

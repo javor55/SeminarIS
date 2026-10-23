@@ -1,9 +1,10 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getEnrollmentWindowByIdWithBlocks } from "@/lib/data";
-import { EnrollmentView } from "@/components/enrollment/EnrollmentView";
+import { getEnrollmentWindowByIdWithBlocks } from "@/modules/seminars/actions/windows";
+import { EnrollmentView } from "@/modules/seminars/components/enrollment/EnrollmentView";
 import { User } from "@/lib/types";
+import { can } from "@/modules/registry";
 
 export default async function EnrollmentDetailPage({
   params,
@@ -18,7 +19,7 @@ export default async function EnrollmentDetailPage({
   }
 
   const user = session.user as User;
-  const isAllowed = user.role === "ADMIN" || user.role === "TEACHER";
+  const isAllowed = can(user.role, "seminars.windows.view");
 
   if (!isAllowed) {
     return (

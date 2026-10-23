@@ -1,18 +1,14 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
+import { can, getRoutePermission } from "@/modules/registry";
 
 export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token;
-    const pathname = req.nextUrl.pathname;
 
-    // Admin-only routes
-    if (pathname.startsWith("/admin") && token?.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
-    }
-
-    // Users page – only ADMIN and TEACHER
-    if (pathname.startsWith("/users") && token?.role !== "ADMIN" && token?.role !== "TEACHER") {
+    // Oprávnění k cestám deklarují moduly ve svých manifestech (routes)
+    const permission = getRoutePermission(req.nextUrl.pathname);
+    if (permission && !can(token?.role, permission)) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
@@ -20,20 +16,13 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      authorized: ({ token }) => !!token && token.isActive !== false,
     },
   }
 );
 
-// Protect all routes except public ones
+// Chráněno je vše kromě veřejné úvodní stránky, přihlášení/registrace, API a statických souborů.
+// (Matcher musí být statický, proto se negeneruje z registru modulů.)
 export const config = {
-  matcher: [
-    "/dashboard/:path*",
-    "/admin/:path*",
-    "/users/:path*",
-    "/subjects/:path*",
-    "/enrollments/:path*",
-    "/profile/:path*",
-    "/settings/:path*",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|login|register).+)"],
 };

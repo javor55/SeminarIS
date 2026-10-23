@@ -7,7 +7,7 @@ export type User = {
   email: string;
   role: Role;
   isActive: boolean;
-  cohort?: string | null;
+  classGroupId?: string | null;
   lastLoginAt?: string | Date | null;
   createdAt: string | Date;
   updatedAt: string | Date;
@@ -23,6 +23,8 @@ export type EnrollmentWindow = {
   startsAt: string | Date;
   endsAt: string | Date;
   visibleToStudents: boolean;
+  // Cílové ročníky; prázdné = všichni
+  targetGrades?: number[];
   createdById: string;
   updatedById?: string;
   createdAt: string | Date;
