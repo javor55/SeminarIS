@@ -308,8 +308,13 @@ npm run db:migrate && npm run build && npm run test:e2e
 
 ## Databáze a migrace
 
-Dřív se schéma měnilo přes `prisma db push`. **Build na Vercelu databázi nemění**: spouští
-jen `prisma generate` a `next build`. Od teď se schéma mění výhradně migracemi:
+Dřív se schéma měnilo přes `prisma db push`. Od teď se schéma mění výhradně migracemi.
+**Produkční nasazení na Vercelu migrace aplikuje samo:** Vercel místo `build` spouští skript
+`vercel-build` (`scripts/vercel-build.sh`), který při `VERCEL_ENV=production` nejdřív pustí
+`prisma migrate deploy` a pak `next build`. Když migrace selže, build skončí chybou a dál běží
+předchozí verze. Preview nasazení migrace přeskakují, protože mohou sdílet produkční databázi
+a migrovala by ji každá větev. V nastavení projektu na Vercelu nesmí být přepsaný Build Command,
+jinak se `vercel-build` nespustí.
 
 | Příkaz | Kdy |
 |---|---|
@@ -318,22 +323,20 @@ jen `prisma generate` a `next build`. Od teď se schéma mění výhradně migra
 | `npm run db:migrate` | aplikuje čekající migrace (`prisma migrate deploy`) na DB z `DATABASE_URL` |
 | `npm run db:seed` | naplní prázdnou DB testovacími daty |
 
-Migrace se do produkce aplikují **ručně** příkazem `npm run db:migrate` s produkčním
-`DATABASE_URL`, a to před nasazením kódu, který je potřebuje. Do buildu se záměrně nedávají:
-preview nasazení větví na Vercelu obvykle sdílejí produkční databázi a migrovala by ji každá
-větev.
+Ruční `npm run db:migrate` s produkčním `DATABASE_URL` zůstává jako záložní cesta (např.
+když je potřeba migraci pustit dřív, než se nasadí kód).
 
 ### Nasazení verze 10/2026 (nová databáze)
 
 Zpětná kompatibilita se starými daty se nezachovává. Historie migrací začíná jednou čistou
 migrací `20261024000000_init` a produkční databáze se založí znovu:
 
-1. **Záloha** současné DB, pokud z ní chcete něco mít (Neon → Backup / branch).
-2. Vyprázdnit produkční databázi. V Neonu nejjednodušeji: smazat a znovu vytvořit databázi
-   (nebo nový branch) a aktualizovat `DATABASE_URL` na Vercelu, nebo v SQL editoru
-   `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`.
-3. `DATABASE_URL="<produkční URL>" npm run db:migrate`, založí všechny tabulky.
-4. Merge do `main` a nasazení na Vercel.
+1. Na Vercelu (Storage) vytvořit novou databázi Prisma Postgres a připojit ji k projektu.
+   Starou databázi jen odpojit, poslouží jako záloha. Zkontrolovat, že `DATABASE_URL`
+   v Environment Variables patří nové databázi.
+2. Merge do `main`. Produkční build sám založí tabulky (`prisma migrate deploy`).
+3. Ověřit v logu buildu řádek „All migrations have been successfully applied.“
+4. Návrat zpět: Instant Rollback na předchozí nasazení a znovu připojit starou databázi.
 5. Naplnění:
    - první registrovaný uživatel se stane adminem,
    - Škola: zkontrolovat školní rok, založit třídy,
@@ -342,7 +345,9 @@ migrací `20261024000000_init` a produkční databáze se založí znovu:
    - Semináře: zápisová okna.
 
 Do budoucna platí: každá změna schématu = nová migrace (`npx prisma migrate dev`), na
-produkci `npm run db:migrate` **před** nasazením kódu.
+produkci ji aplikuje produkční build. Migrace musí být kompatibilní s běžící verzí
+(přidávat sloupce s výchozí hodnotou, mazat až v další verzi), protože se aplikuje chvíli
+před přepnutím na nový kód.
 
 ## Bezpečnostní opravy provedené při refaktoringu
 
