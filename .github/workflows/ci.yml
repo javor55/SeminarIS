@@ -15,6 +15,9 @@ env:
   NEXTAUTH_SECRET: ci-secret-not-for-production
   NEXTAUTH_URL: http://localhost:3000
   NEXT_TELEMETRY_DISABLED: "1"
+  # E-maily se v testech neodesílají, jen zapisují do logu
+  EMAIL_TRANSPORT: log
+  EMAIL_FROM: "Školní IS <test@example.com>"
 
 jobs:
   checks:
