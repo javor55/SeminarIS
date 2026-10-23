@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { User } from "@/lib/types";
+import { PageHeader } from "@/components/page-header";
 
 export function SubjectsClientView({
   subjects,
@@ -26,7 +27,7 @@ export function SubjectsClientView({
   }));
 
   const handleExport = () => {
-    const headers = ["Předmět", "Kód", "Garanti", "Vytvořil", "Vytvořeno", "Upraveno", "Má aktivní zápisy", "Stav"];
+    const headers = ["Seminář", "Kód", "Garanti", "Vytvořil", "Vytvořeno", "Upraveno", "Má aktivní zápisy", "Stav"];
     const rows = subjects.map(s => {
       const teachers = Array.from(new Set((s.subjectOccurrences || []).map(o => o.teacher ? `${o.teacher.firstName} ${o.teacher.lastName}` : null).filter(Boolean))).join(", ");
       const hasActive = (s.subjectOccurrences || []).length > 0 ? "ANO" : "NE";
@@ -51,7 +52,7 @@ export function SubjectsClientView({
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `export_predmetu_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `export_seminaru_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -59,7 +60,7 @@ export function SubjectsClientView({
   };
 
   const handleExportSyllabus = () => {
-    const headers = ["Předmět", "Kód", "Sylabus / Popis"];
+    const headers = ["Seminář", "Kód", "Sylabus / Popis"];
     const rows = subjects.map(s => [
       `"${(s.name || "").replace(/"/g, '""')}"`,
       s.code || "",
@@ -83,46 +84,41 @@ export function SubjectsClientView({
 
   return (
     <div className="space-y-4">
-      {/* HLAVIČKA */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Semináře</h1>
-          <p className="text-sm text-muted-foreground">
-            {isAllowed 
-              ? "Seznam předmětů a jejich kódů." 
-              : "Katalog seminářů nabízených v rámci vašich zápisů."}
-          </p>
-        </div>
-
-        {/* 🔥 TLAČÍTKA - Viditelná jen pro ADMIN/TEACHER */}
-        {isAllowed && (
-          <div className="flex items-center gap-2">
-            {!isEmpty && (
-              <Button onClick={handleExport} variant="outline" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Export CSV
-              </Button>
-            )}
-            {!isEmpty && (
-               <Button onClick={handleExportSyllabus} variant="outline" size="sm">
+      <PageHeader
+        title="Semináře"
+        description={
+          isAllowed ? "Katalog seminářů a jejich kódů." : "Katalog seminářů nabízených v rámci vašich zápisů."
+        }
+        actions={
+          isAllowed ? (
+            <>
+              {!isEmpty && (
+                <Button onClick={handleExport} variant="outline" size="sm">
                   <Download className="mr-2 h-4 w-4" />
-                  Katalog sylabů
-               </Button>
-            )}
-            <Button asChild size="sm">
-              <Link href="/subjects/new/edit">
-                <Plus className="mr-2 h-4 w-4" />
-                Nový předmět
-              </Link>
-            </Button>
-          </div>
-        )}
-      </div>
+                  Export CSV
+                </Button>
+              )}
+              {!isEmpty && (
+                 <Button onClick={handleExportSyllabus} variant="outline" size="sm">
+                    <Download className="mr-2 h-4 w-4" />
+                    Katalog sylabů
+                 </Button>
+              )}
+              <Button asChild size="sm">
+                <Link href="/subjects/new/edit">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nový seminář
+                </Link>
+              </Button>
+            </>
+          ) : undefined
+        }
+      />
 
       {isEmpty ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
-            <p>Zatím nebyly vytvořeny žádné předměty.</p>
+            <p>Zatím nebyly vytvořeny žádné semináře.</p>
           </CardContent>
         </Card>
       ) : (
@@ -131,7 +127,7 @@ export function SubjectsClientView({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-md">Celkem předmětů</CardTitle>
+                  <CardTitle className="text-md">Celkem seminářů</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold">{subjects.length}</p>

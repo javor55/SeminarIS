@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { KeyRound, ShieldCheck, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { changeOwnPassword } from "@/modules/core/actions/profile";
+import { PageHeader } from "@/components/page-header";
 
 export default function ProfilePage() {
   const { user, isLoading } = useAuth();
@@ -44,7 +45,7 @@ export default function ProfilePage() {
   }
 
   if (isLoading || !user) return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
         <div className="h-9 w-48 bg-muted animate-pulse rounded" />
         <div className="h-4 w-72 bg-muted animate-pulse rounded mt-2" />
@@ -67,13 +68,8 @@ export default function ProfilePage() {
   );
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground font-outfit">Můj profil</h1>
-        <p className="text-muted-foreground mt-1">
-          Správa osobních údajů a zabezpečení účtu.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Můj profil" description="Správa osobních údajů a zabezpečení účtu." />
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* INFO KARTA */}

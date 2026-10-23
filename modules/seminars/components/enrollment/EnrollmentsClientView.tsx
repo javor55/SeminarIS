@@ -11,6 +11,7 @@ import {
   EnrollmentRow,
 } from "@/modules/seminars/components/enrollment/enrollment-columns";
 import { EnrollmentWindow, EnrollmentStatus, User, EnrollmentWindowWithBlocks } from "@/lib/types";
+import { PageHeader } from "@/components/page-header";
 
 const newEnrollmentMock: Partial<EnrollmentWindow> = {
   id: "", 
@@ -94,19 +95,15 @@ export function EnrollmentsClientView({ enrollments, currentUser }: EnrollmentsC
   return (
     <>
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold">Zápisová období</h1>
-            <p className="text-sm text-muted-foreground">
-              Přehled všech zápisů, bloků a počtu unikátních studentů.
-            </p>
-          </div>
-          {currentUser.role === "ADMIN" && (
-            <Button onClick={() => setEditEnrollment(newEnrollmentMock)}>
-              Vytvořit nový zápis
-            </Button>
-          )}
-        </div>
+        <PageHeader
+          title="Zápisová období"
+          description="Přehled všech zápisů, bloků a počtu unikátních studentů."
+          actions={
+            currentUser.role === "ADMIN" ? (
+              <Button onClick={() => setEditEnrollment(newEnrollmentMock)}>Vytvořit nový zápis</Button>
+            ) : undefined
+          }
+        />
 
         {rows.length === 0 ? (
           <div className="rounded-lg border border-dashed bg-card p-12 flex flex-col items-center justify-center text-center space-y-4">

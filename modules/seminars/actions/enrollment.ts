@@ -78,7 +78,7 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
       });
 
       if (sameSubjectInWindow) {
-        throw new Error("Tento predmet jiz mate zapsany v jinem bloku tohoto zapisu.");
+        throw new Error("Tento seminář už máte zapsaný v jiném bloku tohoto zápisu.");
       }
 
       // 4. Kontrola, zda je zápisové okno otevřené (pokud uživatel není ADMIN)

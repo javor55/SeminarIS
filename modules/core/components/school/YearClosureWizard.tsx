@@ -3,9 +3,7 @@
 import { unwrap } from "@/lib/action-result";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +19,8 @@ import {
   type YearOutcome,
 } from "@/modules/core/actions/school";
 import { STUDY_END_REASON_LABELS, type StudyEndReasonValue } from "@/lib/school";
+import { PageHeader } from "@/components/page-header";
+import { NativeSelect } from "@/components/ui/native-select";
 
 const LEAVE_REASONS: StudyEndReasonValue[] = ["TRANSFER", "WITHDRAWAL", "EXPULSION", "OTHER"];
 
@@ -31,8 +31,6 @@ const OUTCOME_LABELS: Record<YearOutcome, string> = {
   LEAVE: "Ukončí studium",
 };
 
-// Nativní <select> – na stránce mohou být stovky řádků
-const selectClass = "h-8 rounded-md border border-input bg-background px-2 text-sm";
 
 type Choice = { outcome: YearOutcome; targetLetter: string; leaveReason: StudyEndReasonValue };
 
@@ -100,19 +98,12 @@ export function YearClosureWizard({ preview }: { preview: YearClosurePreview }) 
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div>
-        <Link href="/school" className="text-sm text-muted-foreground hover:underline inline-flex items-center gap-1">
-          <ArrowLeft className="w-4 h-4" /> Zpět na Školu
-        </Link>
-        <h1 className="text-3xl font-bold tracking-tight mt-2">
-          Uzavření školního roku {preview.currentYear.label} → {preview.nextYear.label}
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Zkontrolujte výsledek u každého studenta. Výchozí je postup do dalšího ročníku a absolvování
-          posledního ročníku; upravte jen výjimky (opakování ročníku, odchod ze školy).
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        back={{ href: "/school", label: "Zpět na Školu" }}
+        title={`Uzavření školního roku ${preview.currentYear.label} → ${preview.nextYear.label}`}
+        description="Zkontrolujte výsledek u každého studenta. Výchozí je postup do dalšího ročníku a absolvování posledního ročníku; upravte jen výjimky (opakování ročníku, odchod ze školy)."
+      />
 
       <div className="grid gap-4 md:grid-cols-4" data-testid="closure-summary">
         {(Object.keys(OUTCOME_LABELS) as YearOutcome[]).map((o) => (
@@ -182,8 +173,8 @@ export function YearClosureWizard({ preview }: { preview: YearClosurePreview }) 
                         <TableCell className="font-medium">{s.name}</TableCell>
                         <TableCell>{s.classLabel}</TableCell>
                         <TableCell>
-                          <select
-                            className={selectClass}
+                          <NativeSelect
+                            compact className="w-auto inline-block"
                             aria-label={`Výsledek – ${s.name}`}
                             value={c.outcome}
                             onChange={(e) => setChoice(s, { outcome: e.target.value as YearOutcome })}
@@ -191,7 +182,7 @@ export function YearClosureWizard({ preview }: { preview: YearClosurePreview }) 
                             {outcomes.map((o) => (
                               <option key={o} value={o}>{OUTCOME_LABELS[o]}</option>
                             ))}
-                          </select>
+                          </NativeSelect>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {c.outcome === "PROMOTE" && `→ ${s.grade + 1}.${s.letter}`}
@@ -199,8 +190,8 @@ export function YearClosureWizard({ preview }: { preview: YearClosurePreview }) 
                           {c.outcome === "REPEAT" && (
                             <span className="inline-flex items-center gap-1">
                               → {s.grade}.
-                              <select
-                                className={selectClass}
+                              <NativeSelect
+                                compact className="w-auto inline-block"
                                 aria-label={`Třída po opakování – ${s.name}`}
                                 value={c.targetLetter}
                                 onChange={(e) => setChoice(s, { targetLetter: e.target.value })}
@@ -208,12 +199,12 @@ export function YearClosureWizard({ preview }: { preview: YearClosurePreview }) 
                                 {s.repeatLetters.map((l) => (
                                   <option key={l} value={l}>{l}</option>
                                 ))}
-                              </select>
+                              </NativeSelect>
                             </span>
                           )}
                           {c.outcome === "LEAVE" && (
-                            <select
-                              className={selectClass}
+                            <NativeSelect
+                              compact className="w-auto inline-block"
                               aria-label={`Důvod ukončení – ${s.name}`}
                               value={c.leaveReason}
                               onChange={(e) => setChoice(s, { leaveReason: e.target.value as StudyEndReasonValue })}
@@ -221,7 +212,7 @@ export function YearClosureWizard({ preview }: { preview: YearClosurePreview }) 
                               {LEAVE_REASONS.map((r) => (
                                 <option key={r} value={r}>{STUDY_END_REASON_LABELS[r]}</option>
                               ))}
-                            </select>
+                            </NativeSelect>
                           )}
                         </TableCell>
                       </TableRow>

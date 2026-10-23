@@ -19,6 +19,8 @@ import {
 import { ATTENDANCE_LABELS, type MakeupSessionItem, type MyRegistrationItem } from "@/modules/makeup/types";
 import { SessionsTable, deadlineText, isPastDeadline } from "./common";
 import { MoveDialog, RegisterDialog } from "./RegistrationDialogs";
+import { PageHeader } from "@/components/page-header";
+import { NativeSelect } from "@/components/ui/native-select";
 
 const overlaps = (a: MakeupSessionItem, b: MakeupSessionItem) =>
   new Date(a.startsAt) < new Date(b.endsAt) && new Date(a.endsAt) > new Date(b.startsAt);
@@ -78,13 +80,11 @@ export function StudentMakeupView({
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dopisování písemek</h1>
-        <p className="text-muted-foreground mt-1">
-          Vyberte termín a předmět, který potřebujete dopsat. Zápis, odhlášení i přepis jsou možné do uzávěrky termínu.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Dopisování písemek"
+        description="Vyberte termín a předmět, který potřebujete dopsat. Zápis, odhlášení i přepis jsou možné do uzávěrky termínu."
+      />
 
       <Card className="shadow-sm">
         <CardHeader>
@@ -178,9 +178,9 @@ export function StudentMakeupView({
           </div>
           <div className="space-y-1">
             <Label htmlFor="subject-filter" className="text-xs">Předmět</Label>
-            <select
+            <NativeSelect
               id="subject-filter"
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              className="w-[200px]"
               value={subjectFilter}
               onChange={(e) => setSubjectFilter(e.target.value)}
             >
@@ -188,7 +188,7 @@ export function StudentMakeupView({
               {allSubjects.map(([id, name]) => (
                 <option key={id} value={id}>{name}</option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
         </CardHeader>
         <CardContent>

@@ -10,7 +10,9 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:status": "prisma migrate status",
-    "db:seed": "node --experimental-strip-types prisma/seed.ts"
+    "db:seed": "node --experimental-strip-types prisma/seed.ts",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@next/third-parties": "^16.2.3",
@@ -46,6 +48,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.7.4",
     "@types/react": "^18.3.10",

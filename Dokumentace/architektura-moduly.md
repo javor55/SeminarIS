@@ -132,6 +132,7 @@ Project → Settings → Environment Variables (Production, případně Preview)
 | `AZURE_AD_CLIENT_ID` | Application (client) ID |
 | `AZURE_AD_CLIENT_SECRET` | hodnota client secretu |
 | `NEXTAUTH_URL` | veřejná adresa aplikace (musí sedět s Redirect URI) |
+| `NEXT_PUBLIC_APP_NAME` | volitelně název aplikace v hlavičce a na úvodní stránce |
 
 Po uložení je potřeba nové nasazení (Redeploy).
 
@@ -228,9 +229,8 @@ onSubmit={() => unwrapAsync(registerForSession(…))}    // jako callback
 ```
 
 `safeAction` předá text běžných chyb a chyby databáze nahradí obecnou hláškou. Takto jsou
-napsané akce modulů Dopisování a Škola, správa uživatelů a změna hesla. Starší akce modulu
-Semináře hlásí chyby částečně jinak (`{ error }` u zápisu, jinde výjimkou) a při další
-úpravě je vhodné je převést.
+napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
+(`modules/seminars/actions/enrollment.ts`): ty už původně vracely `{ success } | { error }`.
 
 ## Modul Dopisování písemek (`modules/makeup`)
 
@@ -266,6 +266,45 @@ Semináře hlásí chyby částečně jinak (`{ error }` u zápisu, jinde výjim
   - e-mailové notifikace,
   - import termínů z Excelu (čeká na ukázku tabulky),
   - omezení počtu zápisů na studenta.
+
+## UI konvence
+
+- **Stránka:** obsah je v `container` z layoutu (odsazení 16 px na mobilu, víc na desktopu).
+  Stránky si samy nenastavují šířku (`max-w-*`), aby všechny začínaly na stejné hraně.
+- **Hlavička:** vždy `PageHeader` (`components/page-header.tsx`). Nadpis, popis, akce vpravo
+  a volitelný odkaz `back`.
+- **Rozbalovací seznamy:** `Select` (shadcn), nebo `NativeSelect`
+  (`components/ui/native-select.tsx`) se stejným vzhledem. Holý `<select>` ne.
+- **Datum a čas:** jen přes `lib/datetime.ts` (`formatDateTime`, `formatTimeRange`, …). Pásmo
+  je Europe/Prague a výstup stejný na serveru i v prohlížeči. `toLocaleString()` bez
+  locale dává americký formát.
+- **Pojmy:** modul Semináře = „seminář“, menu Škola = „předmět“ (školní předmět).
+- **Název aplikace:** `lib/app-config.ts`. Změna bez úpravy kódu přes proměnnou prostředí
+  `NEXT_PUBLIC_APP_NAME` (na Vercelu, pak nový build). Výchozí je „Školní informační systém“.
+
+## Testy a CI
+
+- **E2E testy** (`e2e/*.spec.ts`, Playwright) proklikají aplikaci v prohlížeči nad skutečnou
+  databází:
+  1. role, oprávnění a moduly,
+  2. škola, import a cílení zápisu,
+  3. dopisování,
+  4. uzavření roku.
+- **Před každou sadou se databáze vyprázdní a naplní seedem.** Proto
+  **nikdy neukazujte `DATABASE_URL` na produkci**.
+
+```bash
+# lokálně (testovací DB v DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL=http://localhost:3000)
+npm run db:migrate && npm run build && npm run test:e2e
+```
+
+- **GitHub Actions** (`.github/workflows/ci.yml`) běží u každého pull requestu a pushe do `main`:
+  - typecheck, lint, build,
+  - E2E testy s PostgreSQL v kontejneru.
+
+  Při selhání se uloží report s trasami a screenshoty.
+- Doporučení: v nastavení repozitáře nastavit kontroly „Typecheck, lint, build“ a „E2E
+  testy“ jako povinné pro merge do `main`.
 
 ## Databáze a migrace
 

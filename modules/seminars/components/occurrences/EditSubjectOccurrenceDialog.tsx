@@ -85,16 +85,16 @@ export function EditSubjectOccurrenceDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {isNew ? "Přidat výskyt předmětu" : "Upravit výskyt předmětu"}
+            {isNew ? "Přidat výskyt semináře" : "Upravit výskyt semináře"}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3 py-2">
           <div className="space-y-1">
-            <label className="text-sm font-medium">Předmět</label>
+            <label className="text-sm font-medium">Seminář</label>
             <Select value={subjectId} onValueChange={setSubjectId}>
               <SelectTrigger>
-                <SelectValue placeholder="Vyber předmět" />
+                <SelectValue placeholder="Vyber seminář" />
               </SelectTrigger>
               <SelectContent>
                 {subjects.map((s) => (
@@ -166,9 +166,9 @@ export function EditSubjectOccurrenceDialog({
           <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Zrušit tento výskyt předmětu?</AlertDialogTitle>
+                <AlertDialogTitle>Zrušit tento výskyt semináře?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Opravdu chcete odstranit tento výskyt předmětu z bloku? Tato akce je nevratná.
+                  Opravdu chcete odstranit tento výskyt semináře z bloku? Tato akce je nevratná.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -194,7 +194,7 @@ export function EditSubjectOccurrenceDialog({
             <Button 
                 onClick={async () => {
                   if (!subjectId) {
-                    alert("Vyberte vyučovaný předmět.");
+                    alert("Vyberte vyučovaný seminář.");
                     return;
                   }
                   

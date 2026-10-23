@@ -23,7 +23,7 @@ export type SubjectRow = {
 export const subjectsColumns: ColumnDef<SubjectRow>[] = [
   {
     accessorKey: "name",
-    header: "Předmět",
+    header: "Seminář",
     cell: ({ row }) => {
       const s = row.original;
       return (

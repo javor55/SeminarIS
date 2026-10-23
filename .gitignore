@@ -30,3 +30,7 @@ test-output.txt
 *-err.txt
 ts_errors*.txt
 tmp/
+
+# Playwright
+playwright-report/
+test-results/

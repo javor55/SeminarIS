@@ -26,6 +26,8 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import { NativeSelect } from "@/components/ui/native-select";
+import { formatDateTime } from "@/lib/datetime";
 
 export type OccurrenceForDialog = SubjectOccurrence & {
   subject?: {
@@ -110,8 +112,8 @@ export function OccurrencesStudentsDialog({
                 </p>
               ) : (
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <select
-                    className="flex-1 border rounded-md px-2 py-1 text-sm bg-background text-foreground"
+                  <NativeSelect
+                    className="flex-1"
                     value={selectedStudentId}
                     onChange={(e) => setSelectedStudentId(e.target.value)}
                   >
@@ -121,7 +123,7 @@ export function OccurrencesStudentsDialog({
                         {s.firstName} {s.lastName} ({s.email})
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                   <Button
                     size="sm"
                     className="w-full sm:w-auto"
@@ -182,7 +184,7 @@ export function OccurrencesStudentsDialog({
                         {u?.email ?? ""}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        zapsán: {new Date(enr.createdAt).toLocaleString()}
+                        zapsán: {formatDateTime(enr.createdAt)}
                       </p>
                     </div>
                     {isPrivileged && (

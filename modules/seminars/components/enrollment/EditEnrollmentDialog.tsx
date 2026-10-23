@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -98,10 +99,10 @@ export function EditEnrollmentDialog({
       };
 
       if (isExisting && enrollment.id) {
-        await updateEnrollmentWindow(enrollment.id, data);
+        unwrap(await updateEnrollmentWindow(enrollment.id, data));
         onOpenChange(false);
       } else {
-        const newRecord = await createEnrollmentWindow(data);
+        const newRecord = unwrap(await createEnrollmentWindow(data));
         onOpenChange(false);
         router.push(`/enrollments/${newRecord.id}`);
       }
@@ -120,7 +121,7 @@ export function EditEnrollmentDialog({
   async function handleDelete() {
     if (!isExisting || !enrollment.id) return;
     try {
-      await deleteEnrollmentWindow(enrollment.id);
+      unwrap(await deleteEnrollmentWindow(enrollment.id));
       onOpenChange(false);
       router.push("/enrollments");
       router.refresh();

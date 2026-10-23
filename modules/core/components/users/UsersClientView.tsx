@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { User } from "@/lib/types";
+import { PageHeader } from "@/components/page-header";
 
 const NO_CLASS = "__none";
 
@@ -293,25 +294,24 @@ export function UsersClientView({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Správa uživatelů</h1>
-          <p className="text-sm text-muted-foreground">Správa rolí, tříd, stavu studia a zápisů.</p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {currentUser.role === "ADMIN" && (
-            <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="gap-2">
-              <Upload className="w-4 h-4" />
-              Import uživatelů
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
-            <Download className="w-4 h-4" />
-            Export do CSV
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Správa uživatelů"
+        description="Správa rolí, tříd, stavu studia a zápisů."
+        actions={
+          <>
+              {currentUser.role === "ADMIN" && (
+                <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="gap-2">
+                  <Upload className="w-4 h-4" />
+                  Import uživatelů
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
+                <Download className="w-4 h-4" />
+                Export do CSV
+              </Button>
+          </>
+        }
+      />
 
       <Card>
         <CardHeader className="pb-2">

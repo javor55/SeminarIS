@@ -7,6 +7,7 @@ import { User, EnrollmentWindow } from "@/lib/types";
 import { cn, computeEnrollmentStatus } from "@/lib/utils";
 import Link from "next/link"; // Pro proklik z názvu
 import { Badge } from "@/components/ui/badge"; // Pro badge stavu
+import { formatDateTime } from "@/lib/datetime";
 // 🔥 Ikony Check a X již nejsou potřeba
 // import { Check, X } from "lucide-react";
 
@@ -104,19 +105,19 @@ export function getEnrollmentColumns(opts: {
     { // Sloupec 3 (Začátek)
       accessorKey: "startsAt",
       header: "Začátek",
-      cell: ({ row }) => new Date(row.original.startsAt).toLocaleString(),
+      cell: ({ row }) => formatDateTime(row.original.startsAt),
     },
     { // Sloupec 4 (Konec)
       accessorKey: "endsAt",
       header: "Konec",
-      cell: ({ row }) => new Date(row.original.endsAt).toLocaleString(),
+      cell: ({ row }) => formatDateTime(row.original.endsAt),
     },
     
     // 🔥 ZMĚNA: Sloupec "Viditelné" byl odsud přesunut
     
     { // Sloupec 5 (Bloky)
       accessorKey: "blocksWithCounts",
-      header: "Bloky (předměty)",
+      header: "Bloky (semináře)",
       cell: ({ row }) => {
         const { blocksWithCounts } = row.original;
         return (

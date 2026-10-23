@@ -70,7 +70,7 @@ export function getOccurrenceColumns(opts: {
   if (showSubjectName) {
     cols.push({
     id: "subject",
-    header: "Předmět",
+    header: "Seminář",
     cell: ({ row }) => {
       const occ = row.original;
       if (!occ.subject) return null;

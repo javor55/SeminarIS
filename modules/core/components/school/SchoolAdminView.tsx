@@ -26,6 +26,7 @@ import {
   type SchoolOverview,
 } from "@/modules/core/actions/school";
 import { DEFAULT_STUDY_YEARS } from "@/lib/school";
+import { PageHeader } from "@/components/page-header";
 
 const GRADES = Array.from({ length: DEFAULT_STUDY_YEARS }, (_, i) => i + 1);
 
@@ -50,13 +51,11 @@ export function SchoolAdminView({ overview }: { overview: SchoolOverview }) {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Škola</h1>
-        <p className="text-muted-foreground mt-1">
-          Školní rok, třídy, předměty a úvazky učitelů. Tato data sdílejí všechny moduly.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Škola"
+        description="Školní rok, třídy, předměty a úvazky učitelů. Tato data sdílejí všechny moduly."
+      />
 
       <div className="grid gap-6 md:grid-cols-2">
         <SchoolYearCard overview={overview} busy={busy} run={run} />

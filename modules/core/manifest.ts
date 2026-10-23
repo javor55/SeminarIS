@@ -23,7 +23,7 @@ export const coreModule = {
     { label: "Uživatelé", href: "/users", permission: "core.users.view", order: 80 },
     { label: "Škola", href: "/school", permission: "core.school.manage", order: 85 },
     { label: "Administrace", href: "/admin", permission: "core.admin", order: 90 },
-    { label: "Můj Profil", href: "/profile", permission: "core.profile", order: 100 },
+    { label: "Můj profil", href: "/profile", permission: "core.profile", order: 100 },
   ],
   routes: [
     { prefix: "/users", permission: "core.users.view" },

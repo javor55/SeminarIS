@@ -1,5 +1,6 @@
 "use server";
 
+import { safeAction } from "@/lib/safe-action";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { computeEnrollmentStatus } from "@/lib/utils";
@@ -320,195 +321,215 @@ export async function getEnrollmentDetails(windowId: string) {
 // === BLOKY, ZÁPISOVÁ OKNA A VÝSKYTY ===
 
 export async function deleteBlock(blockId: string) {
-  await requirePermission("seminars.windows.manage");
-  const res = await prisma.block.delete({
-    where: { id: blockId },
+  return safeAction(async () => {
+    await requirePermission("seminars.windows.manage");
+    const res = await prisma.block.delete({
+      where: { id: blockId },
+    });
+    revalidatePath("/", "layout");
+    return res;
   });
-  revalidatePath("/", "layout");
-  return res;
 }
 
 
 
 export async function moveBlock(blockId: string, direction: "UP" | "DOWN") {
-  await requirePermission("seminars.windows.manage");
-  const block = await prisma.block.findUnique({ where: { id: blockId } });
-  if (!block) return;
-  const blocks = await prisma.block.findMany({
-    where: { enrollmentWindowId: block.enrollmentWindowId },
-    orderBy: { order: "asc" },
+  return safeAction(async () => {
+    await requirePermission("seminars.windows.manage");
+    const block = await prisma.block.findUnique({ where: { id: blockId } });
+    if (!block) return;
+    const blocks = await prisma.block.findMany({
+      where: { enrollmentWindowId: block.enrollmentWindowId },
+      orderBy: { order: "asc" },
+    });
+    const index = blocks.findIndex((b) => b.id === blockId);
+    if (index === -1) return;
+    const newIndex = direction === "UP" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= blocks.length) return;
+
+    const targetBlock = blocks[newIndex];
+
+    await prisma.$transaction([
+      // Nastavíme dočasné záporné order k obejití unique constraintu
+      prisma.block.update({ where: { id: block.id }, data: { order: -1 } }),
+      // Posuneme druhý blok na starou pozici toho prvního
+      prisma.block.update({ where: { id: targetBlock.id }, data: { order: block.order } }),
+      // Nyní ten první (dočasně na -1) dosadíme na cílovou pozici
+      prisma.block.update({ where: { id: block.id }, data: { order: targetBlock.order } }),
+    ]);
+    revalidatePath("/", "layout");
+    return true;
   });
-  const index = blocks.findIndex((b) => b.id === blockId);
-  if (index === -1) return;
-  const newIndex = direction === "UP" ? index - 1 : index + 1;
-  if (newIndex < 0 || newIndex >= blocks.length) return;
-
-  const targetBlock = blocks[newIndex];
-
-  await prisma.$transaction([
-    // Nastavíme dočasné záporné order k obejití unique constraintu
-    prisma.block.update({ where: { id: block.id }, data: { order: -1 } }),
-    // Posuneme druhý blok na starou pozici toho prvního
-    prisma.block.update({ where: { id: targetBlock.id }, data: { order: block.order } }),
-    // Nyní ten první (dočasně na -1) dosadíme na cílovou pozici
-    prisma.block.update({ where: { id: block.id }, data: { order: targetBlock.order } }),
-  ]);
-  revalidatePath("/", "layout");
-  return true;
 }
 
 
 export async function updateBlock(block: { id: string; name: string; description?: string | null }) {
-  await requirePermission("seminars.windows.manage");
-  const res = await prisma.block.update({
-    where: { id: block.id },
-    data: {
-      name: block.name,
-      description: block.description || null,
-    },
+  return safeAction(async () => {
+    await requirePermission("seminars.windows.manage");
+    const res = await prisma.block.update({
+      where: { id: block.id },
+      data: {
+        name: block.name,
+        description: block.description || null,
+      },
+    });
+    revalidatePath("/", "layout");
+    return res;
   });
-  revalidatePath("/", "layout");
-  return res;
 }
 
 
 
 export async function createBlock(enrollmentWindowId: string, name: string, description?: string | null) {
-  const admin = await requirePermission("seminars.windows.manage");
+  return safeAction(async () => {
+    const admin = await requirePermission("seminars.windows.manage");
   
-  // Zjistíme nejvyšší order a přidáme + 1
-  const existingBlocks = await prisma.block.findMany({
-    where: { enrollmentWindowId },
-    orderBy: { order: "desc" },
-    take: 1
+    // Zjistíme nejvyšší order a přidáme + 1
+    const existingBlocks = await prisma.block.findMany({
+      where: { enrollmentWindowId },
+      orderBy: { order: "desc" },
+      take: 1
+    });
+  
+    const nextOrder = existingBlocks.length > 0 ? existingBlocks[0].order + 1 : 1;
+  
+    const block = await prisma.block.create({
+      data: {
+        name,
+        description: description || null,
+        order: nextOrder,
+        enrollmentWindowId,
+        createdById: admin.id,
+      }
+    });
+  
+    revalidatePath("/", "layout");
+    return JSON.parse(JSON.stringify(block));
   });
-  
-  const nextOrder = existingBlocks.length > 0 ? existingBlocks[0].order + 1 : 1;
-  
-  const block = await prisma.block.create({
-    data: {
-      name,
-      description: description || null,
-      order: nextOrder,
-      enrollmentWindowId,
-      createdById: admin.id,
-    }
-  });
-  
-  revalidatePath("/", "layout");
-  return JSON.parse(JSON.stringify(block));
 }
 
 
 // === ZÁPISOVÁ OKNA (EnrollmentWindow) ===
 export async function createEnrollmentWindow(data: { name: string; description?: string; status: EnrollmentStatus; startsAt: string | Date; endsAt: string | Date; visibleToStudents: boolean; targetGrades?: number[] }) {
-  const admin = await requirePermission("seminars.windows.manage");
-  const created = await prisma.enrollmentWindow.create({
-    data: {
-      name: data.name,
-      description: data.description || null,
-      status: data.status,
-      startsAt: new Date(data.startsAt),
-      endsAt: new Date(data.endsAt),
-      visibleToStudents: data.visibleToStudents,
-      targetGrades: sanitizeTargetGrades(data.targetGrades),
-      createdById: admin.id,
-    },
+  return safeAction(async () => {
+    const admin = await requirePermission("seminars.windows.manage");
+    const created = await prisma.enrollmentWindow.create({
+      data: {
+        name: data.name,
+        description: data.description || null,
+        status: data.status,
+        startsAt: new Date(data.startsAt),
+        endsAt: new Date(data.endsAt),
+        visibleToStudents: data.visibleToStudents,
+        targetGrades: sanitizeTargetGrades(data.targetGrades),
+        createdById: admin.id,
+      },
+    });
+    revalidatePath("/", "layout");
+    return JSON.parse(JSON.stringify(created));
   });
-  revalidatePath("/", "layout");
-  return JSON.parse(JSON.stringify(created));
 }
 
 
 export async function updateEnrollmentWindow(windowId: string, data: { name: string; description?: string; status: EnrollmentStatus; startsAt: string | Date; endsAt: string | Date; visibleToStudents: boolean; targetGrades?: number[] }) {
-  const admin = await requirePermission("seminars.windows.manage");
-  const updated = await prisma.enrollmentWindow.update({
-    where: { id: windowId },
-    data: {
-      name: data.name,
-      description: data.description || null,
-      status: data.status,
-      startsAt: new Date(data.startsAt),
-      endsAt: new Date(data.endsAt),
-      visibleToStudents: data.visibleToStudents,
-      targetGrades: sanitizeTargetGrades(data.targetGrades),
-      updatedById: admin.id,
-    },
+  return safeAction(async () => {
+    const admin = await requirePermission("seminars.windows.manage");
+    const updated = await prisma.enrollmentWindow.update({
+      where: { id: windowId },
+      data: {
+        name: data.name,
+        description: data.description || null,
+        status: data.status,
+        startsAt: new Date(data.startsAt),
+        endsAt: new Date(data.endsAt),
+        visibleToStudents: data.visibleToStudents,
+        targetGrades: sanitizeTargetGrades(data.targetGrades),
+        updatedById: admin.id,
+      },
+    });
+    revalidatePath("/", "layout");
+    return JSON.parse(JSON.stringify(updated));
   });
-  revalidatePath("/", "layout");
-  return JSON.parse(JSON.stringify(updated));
 }
 
 
 export async function deleteEnrollmentWindow(windowId: string) {
-  await requirePermission("seminars.windows.manage");
-  // V schema.prisma je nastaveno onDelete: Cascade, takže Prisma automaticky
-  // smaže i všechny bloky a výskyty předmětů spojené s tímto oknem.
-  const res = await prisma.enrollmentWindow.delete({
-    where: { id: windowId },
+  return safeAction(async () => {
+    await requirePermission("seminars.windows.manage");
+    // V schema.prisma je nastaveno onDelete: Cascade, takže Prisma automaticky
+    // smaže i všechny bloky a výskyty seminářů spojené s tímto oknem.
+    const res = await prisma.enrollmentWindow.delete({
+      where: { id: windowId },
+    });
+    revalidatePath("/", "layout");
+    return res;
   });
-  revalidatePath("/", "layout");
-  return res;
 }
 
 
 
 // === VÝSKYTY PŘEDMĚTŮ (SubjectOccurrence) ===
 export async function createSubjectOccurrence(data: { subjectId: string; blockId: string; teacherId?: string; subCode?: string; capacity?: string | number }) {
-  const admin = await requirePermission("seminars.windows.manage");
-  const occ = await prisma.subjectOccurrence.create({
-    data: {
-      subjectId: data.subjectId,
-      blockId: data.blockId,
-      teacherId: data.teacherId || null,
-      subCode: data.subCode || null,
-      capacity: data.capacity ? (typeof data.capacity === 'string' ? parseInt(data.capacity, 10) : data.capacity) : null,
-      createdById: admin.id,
-    },
+  return safeAction(async () => {
+    const admin = await requirePermission("seminars.windows.manage");
+    const occ = await prisma.subjectOccurrence.create({
+      data: {
+        subjectId: data.subjectId,
+        blockId: data.blockId,
+        teacherId: data.teacherId || null,
+        subCode: data.subCode || null,
+        capacity: data.capacity ? (typeof data.capacity === 'string' ? parseInt(data.capacity, 10) : data.capacity) : null,
+        createdById: admin.id,
+      },
+    });
+    revalidatePath("/", "layout");
+    return JSON.parse(JSON.stringify(occ));
   });
-  revalidatePath("/", "layout");
-  return JSON.parse(JSON.stringify(occ));
 }
 
 
 export async function updateSubjectOccurrence(occurrenceId: string, data: { subjectId: string; teacherId?: string; subCode?: string; capacity?: string | number }) {
-  const admin = await requirePermission("seminars.windows.manage");
-  const occ = await prisma.subjectOccurrence.update({
-    where: { id: occurrenceId },
-    data: {
-      subjectId: data.subjectId,
-      teacherId: data.teacherId || null,
-      subCode: data.subCode || null,
-      capacity: data.capacity ? (typeof data.capacity === 'string' ? parseInt(data.capacity, 10) : data.capacity) : null,
-      updatedById: admin.id,
-    },
+  return safeAction(async () => {
+    const admin = await requirePermission("seminars.windows.manage");
+    const occ = await prisma.subjectOccurrence.update({
+      where: { id: occurrenceId },
+      data: {
+        subjectId: data.subjectId,
+        teacherId: data.teacherId || null,
+        subCode: data.subCode || null,
+        capacity: data.capacity ? (typeof data.capacity === 'string' ? parseInt(data.capacity, 10) : data.capacity) : null,
+        updatedById: admin.id,
+      },
+    });
+    revalidatePath("/", "layout");
+    return JSON.parse(JSON.stringify(occ));
   });
-  revalidatePath("/", "layout");
-  return JSON.parse(JSON.stringify(occ));
 }
 
 
 export async function deleteSubjectOccurrence(occurrenceId: string) {
-  await requirePermission("seminars.windows.manage");
+  return safeAction(async () => {
+    await requirePermission("seminars.windows.manage");
   
-  // Provádíme kaskádové soft-smazání v rámci transakce
-  return await prisma.$transaction(async (tx) => {
-    // 1. Soft-smazání samotného výskytu
-    const occ = await tx.subjectOccurrence.update({
-      where: { id: occurrenceId },
-      data: { deletedAt: new Date() },
-    });
+    // Provádíme kaskádové soft-smazání v rámci transakce
+    return await prisma.$transaction(async (tx) => {
+      // 1. Soft-smazání samotného výskytu
+      const occ = await tx.subjectOccurrence.update({
+        where: { id: occurrenceId },
+        data: { deletedAt: new Date() },
+      });
 
-    // 2. Soft-smazání všech aktivních zápisů pro tento výskyt
-    await tx.studentEnrollment.updateMany({
-      where: { 
-        subjectOccurrenceId: occurrenceId,
-        deletedAt: null 
-      },
-      data: { deletedAt: new Date() },
-    });
+      // 2. Soft-smazání všech aktivních zápisů pro tento výskyt
+      await tx.studentEnrollment.updateMany({
+        where: { 
+          subjectOccurrenceId: occurrenceId,
+          deletedAt: null 
+        },
+        data: { deletedAt: new Date() },
+      });
 
-    revalidatePath("/", "layout");
-    return JSON.parse(JSON.stringify(occ));
+      revalidatePath("/", "layout");
+      return JSON.parse(JSON.stringify(occ));
+    });
   });
 }

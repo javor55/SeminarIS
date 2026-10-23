@@ -2,10 +2,9 @@
 
 import { unwrap, unwrapAsync } from "@/lib/action-result";
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Printer } from "lucide-react";
+import { Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +37,8 @@ import {
 import { SubjectBadges, deadlineText } from "./common";
 import { SessionFormDialog } from "./SessionFormDialog";
 import { MoveDialog } from "./RegistrationDialogs";
+import { PageHeader } from "@/components/page-header";
+import { NativeSelect } from "@/components/ui/native-select";
 
 export function SessionDetailView({
   session,
@@ -74,54 +75,55 @@ export function SessionDetailView({
     );
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="print:hidden">
-        <Link href="/makeup" className="text-sm text-muted-foreground hover:underline inline-flex items-center gap-1">
-          <ArrowLeft className="w-4 h-4" /> Zpět na Dopisování
-        </Link>
-      </div>
-
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+    <div className="space-y-6">
+      <PageHeader
+        back={{ href: "/makeup", label: "Zpět na Dopisování" }}
+        title={
+          <>
             Dopisování {formatTimeRange(session.startsAt, session.endsAt)}
             {cancelled && <Badge variant="destructive" className="ml-2 align-middle">zrušeno</Badge>}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Učebna {session.room} · dozor {session.teacherName} · zapsáno {session.registeredCount}/{session.capacity} ·
-            změny do {deadlineText(session.changeDeadlineMinutes)}
-          </p>
-          <div className="mt-2"><SubjectBadges subjects={session.subjects} /></div>
-          {session.note && <p className="text-sm mt-2">{session.note}</p>}
-          {cancelled && session.cancelReason && <p className="text-sm text-destructive mt-2">Důvod zrušení: {session.cancelReason}</p>}
-        </div>
-        <div className="flex flex-wrap gap-2 print:hidden">
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer className="w-4 h-4 mr-1" /> Tisk
-          </Button>
-          {!cancelled && (
-            <SessionFormDialog session={session} trigger={<Button variant="outline" data-testid="edit-session">Upravit</Button>} />
-          )}
-          {!cancelled && <CancelSessionDialog session={session} onDone={() => router.refresh()} />}
-          {registrations.length === 0 && (
-            <ConfirmAction
-              title="Smazat termín?"
-              description="Na termínu nikdo není zapsaný, termín se smaže úplně."
-              actionLabel="Smazat"
-              onConfirm={async () => {
-                try {
-                  unwrap(await deleteSession(session.id));
-                  toast.success("Termín smazán.");
-                  router.push("/makeup");
-                } catch (err) {
-                  toast.error((err as Error).message);
-                }
-              }}
-              trigger={<Button variant="outline" className="text-destructive">Smazat</Button>}
-            />
-          )}
-        </div>
-      </div>
+          </>
+        }
+        description={
+          <div className="space-y-2">
+            <p>
+              Učebna {session.room} · dozor {session.teacherName} · zapsáno {session.registeredCount}/{session.capacity} ·
+              změny do {deadlineText(session.changeDeadlineMinutes)}
+            </p>
+            <SubjectBadges subjects={session.subjects} />
+            {session.note && <p className="text-foreground">{session.note}</p>}
+            {cancelled && session.cancelReason && <p className="text-destructive">Důvod zrušení: {session.cancelReason}</p>}
+          </div>
+        }
+        actions={
+          <>
+            <Button variant="outline" onClick={() => window.print()}>
+              <Printer className="w-4 h-4 mr-1" /> Tisk
+            </Button>
+            {!cancelled && (
+              <SessionFormDialog session={session} trigger={<Button variant="outline" data-testid="edit-session">Upravit</Button>} />
+            )}
+            {!cancelled && <CancelSessionDialog session={session} onDone={() => router.refresh()} />}
+            {registrations.length === 0 && (
+              <ConfirmAction
+                title="Smazat termín?"
+                description="Na termínu nikdo není zapsaný, termín se smaže úplně."
+                actionLabel="Smazat"
+                onConfirm={async () => {
+                  try {
+                    unwrap(await deleteSession(session.id));
+                    toast.success("Termín smazán.");
+                    router.push("/makeup");
+                  } catch (err) {
+                    toast.error((err as Error).message);
+                  }
+                }}
+                trigger={<Button variant="outline" className="text-destructive">Smazat</Button>}
+              />
+            )}
+          </>
+        }
+      />
 
       <Card className="shadow-sm">
         <CardHeader>
@@ -158,9 +160,9 @@ export function SessionDetailView({
                     <TableCell className="text-sm text-muted-foreground">{r.note}</TableCell>
                     <TableCell>
                       {started && !cancelled ? (
-                        <select
+                        <NativeSelect
                           aria-label={`Docházka – ${r.studentName}`}
-                          className="h-8 rounded-md border border-input bg-background px-2 text-sm print:hidden"
+                          compact className="w-[170px] print:hidden"
                           value={r.attendance}
                           onChange={(e) =>
                             run(() => unwrapAsync(setAttendance(r.id, e.target.value as MakeupAttendanceValue)), "Docházka uložena.")
@@ -169,7 +171,7 @@ export function SessionDetailView({
                           {(Object.keys(ATTENDANCE_LABELS) as MakeupAttendanceValue[]).map((a) => (
                             <option key={a} value={a}>{ATTENDANCE_LABELS[a]}</option>
                           ))}
-                        </select>
+                        </NativeSelect>
                       ) : (
                         <span>{ATTENDANCE_LABELS[r.attendance]}</span>
                       )}

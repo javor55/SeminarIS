@@ -19,10 +19,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { createSessions, getSessionFormOptions, updateSession } from "@/modules/makeup/actions/sessions";
 import { DEADLINE_OPTIONS, type MakeupSessionItem } from "@/modules/makeup/types";
 import { deadlineText } from "./common";
+import { NativeSelect } from "@/components/ui/native-select";
 
 type Options = Awaited<ReturnType<typeof getSessionFormOptions>>;
 
-const selectClass = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
 const pad = (n: number) => String(n).padStart(2, "0");
 // Datum a čas v místním čase prohlížeče (formát pro <input type="date|time">)
 const toDateInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -133,11 +133,11 @@ export function SessionFormDialog({ session, trigger }: { session?: MakeupSessio
             {options?.canChooseTeacher && (
               <div className="space-y-1">
                 <Label htmlFor="ms-teacher">Dozor</Label>
-                <select id="ms-teacher" className={selectClass} value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
+                <NativeSelect id="ms-teacher" value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
                   {options.teachers.map((t) => (
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
-                </select>
+                </NativeSelect>
               </div>
             )}
             <div className="grid grid-cols-3 gap-2">
@@ -204,11 +204,11 @@ export function SessionFormDialog({ session, trigger }: { session?: MakeupSessio
             </div>
             <div className="space-y-1">
               <Label htmlFor="ms-deadline">Zápis, odhlášení a přepis nejpozději</Label>
-              <select id="ms-deadline" className={selectClass} value={deadline} onChange={(e) => setDeadline(e.target.value)}>
+              <NativeSelect id="ms-deadline" value={deadline} onChange={(e) => setDeadline(e.target.value)}>
                 {DEADLINE_OPTIONS.map((m) => (
                   <option key={m} value={m}>{deadlineText(m)}</option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
             <div className="space-y-1">
               <Label htmlFor="ms-note">Poznámka pro studenty (nepovinná)</Label>

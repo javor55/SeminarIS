@@ -20,6 +20,7 @@ import { Users, BookOpen, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { PerformanceBenchmarks } from "@/modules/core/components/admin/PerformanceBenchmarks";
 import { can } from "@/modules/registry";
+import { PageHeader } from "@/components/page-header";
 
 const STAT_ICONS = {
   users: <Users className="h-4 w-4 text-slate-500" />,
@@ -59,7 +60,7 @@ export default function AdminPage() {
 
 
   if (isLoading || !user || !can(user.role, "core.admin")) return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6">
       <div>
         <div className="h-9 w-64 bg-muted animate-pulse rounded" />
         <div className="h-4 w-96 bg-muted animate-pulse rounded mt-2" />
@@ -76,13 +77,11 @@ export default function AdminPage() {
   );
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground font-outfit">Administrační centrum</h1>
-        <p className="text-muted-foreground mt-1">
-          Správa globálního nastavení systému a přehled statistik.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Administrační centrum"
+        description="Správa globálního nastavení systému a přehled statistik."
+      />
 
       {/* STATISTIKY (dodávají je zapnuté moduly) */}
       <div className="grid gap-4 md:grid-cols-3">

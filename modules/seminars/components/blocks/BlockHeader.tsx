@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -71,7 +72,7 @@ export function BlockHeader({
                 } as SubjectOccurrence)
               }
             >
-              Přidat předmět
+              Přidat seminář
             </Button>
 
             <Button
@@ -87,7 +88,7 @@ export function BlockHeader({
               size="sm"
               disabled={blockIndex === 0}
               onClick={async () => {
-                const ok = await moveBlock(block.id, "UP");
+                const ok = unwrap(await moveBlock(block.id, "UP"));
                 if (ok) {
                   toast.success("Blok posunut nahoru");
                   router.refresh();
@@ -102,7 +103,7 @@ export function BlockHeader({
               size="sm"
               disabled={blockIndex === totalBlocks - 1}
               onClick={async () => {
-                const ok = await moveBlock(block.id, "DOWN");
+                const ok = unwrap(await moveBlock(block.id, "DOWN"));
                 if (ok) {
                   toast.success("Blok posunut dolů");
                   router.refresh();
@@ -138,7 +139,7 @@ export function BlockHeader({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 try {
-                  const res = await deleteBlock(block.id);
+                  const res = unwrap(await deleteBlock(block.id));
                   if (res) {
                     toast.success("Blok byl smazán");
                     router.refresh();
@@ -168,7 +169,7 @@ export function BlockHeader({
             }}
             onSubmit={async (data) => {
               try {
-                await updateBlock(data);
+                unwrap(await updateBlock(data));
                 toast.success("Blok byl upraven");
                 router.refresh();
               } catch {
@@ -184,14 +185,14 @@ export function BlockHeader({
           onOpenChange={(open) => !open && setEditOccurrence(null)}
           onSubmit={async (data) => {
               if (data.id) {
-                await updateSubjectOccurrence(data.id, data);
+                unwrap(await updateSubjectOccurrence(data.id, data));
               } else {
-                await createSubjectOccurrence(data);
+                unwrap(await createSubjectOccurrence(data));
               }
               router.refresh();
           }}
           onDelete={async (id) => {
-              await deleteSubjectOccurrence(id);
+              unwrap(await deleteSubjectOccurrence(id));
               router.refresh();
           }}
         />

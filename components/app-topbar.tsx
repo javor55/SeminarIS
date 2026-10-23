@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { APP_NAME } from "@/lib/app-config";
 
 export function AppTopbar({ user }: { user?: User }) {
   const pathname = usePathname();
@@ -32,7 +33,7 @@ export function AppTopbar({ user }: { user?: User }) {
         <div className="flex items-center gap-4">
           {/* Logo/Název - Vždy viditelné */}
           <Link href="/" className="font-semibold">
-            Zápis seminářů
+            {APP_NAME}
           </Link>
 
           {/* 🔥 DESKTOP Navigace: Skrytá na mobilu (hidden), viditelná od 'md' (md:flex) */}

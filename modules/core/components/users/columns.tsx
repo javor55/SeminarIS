@@ -7,6 +7,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Switch } from "@/components/ui/switch";
 import { updateUserRole, toggleUserActive } from "@/modules/core/actions/users";
 import { useState } from "react";
+import { formatDateTime } from "@/lib/datetime";
 
 export type UserRow = User & {
   createdAt?: string;
@@ -94,7 +95,7 @@ export const columns: ColumnDef<UserRow>[] = [
     header: "Vytvořen",
     cell: ({ row }) => {
       const v = row.original.createdAt;
-      return v ? new Date(v).toLocaleString() : "—";
+      return v ? formatDateTime(v) : "—";
     },
   },
   {
@@ -102,7 +103,7 @@ export const columns: ColumnDef<UserRow>[] = [
     header: "Poslední přihlášení",
     cell: ({ row }) => {
       const v = row.original.lastLoginAt;
-      return v ? new Date(v).toLocaleString() : "—";
+      return v ? formatDateTime(v) : "—";
     },
   },
 ];

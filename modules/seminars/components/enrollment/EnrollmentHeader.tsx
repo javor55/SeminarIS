@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -113,7 +114,7 @@ export function EnrollmentHeader({
   const handleExportStudentList = async () => {
     try {
       const { window, classLabels } = await getEnrollmentDetails(ew.id);
-      const headers = ["Příjmení", "Jméno", "Email", "Třída", "Blok", "Předmět", "Kód semináře", "Vyučující", "Zapsáno dne"];
+      const headers = ["Příjmení", "Jméno", "Email", "Třída", "Blok", "Seminář", "Kód semináře", "Vyučující", "Zapsáno dne"];
       const rows: string[][] = [];
 
       window.blocks.forEach(b => {
@@ -146,7 +147,7 @@ export function EnrollmentHeader({
   const handleExportSubjectOccupancy = async () => {
     try {
       const { window } = await getEnrollmentDetails(ew.id);
-      const headers = ["Blok", "Předmět", "Kód semináře", "Vyučující", "Kapacita", "Obsazeno", "Studenti"];
+      const headers = ["Blok", "Seminář", "Kód semináře", "Vyučující", "Kapacita", "Obsazeno", "Studenti"];
       const rows: string[][] = [];
 
       window.blocks.forEach(b => {
@@ -176,7 +177,7 @@ export function EnrollmentHeader({
   const handleExportTeacherReports = async () => {
     try {
       const { window, classLabels } = await getEnrollmentDetails(ew.id);
-      const headers = ["Učitel", "Blok", "Předmět", "Kód", "Student", "Email", "Třída"];
+      const headers = ["Učitel", "Blok", "Seminář", "Kód", "Student", "Email", "Třída"];
       const rows: string[][] = [];
 
       window.blocks.forEach(b => {
@@ -343,13 +344,13 @@ export function EnrollmentHeader({
           </div>
           <div>
             <p className="font-medium text-sm">Váš účet čeká na schválení administrátorem</p>
-            <p className="text-xs mt-1">Nyní máte pouze oprávnění k prohlížení aktuálních zápisů. Nemůžete se zapisovat na žádné předměty.</p>
+            <p className="text-xs mt-1">Nyní máte pouze oprávnění k prohlížení aktuálních zápisů. Nemůžete se zapisovat na žádné semináře.</p>
           </div>
         </div>
       )}
 
       {isAdmin && (
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
@@ -410,7 +411,7 @@ export function EnrollmentHeader({
         block={emptyBlockData}
         onSubmit={async (data) => {
           try {
-            await createBlock(ew.id, data.name, data.description);
+            unwrap(await createBlock(ew.id, data.name, data.description));
             router.refresh();
             setIsCreatingBlock(false);
 

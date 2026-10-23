@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { PageHeader } from "@/components/page-header";
 import { Fragment } from "react";
 import { getCurrentUser } from "@/lib/session";
 import { getEnabledModuleIds } from "@/lib/modules";
@@ -23,13 +24,10 @@ export default async function DashboardPage() {
 
   if (widgets.length === 0) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-semibold">Vítejte</h1>
-        <p className="text-muted-foreground">
-          Momentálně zde není žádné aktivní ani naplánované zápisové období
-          k zobrazení.
-        </p>
-      </div>
+      <PageHeader
+        title={`Vítejte, ${user.firstName}`}
+        description="Momentálně tu pro vás není nic aktuálního – žádný otevřený zápis ani termín. Další agendu najdete v menu."
+      />
     );
   }
 

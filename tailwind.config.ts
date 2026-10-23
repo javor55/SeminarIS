@@ -11,6 +11,12 @@ const config: Config = {
     "./modules/**/*.{ts,tsx}",
   ],
   theme: {
+  	// Jednotné boční odsazení obsahu (mobil 16 px, větší obrazovky víc)
+  	container: {
+  		center: true,
+  		padding: { DEFAULT: '1rem', sm: '1.5rem', lg: '2rem' },
+  		screens: { '2xl': '1400px' },
+  	},
   	extend: {
   		borderRadius: {
   			lg: 'var(--radius)',

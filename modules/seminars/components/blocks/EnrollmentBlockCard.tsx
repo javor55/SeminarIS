@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import * as React from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -288,11 +289,11 @@ export function EnrollmentBlockCard({
           occurrence={editOccurrence}
           onOpenChange={(open) => !open && setEditOccurrence(null)}
           onSubmit={async (data) => {
-              await updateSubjectOccurrence(data.id, data);
+              unwrap(await updateSubjectOccurrence(data.id, data));
               router.refresh();
           }}
           onDelete={async (id) => {
-              await deleteSubjectOccurrence(id);
+              unwrap(await deleteSubjectOccurrence(id));
               router.refresh();
           }}
         />
@@ -305,7 +306,7 @@ export function EnrollmentBlockCard({
               <AlertDialogTitle>Nelze se zapsat</AlertDialogTitle>
               <AlertDialogDescription className="space-y-2">
                 <p>
-                  Už jste zapsán na předmět{" "}
+                  Už jste zapsán na seminář{" "}
                   <strong>{sameSubjectAlert.subjectName}</strong> se stejným
                   kódem <strong>{sameSubjectAlert.subjectCode}</strong> v jiném
                   bloku.
@@ -416,9 +417,9 @@ export function EnrollmentBlockCard({
         <AlertDialog open onOpenChange={() => setDeleteOccurrence(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Opravdu smazat předmět z bloku?</AlertDialogTitle>
+              <AlertDialogTitle>Opravdu smazat seminář z bloku?</AlertDialogTitle>
               <AlertDialogDescription>
-                Tato akce trvale odstraní výskyt předmětu{" "}
+                Tato akce trvale odstraní výskyt semináře{" "}
                 <strong>{deleteOccurrence.teacherName}</strong>{" "}
                 (nebo code) z bloku <strong>{block.name}</strong>.
               </AlertDialogDescription>
@@ -429,12 +430,12 @@ export function EnrollmentBlockCard({
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={async () => {
                   try {
-                    await deleteSubjectOccurrence(deleteOccurrence.id);
-                    toast.success("Předmět byl z bloku smazán.");
+                    unwrap(await deleteSubjectOccurrence(deleteOccurrence.id));
+                    toast.success("Seminář byl z bloku smazán.");
                     router.refresh();
                   } catch (err: unknown) {
                     const error = err as Error;
-                    toast.error(error.message || "Nepodařilo se smazat předmět.");
+                    toast.error(error.message || "Nepodařilo se smazat seminář.");
                   } finally {
                     setDeleteOccurrence(null);
                   }

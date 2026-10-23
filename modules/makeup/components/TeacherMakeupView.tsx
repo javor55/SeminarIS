@@ -11,6 +11,7 @@ import type { getMySubjectRegistrations } from "@/modules/makeup/actions/session
 import { ATTENDANCE_LABELS, type MakeupSessionItem } from "@/modules/makeup/types";
 import { SessionsTable } from "./common";
 import { SessionFormDialog } from "./SessionFormDialog";
+import { PageHeader } from "@/components/page-header";
 
 type SubjectRegistration = Awaited<ReturnType<typeof getMySubjectRegistrations>>[number];
 
@@ -33,22 +34,20 @@ export function TeacherMakeupView({
     ) : null;
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dopisování písemek</h1>
-          <p className="text-muted-foreground mt-1">
-            Vypisujte termíny (svůj čas a učebnu), na které se studenti zapisují k dopsání písemek.
-          </p>
-        </div>
-        <SessionFormDialog
-          trigger={
-            <Button data-testid="new-session">
-              <Plus className="w-4 h-4 mr-1" /> Nový termín
-            </Button>
-          }
-        />
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Dopisování písemek"
+        description="Vypisujte termíny (svůj čas a učebnu), na které se studenti zapisují k dopsání písemek."
+        actions={
+          <SessionFormDialog
+            trigger={
+              <Button data-testid="new-session">
+                <Plus className="w-4 h-4 mr-1" /> Nový termín
+              </Button>
+            }
+          />
+        }
+      />
 
       <Card className="shadow-sm">
         <CardHeader>

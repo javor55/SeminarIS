@@ -38,3 +38,17 @@ export function formatMinutes(minutes: number): string {
   if (minutes % 60 === 0) return `${minutes / 60} h`;
   return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }
+
+const dateTimeFmt = new Intl.DateTimeFormat("cs-CZ", {
+  timeZone: SCHOOL_TIME_ZONE,
+  day: "numeric",
+  month: "numeric",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** "23. 10. 2026 08:58" – výchozí formát data a času v tabulkách */
+export function formatDateTime(d: Date | string): string {
+  return dateTimeFmt.format(new Date(d));
+}

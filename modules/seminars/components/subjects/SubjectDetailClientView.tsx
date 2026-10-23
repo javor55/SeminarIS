@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import * as React from "react";
 import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -103,7 +104,7 @@ export function SubjectDetailClientView({
 
     // Pro účely kontroly v bloku musíme vědět, co dalšího je v bloku.
     // OccurrenceRow má block: Block, ale ne occurrences.
-    // V této view (Detail předmětu) ale nemáme přístup ke všem výskytům v bloku snadno.
+    // V této view (Detail semináře) ale nemáme přístup ke všem výskytům v bloku snadno.
     // Předpokládáme, že occ.block v db by měl mít occurrences, ale OccurrenceRow má jen Block.
     // Prozatím zkusíme přetypovat, v reálu by to mělo být v datech.
     const inBlock = findMyEnrollmentInBlock((occ.block as unknown as { occurrences?: SubjectOccurrenceWithRelations[] })?.occurrences);
@@ -161,7 +162,7 @@ export function SubjectDetailClientView({
         onEdit: (occ) => setEditOccurrence(occ),
         onDelete: async (occ) => {
           if (window.confirm("Opravdu smazat tento výskyt?")) {
-            await deleteSubjectOccurrence(occ.id);
+            unwrap(await deleteSubjectOccurrence(occ.id));
             toast.success("Výskyt byl smazán.");
             router.refresh();
           }
@@ -174,12 +175,12 @@ export function SubjectDetailClientView({
 
   const handleToggleActive = async () => {
     try {
-      await toggleSubjectActive(subject.id);
-      toast.success(`Předmět byl ${subject.isActive ? "archivován" : "aktivován"}.`);
+      unwrap(await toggleSubjectActive(subject.id));
+      toast.success(`Seminář byl ${subject.isActive ? "archivován" : "aktivován"}.`);
       router.refresh();
     } catch (err: unknown) {
       const error = err as Error;
-      toast.error(error.message || "Něco se pokazilo při změně stavu předmětu.");
+      toast.error(error.message || "Něco se pokazilo při změně stavu semináře.");
     } finally {
       setShowArchiveConfirm(false);
     }
@@ -208,7 +209,7 @@ export function SubjectDetailClientView({
       <div>
         <Link href="/subjects" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4 transition-colors">
           <ArrowLeft className="w-4 h-4 mr-1" />
-          Zpět na přehled předmětů
+          Zpět na přehled seminářů
         </Link>
       </div>
 
@@ -227,7 +228,7 @@ export function SubjectDetailClientView({
               ) : null}
             </div>
             <p className="text-sm text-muted-foreground">
-              {subject.description || "Tento předmět nemá popis."}
+              {subject.description || "Tento seminář nemá popis."}
             </p>
             <p className="text-xs text-muted-foreground">
               Vytvořil: <strong>{getUserName(subject.createdById)}</strong> dne{" "}
@@ -245,7 +246,7 @@ export function SubjectDetailClientView({
                 variant="outline"
                 onClick={() => router.push(`/subjects/${subject.id}/edit`)}
               >
-                Upravit předmět
+                Upravit seminář
               </Button>
               <Button
                 size="sm"
@@ -283,12 +284,12 @@ export function SubjectDetailClientView({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {subject.isActive ? "Archivovat předmět?" : "Obnovit předmět?"}
+              {subject.isActive ? "Archivovat seminář?" : "Obnovit seminář?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {subject.isActive
-                ? `Opravdu chcete archivovat předmět "${subject.name}"? Předmět se přestane nabízet v aktuálních zápisech, ale jeho data zůstanou zachována.`
-                : `Opravdu chcete obnovit předmět "${subject.name}"? Předmět se opět stane aktivním v katalogu.`}
+                ? `Opravdu chcete archivovat seminář "${subject.name}"? Seminář se přestane nabízet v aktuálních zápisech, ale jeho data zůstanou zachována.`
+                : `Opravdu chcete obnovit seminář "${subject.name}"? Seminář se opět stane aktivním v katalogu.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -306,9 +307,9 @@ export function SubjectDetailClientView({
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Trvale smazat předmět?</AlertDialogTitle>
+            <AlertDialogTitle>Trvale smazat seminář?</AlertDialogTitle>
             <AlertDialogDescription>
-              Opravdu chcete <strong>trvale a nevratně smazat</strong> předmět &quot;{subject.name}&quot;?<br />
+              Opravdu chcete <strong>trvale a nevratně smazat</strong> seminář &quot;{subject.name}&quot;?<br />
               Budou smazány také všechny jeho výskyty v zápisových oknech a veškeré zápisy studentů.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -318,12 +319,12 @@ export function SubjectDetailClientView({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 try {
-                  await deleteSubjectPermanently(subject.id);
-                  toast.success("Předmět byl trvale smazán.");
+                  unwrap(await deleteSubjectPermanently(subject.id));
+                  toast.success("Seminář byl trvale smazán.");
                   router.push("/subjects");
                 } catch (err: unknown) {
                   const error = err as Error;
-                  toast.error(error.message || "Nepodařilo se smazat předmět.");
+                  toast.error(error.message || "Nepodařilo se smazat seminář.");
                 } finally {
                   setShowDeleteConfirm(false);
                 }
@@ -341,7 +342,7 @@ export function SubjectDetailClientView({
             <AlertDialogHeader>
               <AlertDialogTitle>Nelze se zapsat</AlertDialogTitle>
               <AlertDialogDescription>
-                Tento předmět (<strong>{sameSubjectAlert.subjectName}</strong>) již máte zapsaný v jiném bloku (<strong>{sameSubjectAlert.blockName}</strong>) v rámci tohoto zápisu. Nejdříve se prosím odepište.
+                Tento seminář (<strong>{sameSubjectAlert.subjectName}</strong>) již máte zapsaný v jiném bloku (<strong>{sameSubjectAlert.blockName}</strong>) v rámci tohoto zápisu. Nejdříve se prosím odepište.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -414,9 +415,9 @@ export function SubjectDetailClientView({
         <AlertDialog open onOpenChange={() => setUnenrollConfirm(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Odhlásit se z předmětu?</AlertDialogTitle>
+              <AlertDialogTitle>Odhlásit se z semináře?</AlertDialogTitle>
               <AlertDialogDescription>
-                Opravdu se chcete odhlásit z předmětu <strong>{subject.name}</strong> v bloku <strong>{unenrollConfirm.blockName}</strong>?
+                Opravdu se chcete odhlásit z semináře <strong>{subject.name}</strong> v bloku <strong>{unenrollConfirm.blockName}</strong>?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -451,18 +452,18 @@ export function SubjectDetailClientView({
       <div className="space-y-2">
         <div className="space-y-1">
           <h2 className="text-base font-semibold">
-            Výskyty předmětu v zápisech
+            Výskyty semináře v zápisech
           </h2>
           <p className="text-sm text-muted-foreground">
             {isPrivilegedUser 
-              ? "Přehled všech bloků a zápisových oken, kde je tento předmět zařazen."
-              : "Seznam termínů a bloků, ve kterých si můžete tento předmět zapsat."}
+              ? "Přehled všech bloků a zápisových oken, kde je tento seminář zařazen."
+              : "Seznam termínů a bloků, ve kterých si můžete tento seminář zapsat."}
           </p>
         </div>
 
         {occurrences.length === 0 ? (
           <p className="px-1 py-3 text-sm text-muted-foreground">
-            Tento předmět momentálně není v žádném {isPrivilegedUser ? "zápisu nabízen" : "pro vás dostupném zápisu"}.
+            Tento seminář momentálně není v žádném {isPrivilegedUser ? "zápisu nabízen" : "pro vás dostupném zápisu"}.
           </p>
         ) : (
           <DataTable<OccurrenceRow>
@@ -491,12 +492,12 @@ export function SubjectDetailClientView({
               occurrence={editOccurrence}
               onOpenChange={(open) => !open && setEditOccurrence(null)}
               onSubmit={async (data) => {
-                await updateSubjectOccurrence(data.id, data);
+                unwrap(await updateSubjectOccurrence(data.id, data));
                 toast.success("Výskyt byl upraven.");
                 router.refresh();
               }}
               onDelete={async (id) => {
-                await deleteSubjectOccurrence(id);
+                unwrap(await deleteSubjectOccurrence(id));
                 toast.success("Výskyt byl smazán.");
                 router.refresh();
               }}
