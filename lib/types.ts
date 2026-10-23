@@ -8,6 +8,10 @@ export type User = {
   role: Role;
   isActive: boolean;
   classGroupId?: string | null;
+  // Označení třídy studenta ("2.A"), jen v session při náhledu (banner)
+  classLabel?: string | null;
+  // Vyplněno jen v režimu „zobrazit jako“: admin, který právě uživatele prohlíží
+  impersonatedBy?: { id: string; name: string } | null;
   lastLoginAt?: string | Date | null;
   createdAt: string | Date;
   updatedAt: string | Date;

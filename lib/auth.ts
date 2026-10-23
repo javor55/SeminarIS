@@ -12,6 +12,7 @@ import {
   isPasswordLoginAllowed,
 } from "@/lib/auth-settings";
 import { getDefaultRole } from "@/modules/core/settings";
+import { resolveImpersonation } from "@/lib/impersonation";
 
 export const MICROSOFT_PROVIDER_ID = "azure-ad";
 
@@ -178,6 +179,16 @@ export const authOptions: NextAuthOptions = {
         session.user.firstName = token.firstName;
         session.user.lastName = token.lastName;
         session.user.isActive = token.isActive;
+        // Admin v režimu „zobrazit jako“: celá aplikace (oprávnění, menu, data) vidí cílového
+        // uživatele. Podmínky ověřuje resolveImpersonation (podpis, platnost, skutečný admin).
+        const impersonated = await resolveImpersonation({
+          id: token.id,
+          role: token.role,
+          isActive: token.isActive,
+          firstName: token.firstName,
+          lastName: token.lastName,
+        });
+        if (impersonated) session.user = { ...session.user, ...impersonated };
       }
       session.enabledModules = await getEnabledModuleIds();
       return session;

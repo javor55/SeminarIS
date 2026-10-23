@@ -1,14 +1,27 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 import { can, getRoutePermission } from "@/modules/registry";
+import { IMPERSONATION_COOKIE, verifyImpersonation } from "@/lib/impersonation-token";
 
 export default withAuth(
-  function middleware(req) {
+  async function middleware(req) {
     const token = req.nextauth.token;
+
+    // Role, podle které se hlídají cesty. V režimu „zobrazit jako“ je to role zobrazovaného
+    // uživatele – ale jen s platným podpisem cookie, který patří přihlášenému adminovi.
+    // (Role v cookie je jen pro přesměrování; server oprávnění vždy znovu ověří v DB.)
+    let role = token?.role;
+    if (token?.role === "ADMIN") {
+      const impersonation = await verifyImpersonation(
+        req.cookies.get(IMPERSONATION_COOKIE)?.value,
+        process.env.NEXTAUTH_SECRET
+      );
+      if (impersonation && impersonation.a === token.id) role = impersonation.r as typeof role;
+    }
 
     // Oprávnění k cestám deklarují moduly ve svých manifestech (routes)
     const permission = getRoutePermission(req.nextUrl.pathname);
-    if (permission && !can(token?.role, permission)) {
+    if (permission && !can(role, permission)) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 

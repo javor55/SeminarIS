@@ -14,6 +14,23 @@ export async function getCurrentUser(): Promise<User | null> {
   return user;
 }
 
+/** Hláška, kterou dostane každá změna provedená v režimu „zobrazit jako“. */
+export const PREVIEW_READONLY_MESSAGE = "V režimu náhledu nelze nic měnit.";
+
+/** Prohlíží admin právě aplikaci jako jiný uživatel? (mimo požadavek, např. v cronu, vždy false) */
+export async function isImpersonating(): Promise<boolean> {
+  try {
+    return !!(await getCurrentUser())?.impersonatedBy;
+  } catch {
+    return false;
+  }
+}
+
+/** Každá změna dat musí projít tudy (safeAction ji volá sám): v režimu náhledu vyhodí chybu. */
+export async function assertNotImpersonating(): Promise<void> {
+  if (await isImpersonating()) throw new Error(PREVIEW_READONLY_MESSAGE);
+}
+
 export async function requireAuth(): Promise<User> {
   const user = await getCurrentUser();
   if (!user) throw new Error("Unauthorized");

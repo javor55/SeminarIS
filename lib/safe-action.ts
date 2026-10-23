@@ -1,13 +1,18 @@
 import { Prisma } from "@prisma/client";
 import type { ActionResult } from "@/lib/action-result";
+import { assertNotImpersonating } from "@/lib/session";
 
 /**
  * Obalí tělo server action: chyby vrátí jako `{ ok: false, error }`. Text běžných chyb
  * (validace v kódu) se předá uživateli; chyby databáze se jen zalogují a uživatel
  * dostane obecnou hlášku, aby se neprozradily detaily dotazů.
+ * Zároveň odmítne vše v režimu „zobrazit jako“ (jen pro čtení).
  */
 export async function safeAction<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
+    // Režim „zobrazit jako“ je jen pro čtení: žádná akce zabalená v safeAction (= každá změna dat)
+    // se v něm neprovede ani nezapíše do historie ani nepošle e-mail.
+    await assertNotImpersonating();
     return { ok: true, data: await fn() };
   } catch (e) {
     // Interní signály Next.js (redirect, notFound) musí projít dál
