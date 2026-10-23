@@ -1,5 +1,6 @@
 "use server";
 
+import { safeAction } from "@/lib/safe-action";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
@@ -141,22 +142,24 @@ export async function getClassOptions(): Promise<ClassOption[]> {
  * aby historie tříd zůstala konzistentní.
  */
 export async function setCurrentSchoolYear(startYear: number) {
-  await requirePermission("core.school.manage");
-  if (!Number.isInteger(startYear) || startYear < 2000 || startYear > 2100) {
-    throw new Error("Neplatný školní rok.");
-  }
-  if ((await prisma.classMembership.count()) > 0) {
-    throw new Error("Studenti už jsou zařazeni do tříd – školní rok změňte uzavřením roku.");
-  }
-  await prisma.$transaction([
-    prisma.schoolYear.updateMany({ where: { isCurrent: true }, data: { isCurrent: false } }),
-    prisma.schoolYear.upsert({
-      where: { startYear },
-      update: { isCurrent: true },
-      create: { startYear, isCurrent: true },
-    }),
-  ]);
-  revalidatePath("/", "layout");
+  return safeAction(async () => {
+    await requirePermission("core.school.manage");
+    if (!Number.isInteger(startYear) || startYear < 2000 || startYear > 2100) {
+      throw new Error("Neplatný školní rok.");
+    }
+    if ((await prisma.classMembership.count()) > 0) {
+      throw new Error("Studenti už jsou zařazeni do tříd – školní rok změňte uzavřením roku.");
+    }
+    await prisma.$transaction([
+      prisma.schoolYear.updateMany({ where: { isCurrent: true }, data: { isCurrent: false } }),
+      prisma.schoolYear.upsert({
+        where: { startYear },
+        update: { isCurrent: true },
+        create: { startYear, isCurrent: true },
+      }),
+    ]);
+    revalidatePath("/", "layout");
+  });
 }
 
 // === UZAVŘENÍ ŠKOLNÍHO ROKU ===
@@ -258,154 +261,156 @@ export async function closeSchoolYear(input: {
   copyAssignments: boolean;
   exceptions: YearClosureException[];
 }) {
-  await requirePermission("core.school.manage");
-  const current = await ensureCurrentSchoolYear();
-  if (current.startYear !== input.expectedStartYear) {
-    throw new Error("Školní rok se mezitím změnil. Načtěte stránku znovu.");
-  }
-  const nextStart = current.startYear + 1;
-  const firstGradeLetters = input.newFirstGradeLetters.trim() ? parseLetters(input.newFirstGradeLetters) : [];
-  const exceptions = new Map(input.exceptions.map((e) => [e.userId, e]));
-  const now = new Date();
-
-  const students = await prisma.user.findMany({
-    where: { ...activeStudentsWhere, classGroupId: { not: null } },
-    include: { classGroup: true },
-  });
-
-  // Rozdělení studentů podle výsledku (s kontrolou přípustnosti)
-  const promote: { userId: string; classGroupId: string; grade: number }[] = [];
-  const graduate: string[] = [];
-  const repeat: { userId: string; entryYear: number; letter: string; grade: number }[] = [];
-  const leave = new Map<StudyEndReasonValue, string[]>();
-  for (const u of students) {
-    const cls = u.classGroup!;
-    const grade = gradeOf(cls, current.startYear);
-    const isLast = grade >= (cls.studyYears ?? DEFAULT_STUDY_YEARS);
-    const ex = exceptions.get(u.id);
-    const outcome: YearOutcome = ex?.outcome ?? (isLast ? "GRADUATE" : "PROMOTE");
-    const name = fullName(u);
-
-    if (outcome === "PROMOTE") {
-      if (isLast) throw new Error(`${name}: z posledního ročníku nelze postoupit – absolvuje, opakuje, nebo ukončí studium.`);
-      promote.push({ userId: u.id, classGroupId: cls.id, grade: grade + 1 });
-    } else if (outcome === "GRADUATE") {
-      if (!isLast) throw new Error(`${name}: absolvovat lze jen z posledního ročníku.`);
-      graduate.push(u.id);
-    } else if (outcome === "REPEAT") {
-      const letter = (ex?.targetLetter || cls.letter).trim().toUpperCase();
-      if (!/^[A-Z]$/.test(letter)) throw new Error(`${name}: neplatné písmeno třídy.`);
-      repeat.push({ userId: u.id, entryYear: cls.entryYear + 1, letter, grade });
-    } else if (outcome === "LEAVE") {
-      const reason = ex?.leaveReason;
-      if (!reason || reason === "GRADUATED") throw new Error(`${name}: vyberte důvod ukončení studia.`);
-      leave.set(reason, [...(leave.get(reason) ?? []), u.id]);
+  return safeAction(async () => {
+    await requirePermission("core.school.manage");
+    const current = await ensureCurrentSchoolYear();
+    if (current.startYear !== input.expectedStartYear) {
+      throw new Error("Školní rok se mezitím změnil. Načtěte stránku znovu.");
     }
-  }
+    const nextStart = current.startYear + 1;
+    const firstGradeLetters = input.newFirstGradeLetters.trim() ? parseLetters(input.newFirstGradeLetters) : [];
+    const exceptions = new Map(input.exceptions.map((e) => [e.userId, e]));
+    const now = new Date();
 
-  await prisma.$transaction(
-    async (tx) => {
-      // 1. Doplnit historii aktuálního roku (kdyby někdo byl zařazen mimo setStudentClass)
-      await tx.classMembership.createMany({
-        data: students.map((u) => ({
-          userId: u.id,
-          classGroupId: u.classGroupId!,
-          schoolYearId: current.id,
-          grade: gradeOf(u.classGroup!, current.startYear),
-          reason: "ASSIGNED" as const,
-        })),
-        skipDuplicates: true,
-      });
+    const students = await prisma.user.findMany({
+      where: { ...activeStudentsWhere, classGroupId: { not: null } },
+      include: { classGroup: true },
+    });
 
-      // 2. Nový školní rok
-      await tx.schoolYear.updateMany({ where: { isCurrent: true }, data: { isCurrent: false } });
-      const next = await tx.schoolYear.upsert({
-        where: { startYear: nextStart },
-        update: { isCurrent: true },
-        create: { startYear: nextStart, isCurrent: true },
-      });
+    // Rozdělení studentů podle výsledku (s kontrolou přípustnosti)
+    const promote: { userId: string; classGroupId: string; grade: number }[] = [];
+    const graduate: string[] = [];
+    const repeat: { userId: string; entryYear: number; letter: string; grade: number }[] = [];
+    const leave = new Map<StudyEndReasonValue, string[]>();
+    for (const u of students) {
+      const cls = u.classGroup!;
+      const grade = gradeOf(cls, current.startYear);
+      const isLast = grade >= (cls.studyYears ?? DEFAULT_STUDY_YEARS);
+      const ex = exceptions.get(u.id);
+      const outcome: YearOutcome = ex?.outcome ?? (isLast ? "GRADUATE" : "PROMOTE");
+      const name = fullName(u);
 
-      // 3. Nové 1. ročníky
-      for (const letter of firstGradeLetters) {
-        await tx.classGroup.upsert({
-          where: { entryYear_letter: { entryYear: nextStart, letter } },
-          update: {},
-          create: { entryYear: nextStart, letter, studyYears: DEFAULT_STUDY_YEARS },
-        });
+      if (outcome === "PROMOTE") {
+        if (isLast) throw new Error(`${name}: z posledního ročníku nelze postoupit – absolvuje, opakuje, nebo ukončí studium.`);
+        promote.push({ userId: u.id, classGroupId: cls.id, grade: grade + 1 });
+      } else if (outcome === "GRADUATE") {
+        if (!isLast) throw new Error(`${name}: absolvovat lze jen z posledního ročníku.`);
+        graduate.push(u.id);
+      } else if (outcome === "REPEAT") {
+        const letter = (ex?.targetLetter || cls.letter).trim().toUpperCase();
+        if (!/^[A-Z]$/.test(letter)) throw new Error(`${name}: neplatné písmeno třídy.`);
+        repeat.push({ userId: u.id, entryYear: cls.entryYear + 1, letter, grade });
+      } else if (outcome === "LEAVE") {
+        const reason = ex?.leaveReason;
+        if (!reason || reason === "GRADUATED") throw new Error(`${name}: vyberte důvod ukončení studia.`);
+        leave.set(reason, [...(leave.get(reason) ?? []), u.id]);
       }
+    }
 
-      // 4. Postup – třída zůstává, jen záznam do historie
-      await tx.classMembership.createMany({
-        data: promote.map((p) => ({
-          userId: p.userId,
-          classGroupId: p.classGroupId,
-          schoolYearId: next.id,
-          grade: p.grade,
-          reason: "PROMOTED" as const,
-        })),
-        skipDuplicates: true,
-      });
-
-      // 5. Opakování – třída o rok mladší (založí se, pokud neexistuje)
-      for (const r of repeat) {
-        const target = await tx.classGroup.upsert({
-          where: { entryYear_letter: { entryYear: r.entryYear, letter: r.letter } },
-          update: {},
-          create: { entryYear: r.entryYear, letter: r.letter, studyYears: DEFAULT_STUDY_YEARS },
-        });
-        await setStudentClass(tx, {
-          userId: r.userId,
-          classGroupId: target.id,
-          schoolYear: next,
-          reason: "REPEATED",
-        });
-      }
-
-      // 6. Absolventi a odcházející – ukončení studia a deaktivace účtu
-      if (graduate.length > 0) {
-        await tx.user.updateMany({
-          where: { id: { in: graduate } },
-          data: { studyStatus: "GRADUATED", studyEndReason: "GRADUATED", studyEndedAt: now, isActive: false },
-        });
-      }
-      for (const [reason, ids] of leave) {
-        await tx.user.updateMany({
-          where: { id: { in: ids } },
-          data: { studyStatus: "LEFT", studyEndReason: reason, studyEndedAt: now, isActive: false },
-        });
-      }
-
-      // 7. Úvazky do nového roku (jen třídy, které v něm ještě studují)
-      if (input.copyAssignments) {
-        const assignments = await tx.teachingAssignment.findMany({
-          where: { schoolYearId: current.id },
-          include: { classGroup: true },
-        });
-        await tx.teachingAssignment.createMany({
-          data: assignments
-            .filter((a) => classStatus(a.classGroup, nextStart) === "active")
-            .map((a) => ({
-              teacherId: a.teacherId,
-              subjectId: a.subjectId,
-              classGroupId: a.classGroupId,
-              schoolYearId: next.id,
-            })),
+    await prisma.$transaction(
+      async (tx) => {
+        // 1. Doplnit historii aktuálního roku (kdyby někdo byl zařazen mimo setStudentClass)
+        await tx.classMembership.createMany({
+          data: students.map((u) => ({
+            userId: u.id,
+            classGroupId: u.classGroupId!,
+            schoolYearId: current.id,
+            grade: gradeOf(u.classGroup!, current.startYear),
+            reason: "ASSIGNED" as const,
+          })),
           skipDuplicates: true,
         });
-      }
-    },
-    // Stovky studentů v jedné transakci – delší limit než výchozích 5 s
-    { timeout: 120_000, maxWait: 10_000 }
-  );
 
-  revalidatePath("/", "layout");
-  return {
-    promoted: promote.length,
-    graduated: graduate.length,
-    repeated: repeat.length,
-    left: [...leave.values()].reduce((n, ids) => n + ids.length, 0),
-    nextYearLabel: schoolYearLabel(nextStart),
-  };
+        // 2. Nový školní rok
+        await tx.schoolYear.updateMany({ where: { isCurrent: true }, data: { isCurrent: false } });
+        const next = await tx.schoolYear.upsert({
+          where: { startYear: nextStart },
+          update: { isCurrent: true },
+          create: { startYear: nextStart, isCurrent: true },
+        });
+
+        // 3. Nové 1. ročníky
+        for (const letter of firstGradeLetters) {
+          await tx.classGroup.upsert({
+            where: { entryYear_letter: { entryYear: nextStart, letter } },
+            update: {},
+            create: { entryYear: nextStart, letter, studyYears: DEFAULT_STUDY_YEARS },
+          });
+        }
+
+        // 4. Postup – třída zůstává, jen záznam do historie
+        await tx.classMembership.createMany({
+          data: promote.map((p) => ({
+            userId: p.userId,
+            classGroupId: p.classGroupId,
+            schoolYearId: next.id,
+            grade: p.grade,
+            reason: "PROMOTED" as const,
+          })),
+          skipDuplicates: true,
+        });
+
+        // 5. Opakování – třída o rok mladší (založí se, pokud neexistuje)
+        for (const r of repeat) {
+          const target = await tx.classGroup.upsert({
+            where: { entryYear_letter: { entryYear: r.entryYear, letter: r.letter } },
+            update: {},
+            create: { entryYear: r.entryYear, letter: r.letter, studyYears: DEFAULT_STUDY_YEARS },
+          });
+          await setStudentClass(tx, {
+            userId: r.userId,
+            classGroupId: target.id,
+            schoolYear: next,
+            reason: "REPEATED",
+          });
+        }
+
+        // 6. Absolventi a odcházející – ukončení studia a deaktivace účtu
+        if (graduate.length > 0) {
+          await tx.user.updateMany({
+            where: { id: { in: graduate } },
+            data: { studyStatus: "GRADUATED", studyEndReason: "GRADUATED", studyEndedAt: now, isActive: false },
+          });
+        }
+        for (const [reason, ids] of leave) {
+          await tx.user.updateMany({
+            where: { id: { in: ids } },
+            data: { studyStatus: "LEFT", studyEndReason: reason, studyEndedAt: now, isActive: false },
+          });
+        }
+
+        // 7. Úvazky do nového roku (jen třídy, které v něm ještě studují)
+        if (input.copyAssignments) {
+          const assignments = await tx.teachingAssignment.findMany({
+            where: { schoolYearId: current.id },
+            include: { classGroup: true },
+          });
+          await tx.teachingAssignment.createMany({
+            data: assignments
+              .filter((a) => classStatus(a.classGroup, nextStart) === "active")
+              .map((a) => ({
+                teacherId: a.teacherId,
+                subjectId: a.subjectId,
+                classGroupId: a.classGroupId,
+                schoolYearId: next.id,
+              })),
+            skipDuplicates: true,
+          });
+        }
+      },
+      // Stovky studentů v jedné transakci – delší limit než výchozích 5 s
+      { timeout: 120_000, maxWait: 10_000 }
+    );
+
+    revalidatePath("/", "layout");
+    return {
+      promoted: promote.length,
+      graduated: graduate.length,
+      repeated: repeat.length,
+      left: [...leave.values()].reduce((n, ids) => n + ids.length, 0),
+      nextYearLabel: schoolYearLabel(nextStart),
+    };
+  });
 }
 
 // === TŘÍDY ===
@@ -423,24 +428,28 @@ function parseLetters(letters: string): string[] {
 
 /** Založí třídy daného ročníku v aktuálním školním roce, např. 1. ročník „A, B, C“. */
 export async function createClasses(grade: number, letters: string) {
-  await requirePermission("core.school.manage");
-  if (!Number.isInteger(grade) || grade < 1 || grade > DEFAULT_STUDY_YEARS) {
-    throw new Error(`Ročník musí být 1–${DEFAULT_STUDY_YEARS}.`);
-  }
-  const { startYear } = await ensureCurrentSchoolYear();
-  const list = parseLetters(letters);
-  for (const letter of list) {
-    await findOrCreateClass(grade, letter, startYear);
-  }
-  revalidateSchool();
-  return list.length;
+  return safeAction(async () => {
+    await requirePermission("core.school.manage");
+    if (!Number.isInteger(grade) || grade < 1 || grade > DEFAULT_STUDY_YEARS) {
+      throw new Error(`Ročník musí být 1–${DEFAULT_STUDY_YEARS}.`);
+    }
+    const { startYear } = await ensureCurrentSchoolYear();
+    const list = parseLetters(letters);
+    for (const letter of list) {
+      await findOrCreateClass(grade, letter, startYear);
+    }
+    revalidateSchool();
+    return list.length;
+  });
 }
 
 /** Smaže třídu. Studenti zůstanou, jen nebudou zařazeni; úvazky třídy se smažou. */
 export async function deleteClass(classGroupId: string) {
-  await requirePermission("core.school.manage");
-  await prisma.classGroup.delete({ where: { id: classGroupId } });
-  revalidateSchool();
+  return safeAction(async () => {
+    await requirePermission("core.school.manage");
+    await prisma.classGroup.delete({ where: { id: classGroupId } });
+    revalidateSchool();
+  });
 }
 
 // === ŠKOLNÍ PŘEDMĚTY ===
@@ -453,65 +462,77 @@ function cleanSubjectInput(data: { name: string; code: string }) {
 }
 
 export async function createSchoolSubject(data: { name: string; code: string }) {
-  await requirePermission("core.school.manage");
-  const clean = cleanSubjectInput(data);
-  const exists = await prisma.subject.findUnique({ where: { code: clean.code } });
-  if (exists) throw new Error(`Předmět se zkratkou ${clean.code} už existuje.`);
-  await prisma.subject.create({ data: clean });
-  revalidateSchool();
+  return safeAction(async () => {
+    await requirePermission("core.school.manage");
+    const clean = cleanSubjectInput(data);
+    const exists = await prisma.subject.findUnique({ where: { code: clean.code } });
+    if (exists) throw new Error(`Předmět se zkratkou ${clean.code} už existuje.`);
+    await prisma.subject.create({ data: clean });
+    revalidateSchool();
+  });
 }
 
 export async function updateSchoolSubject(id: string, data: { name: string; code: string }) {
-  await requirePermission("core.school.manage");
-  const clean = cleanSubjectInput(data);
-  const exists = await prisma.subject.findUnique({ where: { code: clean.code } });
-  if (exists && exists.id !== id) throw new Error(`Předmět se zkratkou ${clean.code} už existuje.`);
-  await prisma.subject.update({ where: { id }, data: clean });
-  revalidateSchool();
+  return safeAction(async () => {
+    await requirePermission("core.school.manage");
+    const clean = cleanSubjectInput(data);
+    const exists = await prisma.subject.findUnique({ where: { code: clean.code } });
+    if (exists && exists.id !== id) throw new Error(`Předmět se zkratkou ${clean.code} už existuje.`);
+    await prisma.subject.update({ where: { id }, data: clean });
+    revalidateSchool();
+  });
 }
 
 export async function toggleSchoolSubjectActive(id: string) {
-  await requirePermission("core.school.manage");
-  const subject = await prisma.subject.findUnique({ where: { id } });
-  if (!subject) throw new Error("Předmět nenalezen.");
-  await prisma.subject.update({ where: { id }, data: { isActive: !subject.isActive } });
-  revalidateSchool();
+  return safeAction(async () => {
+    await requirePermission("core.school.manage");
+    const subject = await prisma.subject.findUnique({ where: { id } });
+    if (!subject) throw new Error("Předmět nenalezen.");
+    await prisma.subject.update({ where: { id }, data: { isActive: !subject.isActive } });
+    revalidateSchool();
+  });
 }
 
 export async function deleteSchoolSubject(id: string) {
-  await requirePermission("core.school.manage");
-  await prisma.subject.delete({ where: { id } });
-  revalidateSchool();
+  return safeAction(async () => {
+    await requirePermission("core.school.manage");
+    await prisma.subject.delete({ where: { id } });
+    revalidateSchool();
+  });
 }
 
 // === ÚVAZKY (kdo co učí) ===
 
 /** Přidá úvazky učitele pro předmět ve vybraných třídách v aktuálním školním roce. */
 export async function createTeachingAssignments(data: { teacherId: string; subjectId: string; classGroupIds: string[] }) {
-  await requirePermission("core.school.manage");
-  if (!data.teacherId || !data.subjectId || data.classGroupIds.length === 0) {
-    throw new Error("Vyberte učitele, předmět a alespoň jednu třídu.");
-  }
-  const teacher = await prisma.user.findUnique({ where: { id: data.teacherId }, select: { role: true } });
-  if (!teacher || (teacher.role !== "TEACHER" && teacher.role !== "ADMIN")) {
-    throw new Error("Vybraný uživatel není učitel.");
-  }
-  const year = await ensureCurrentSchoolYear();
-  const res = await prisma.teachingAssignment.createMany({
-    data: data.classGroupIds.map((classGroupId) => ({
-      teacherId: data.teacherId,
-      subjectId: data.subjectId,
-      classGroupId,
-      schoolYearId: year.id,
-    })),
-    skipDuplicates: true,
+  return safeAction(async () => {
+    await requirePermission("core.school.manage");
+    if (!data.teacherId || !data.subjectId || data.classGroupIds.length === 0) {
+      throw new Error("Vyberte učitele, předmět a alespoň jednu třídu.");
+    }
+    const teacher = await prisma.user.findUnique({ where: { id: data.teacherId }, select: { role: true } });
+    if (!teacher || (teacher.role !== "TEACHER" && teacher.role !== "ADMIN")) {
+      throw new Error("Vybraný uživatel není učitel.");
+    }
+    const year = await ensureCurrentSchoolYear();
+    const res = await prisma.teachingAssignment.createMany({
+      data: data.classGroupIds.map((classGroupId) => ({
+        teacherId: data.teacherId,
+        subjectId: data.subjectId,
+        classGroupId,
+        schoolYearId: year.id,
+      })),
+      skipDuplicates: true,
+    });
+    revalidateSchool();
+    return res.count;
   });
-  revalidateSchool();
-  return res.count;
 }
 
 export async function deleteTeachingAssignment(id: string) {
-  await requirePermission("core.school.manage");
-  await prisma.teachingAssignment.delete({ where: { id } });
-  revalidateSchool();
+  return safeAction(async () => {
+    await requirePermission("core.school.manage");
+    await prisma.teachingAssignment.delete({ where: { id } });
+    revalidateSchool();
+  });
 }

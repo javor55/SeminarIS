@@ -25,6 +25,10 @@ modules/
     server.tsx          widget na dashboard, statistiky, úklid při mazání uživatele
     window-status.ts    synchronizace stavu zápisového okna s časem
     eligibility.ts      cílení zápisových oken na ročníky
+  makeup/               dopisování písemek (termíny, zápisy, docházka)
+    manifest.ts, server.tsx, data.ts (interní dotazy), types.ts
+    actions/            sessions.ts (dozor), registrations.ts (student)
+    components/
     actions/            subjects.ts, windows.ts, enrollment.ts
     components/         blocks/, enrollment/, occurrences/, subjects/
 lib/
@@ -34,6 +38,9 @@ lib/
   prisma.ts             Prisma klient (passwordHash se nikdy nevrací bez výslovného omit: false)
   auth.ts               NextAuth (heslo + Microsoft 365); role a aktivita se při každém ověření načtou z DB
   auth-settings.ts      nastavení přihlašování (M365 zapnuto, kdo smí heslem, zakládání účtů)
+  datetime.ts           formátování data a času v pásmu Europe/Prague
+  action-result.ts      ActionResult, unwrap – chyby server actions pro uživatele (klient)
+  safe-action.ts        safeAction – obalení server action (server)
   school.ts             čisté výpočty: školní rok, ročník, označení třídy („3.A“), popisy stavu studia
 app/                    stránky (URL zůstaly beze změny)
 components/             sdílené UI (shadcn/ui, editor, topbar)
@@ -184,17 +191,81 @@ Administrace → karta **Moduly**. Vypnutý modul:
 
 Data zůstávají v databázi.
 
-## Jak přidat nový modul (např. dopisovací písemky)
+## Jak přidat nový modul
 
-1. `modules/makeup-exams/manifest.ts`: id, název, oprávnění, menu, chráněné cesty.
+Vzorem je modul Dopisování (`modules/makeup/`).
+
+1. `modules/<id>/manifest.ts`: id, název, oprávnění, menu, chráněné cesty.
 2. Přidat manifest do `MODULES` v `modules/registry.ts`.
 3. Modely do `prisma/schema.prisma` (do vlastní sekce) a vytvořit migraci
-   (`npx prisma migrate dev --name makeup_exams`, viz níže).
-4. Server actions do `modules/makeup-exams/actions/*.ts` (`"use server"`), každá začíná
+   (`npx prisma migrate dev --name <id>`, viz níže).
+4. Server actions do `modules/<id>/actions/*.ts` (`"use server"`). Každá začíná
    `requirePermission(...)`.
-5. Stránky do `app/<cesta>/` a `layout.tsx` s `ensureModulePage("makeup-exams")`.
-6. Podle potřeby `modules/makeup-exams/server.tsx` (widget, statistiky, `onUserDelete`
+5. Stránky do `app/<cesta>/` a `layout.tsx` s `ensureModulePage("<id>")`.
+6. Podle potřeby `modules/<id>/server.tsx` (widget, statistiky, `onUserDelete`
    pro tabulky odkazující na uživatele) a jeho registrace v `modules/server-registry.ts`.
+7. Časy zobrazovat přes `lib/datetime.ts` (pásmo Europe/Prague). Server na Vercelu běží v UTC.
+
+### Chyby v server actions (důležité)
+
+V produkčním buildu Next.js **nahradí text výjimky** vyhozené ze server action obecnou
+hláškou. Uživatel by místo „Učebna je obsazená“ viděl „An error occurred…“. Akce, jejichž
+chyby má uživatel vidět, proto:
+
+```ts
+// server ("use server")
+export async function createSessions(input: …) {
+  return safeAction(async () => {          // lib/safe-action.ts
+    const user = await requirePermission("makeup.sessions.manage");
+    if (…) throw new Error("Učebna je v tu dobu obsazená.");
+    …
+  });
+}
+
+// klient
+const count = unwrap(await createSessions(input));     // lib/action-result.ts
+onSubmit={() => unwrapAsync(registerForSession(…))}    // jako callback
+```
+
+`safeAction` předá text běžných chyb a chyby databáze nahradí obecnou hláškou. Takto jsou
+napsané akce modulů Dopisování a Škola, správa uživatelů a změna hesla. Starší akce modulu
+Semináře hlásí chyby částečně jinak (`{ error }` u zápisu, jinde výjimkou) a při další
+úpravě je vhodné je převést.
+
+## Modul Dopisování písemek (`modules/makeup`)
+
+- **Termín** = čas a místo dozoru (učitele): datum, od–do, učebna, kapacita (na celý termín),
+  povolené předměty, uzávěrka změn (do začátku / 30 min / 1 h / 2 h / 24 h / 48 h předem)
+  a poznámka. Učitel ho vypisuje sobě, admin komukoli. Lze vytvořit **opakovanou řadu**
+  (každý týden do zvoleného data, max. 60 termínů).
+- **Kontroly:**
+  - dozor nemá dva termíny současně,
+  - učebna není obsazená dvakrát,
+  - student nemá dva zápisy, které se časově překrývají.
+- **Student** (studující, všechny ročníky) vidí všechny nadcházející termíny a u nich jen
+  počet zapsaných. Zapíše se, vybere předmět(y) z povolených a připíše volitelnou poznámku.
+  Do uzávěrky může zápis upravit, odhlásit se nebo se přepsat na jiný termín. Ze zrušeného
+  termínu se může odhlásit nebo přepsat kdykoliv.
+- **Vyučující** se k zápisu doplní automaticky z úvazků (předmět × třída studenta ×
+  aktuální rok). Učitel vidí přehled „Kdo dopisuje moje písemky“.
+- **Dozor (a admin):**
+  - upraví termín i s přihlášenými (kapacita nesmí klesnout pod počet zapsaných a nelze
+    odebrat předmět, který si někdo zvolil),
+  - zruší termín nebo celou řadu (s důvodem),
+  - smaže termín bez zápisů,
+  - odepíše nebo přesune studenta (uzávěrka se u něj nekontroluje),
+  - po začátku termínu zapíše docházku (dopsal/a – nedostavil/a se),
+  - vytiskne seznam.
+- **Oprávnění:**
+  - `makeup.view` (všichni),
+  - `makeup.register` (studenti),
+  - `makeup.sessions.manage` (učitelé, vlastní termíny),
+  - `makeup.sessions.manageAll` (admin),
+  - `makeup.subjectTeacher`.
+- **Zatím chybí:**
+  - e-mailové notifikace,
+  - import termínů z Excelu (čeká na ukázku tabulky),
+  - omezení počtu zápisů na studenta.
 
 ## Databáze a migrace
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import * as React from "react";
 import {
   flexRender,
@@ -99,13 +100,13 @@ export function UsersDataTable({ data, forceRefresh }: { data: UserRow[], forceR
     await Promise.all(filteredRows.map(async (row) => {
       const u = row.original;
       if (bulkRole) {
-        await updateUserRole(u.id, bulkRole);
+        unwrap(await updateUserRole(u.id, bulkRole));
       }
       if (bulkStatus) {
         const desiredActive = bulkStatus === "ACTIVE";
         const currentActive = u.isActive !== false;
         if (currentActive !== desiredActive) {
-          await toggleUserActive(u.id);
+          unwrap(await toggleUserActive(u.id));
         }
       }
     }));

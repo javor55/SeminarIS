@@ -12,7 +12,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
   <>
-    <header>
+    <header className="print:hidden">
       <AppTopbar user={user} />
     </header>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import { useState } from "react";
 import {
   Dialog,
@@ -33,7 +34,7 @@ export function ResetPasswordDialog({ userId, userName }: ResetPasswordDialogPro
 
     setLoading(true);
     try {
-      await resetUserPassword(userId, password);
+      unwrap(await resetUserPassword(userId, password));
       toast.success(`Heslo pro uživatele ${userName} bylo změněno.`);
       setOpen(false);
       setPassword("");

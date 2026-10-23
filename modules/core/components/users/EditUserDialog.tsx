@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import * as React from "react";
 import { useState, useEffect } from "react";
 import {
@@ -62,12 +63,12 @@ export function EditUserDialog({ user, onSuccess }: EditUserDialogProps) {
     setSaving(true);
     setError(null);
     try {
-      await updateUserProfile(user.id, {
+      unwrap(await updateUserProfile(user.id, {
         firstName,
         lastName,
         email,
         classGroupId: classGroupId === NO_CLASS ? null : classGroupId,
-      });
+      }));
       toast.success(`Profil uživatele ${firstName} ${lastName} byl uložen.`);
       setOpen(false);
       router.refresh();

@@ -1,5 +1,6 @@
 "use server";
 
+import { safeAction } from "@/lib/safe-action";
 import { prisma } from "@/lib/prisma";
 import { setSetting } from "@/lib/settings";
 import { getEnabledModuleIds, setModuleEnabled } from "@/lib/modules";
@@ -49,19 +50,25 @@ export async function getAdminOverview() {
 }
 
 export async function setRegistrationEnabled(enabled: boolean) {
-  await requirePermission("core.admin");
-  return await setSetting("registration_enabled", enabled ? "true" : "false");
+  return safeAction(async () => {
+    await requirePermission("core.admin");
+    return await setSetting("registration_enabled", enabled ? "true" : "false");
+  });
 }
 
 export async function setDefaultRole(role: "GUEST" | "STUDENT") {
-  await requirePermission("core.admin");
-  if (role !== "GUEST" && role !== "STUDENT") throw new Error("Neplatná role.");
-  return await setSetting("default_user_role", role);
+  return safeAction(async () => {
+    await requirePermission("core.admin");
+    if (role !== "GUEST" && role !== "STUDENT") throw new Error("Neplatná role.");
+    return await setSetting("default_user_role", role);
+  });
 }
 
 export async function setModuleEnabledAction(moduleId: string, enabled: boolean) {
-  await requirePermission("core.admin");
-  await setModuleEnabled(moduleId, enabled);
+  return safeAction(async () => {
+    await requirePermission("core.admin");
+    await setModuleEnabled(moduleId, enabled);
+  });
 }
 
 /** Nastavení přihlašování (Microsoft 365 / heslo). Přístupové údaje k Microsoftu jsou v env. */
@@ -70,18 +77,20 @@ export async function setAuthSettings(data: {
   microsoftAutoCreate?: boolean;
   passwordScope?: PasswordLoginScope;
 }) {
-  await requirePermission("core.admin");
-  if (data.microsoftEnabled !== undefined) {
-    await setSetting(AUTH_SETTING_KEYS.microsoftEnabled, data.microsoftEnabled ? "true" : "false");
-  }
-  if (data.microsoftAutoCreate !== undefined) {
-    await setSetting(AUTH_SETTING_KEYS.microsoftAutoCreate, data.microsoftAutoCreate ? "true" : "false");
-  }
-  if (data.passwordScope !== undefined) {
-    if (!PASSWORD_SCOPES.includes(data.passwordScope)) throw new Error("Neplatná volba.");
-    await setSetting(AUTH_SETTING_KEYS.passwordScope, data.passwordScope);
-  }
-  return getAuthSettings();
+  return safeAction(async () => {
+    await requirePermission("core.admin");
+    if (data.microsoftEnabled !== undefined) {
+      await setSetting(AUTH_SETTING_KEYS.microsoftEnabled, data.microsoftEnabled ? "true" : "false");
+    }
+    if (data.microsoftAutoCreate !== undefined) {
+      await setSetting(AUTH_SETTING_KEYS.microsoftAutoCreate, data.microsoftAutoCreate ? "true" : "false");
+    }
+    if (data.passwordScope !== undefined) {
+      if (!PASSWORD_SCOPES.includes(data.passwordScope)) throw new Error("Neplatná volba.");
+      await setSetting(AUTH_SETTING_KEYS.passwordScope, data.passwordScope);
+    }
+    return getAuthSettings();
+  });
 }
 
 let isColdStart = true;

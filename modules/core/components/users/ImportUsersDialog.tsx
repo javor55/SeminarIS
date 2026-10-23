@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import * as React from "react";
 import {
   Dialog,
@@ -86,7 +87,7 @@ export function ImportUsersDialog({ open, onOpenChange, onSuccess }: ImportUsers
           return obj;
         });
 
-        const res = await importUsers(json as Array<{ firstName?: string, lastName?: string, email: string, class?: string, role?: string, isActive?: boolean | string | number, password?: string }>);
+        const res = unwrap(await importUsers(json as Array<{ firstName?: string, lastName?: string, email: string, class?: string, role?: string, isActive?: boolean | string | number, password?: string }>));
         setImportResult(res);
         toast.success("Import dokončen");
         onSuccess();

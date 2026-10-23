@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -37,10 +38,10 @@ export function StudyStatusDialog({ user }: { user: UserRow }) {
     setSaving(true);
     try {
       if (isStudying) {
-        await endStudy(user.id, { reason, endedAt, note });
+        unwrap(await endStudy(user.id, { reason, endedAt, note }));
         toast.success(`Studium – ${user.firstName} ${user.lastName}: ukončeno.`);
       } else {
-        await restoreStudy(user.id);
+        unwrap(await restoreStudy(user.id));
         toast.success(`Studium – ${user.firstName} ${user.lastName}: obnoveno.`);
       }
       setOpen(false);

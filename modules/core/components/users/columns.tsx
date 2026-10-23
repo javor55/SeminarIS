@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import { ColumnDef } from "@tanstack/react-table";
 import { User } from "@/lib/types";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -20,7 +21,7 @@ function RoleCell({ user }: { user: UserRow }) {
     <Select
       value={role}
       onValueChange={async (value) => {
-        await updateUserRole(user.id, value);
+        unwrap(await updateUserRole(user.id, value));
         setRole(value as User["role"]);
       }}
     >
@@ -44,7 +45,7 @@ function ActiveCell({ user }: { user: UserRow }) {
     <Switch
       checked={active}
       onCheckedChange={async () => {
-        await toggleUserActive(user.id);
+        unwrap(await toggleUserActive(user.id));
         setActive(!active);
       }}
     />

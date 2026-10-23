@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -80,12 +81,12 @@ export function YearClosureWizard({ preview }: { preview: YearClosurePreview }) 
             leaveReason: c.outcome === "LEAVE" ? c.leaveReason : undefined,
           };
         });
-      const res = await closeSchoolYear({
+      const res = unwrap(await closeSchoolYear({
         expectedStartYear: preview.currentYear.startYear,
         newFirstGradeLetters: letters,
         copyAssignments,
         exceptions,
-      });
+      }));
       toast.success(
         `Školní rok ${res.nextYearLabel} zahájen: postoupilo ${res.promoted}, absolvovalo ${res.graduated}, opakuje ${res.repeated}, odešlo ${res.left}.`
       );

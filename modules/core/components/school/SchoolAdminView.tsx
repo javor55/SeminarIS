@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrapAsync } from "@/lib/action-result";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -114,7 +115,7 @@ function SchoolYearCard({ overview, busy, run }: CardProps) {
               <Button
                 variant="outline"
                 disabled={!changed || busy}
-                onClick={() => run(() => setCurrentSchoolYear(Number(selected)), "Školní rok nastaven.")}
+                onClick={() => run(() => unwrapAsync(setCurrentSchoolYear(Number(selected))), "Školní rok nastaven.")}
               >
                 Nastavit
               </Button>
@@ -162,7 +163,7 @@ function ClassesCard({ overview, busy, run }: CardProps) {
           </div>
           <Button
             disabled={busy}
-            onClick={() => run(() => createClasses(Number(grade), letters), "Třídy založeny.")}
+            onClick={() => run(() => unwrapAsync(createClasses(Number(grade), letters)), "Třídy založeny.")}
           >
             <Plus className="w-4 h-4 mr-1" /> Založit
           </Button>
@@ -180,7 +181,7 @@ function ClassesCard({ overview, busy, run }: CardProps) {
                   title={`Smazat třídu ${c.label}?`}
                   description="Studenti zůstanou v systému, jen nebudou zařazeni do třídy. Úvazky této třídy se smažou."
                   actionLabel="Smazat"
-                  onConfirm={async () => { await run(() => deleteClass(c.id), "Třída smazána."); }}
+                  onConfirm={async () => { await run(() => unwrapAsync(deleteClass(c.id)), "Třída smazána."); }}
                   trigger={
                     <button className="text-muted-foreground hover:text-destructive" title="Smazat třídu">
                       <Trash2 className="w-3.5 h-3.5" />
@@ -219,7 +220,7 @@ function SubjectsCard({ overview, busy, run }: CardProps) {
           className="flex flex-wrap items-end gap-2"
           onSubmit={async (e) => {
             e.preventDefault();
-            const ok = await run(() => createSchoolSubject({ name, code }), "Předmět přidán.");
+            const ok = await run(() => unwrapAsync(createSchoolSubject({ name, code })), "Předmět přidán.");
             if (ok) {
               setName("");
               setCode("");
@@ -266,7 +267,7 @@ function SubjectsCard({ overview, busy, run }: CardProps) {
                       className="h-8 w-8 p-0"
                       title={s.isActive ? "Archivovat" : "Obnovit"}
                       disabled={busy}
-                      onClick={() => run(() => toggleSchoolSubjectActive(s.id), s.isActive ? "Předmět archivován." : "Předmět obnoven.")}
+                      onClick={() => run(() => unwrapAsync(toggleSchoolSubjectActive(s.id)), s.isActive ? "Předmět archivován." : "Předmět obnoven.")}
                     >
                       {s.isActive ? <Archive className="w-4 h-4" /> : <ArchiveRestore className="w-4 h-4" />}
                     </Button>
@@ -274,7 +275,7 @@ function SubjectsCard({ overview, busy, run }: CardProps) {
                       title={`Smazat předmět ${s.name}?`}
                       description="Smažou se i všechny úvazky tohoto předmětu. Pokud ho jen nechcete nabízet, raději ho archivujte."
                       actionLabel="Smazat"
-                      onConfirm={async () => { await run(() => deleteSchoolSubject(s.id), "Předmět smazán."); }}
+                      onConfirm={async () => { await run(() => unwrapAsync(deleteSchoolSubject(s.id)), "Předmět smazán."); }}
                       trigger={
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" title="Smazat">
                           <Trash2 className="w-4 h-4" />
@@ -373,7 +374,7 @@ function AssignmentsCard({ overview, busy, run }: CardProps) {
           disabled={busy || !teacherId || !subjectId || classIds.length === 0}
           onClick={async () => {
             const ok = await run(
-              () => createTeachingAssignments({ teacherId, subjectId, classGroupIds: classIds }),
+              () => unwrapAsync(createTeachingAssignments({ teacherId, subjectId, classGroupIds: classIds })),
               "Úvazky přidány."
             );
             if (ok) setClassIds([]);
@@ -405,7 +406,7 @@ function AssignmentsCard({ overview, busy, run }: CardProps) {
                             title="Odebrat úvazek"
                             className="text-muted-foreground hover:text-destructive"
                             disabled={busy}
-                            onClick={() => run(() => deleteTeachingAssignment(a.id), "Úvazek odebrán.")}
+                            onClick={() => run(() => unwrapAsync(deleteTeachingAssignment(a.id)), "Úvazek odebrán.")}
                           >
                             ×
                           </button>

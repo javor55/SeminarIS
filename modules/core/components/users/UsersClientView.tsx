@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap, unwrapAsync } from "@/lib/action-result";
 import * as React from "react";
 import { updateUserRole, toggleUserActive, setUsersClass, deleteUserPermanently } from "@/modules/core/actions/users";
 import { getClassOptions, type ClassOption } from "@/modules/core/actions/school";
@@ -116,7 +117,7 @@ export function UsersClientView({
       if (!selectedRole) return;
       setLoading(true);
       try {
-        await Promise.all(filteredRows.map(u => updateUserRole(u.id, selectedRole)));
+        await Promise.all(filteredRows.map(u => unwrapAsync(updateUserRole(u.id, selectedRole))));
         toast.success(`Role byla změněna pro ${filteredRows.length} uživatelů.`);
         router.refresh();
         forceRefresh();
@@ -132,7 +133,7 @@ export function UsersClientView({
       if (!selectedClass) return;
       setLoading(true);
       try {
-        await setUsersClass(filteredRows.map(u => u.id), selectedClass === NO_CLASS ? null : selectedClass);
+        unwrap(await setUsersClass(filteredRows.map(u => u.id), selectedClass === NO_CLASS ? null : selectedClass));
         toast.success(`Třída byla změněna pro ${filteredRows.length} uživatelů.`);
         router.refresh();
         forceRefresh();
@@ -153,7 +154,7 @@ export function UsersClientView({
             const currentState = u.isActive !== false;
             const isSelf = u.id === currentUser.id || u.email === currentUser.email;
             if (isSelf && !setActive) return;
-            if (currentState !== setActive) await toggleUserActive(u.id);
+            if (currentState !== setActive) unwrap(await toggleUserActive(u.id));
           })
         );
         toast.success(`Stav byl změněn pro ${filteredRows.length} uživatelů.`);
@@ -180,7 +181,7 @@ export function UsersClientView({
       try {
         for (const u of usersToDelete) {
           try {
-            await deleteUserPermanently(u.id);
+            unwrap(await deleteUserPermanently(u.id));
             deleted++;
           } catch {
             errors++;

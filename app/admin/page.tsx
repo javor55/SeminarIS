@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { getAdminOverview, setRegistrationEnabled, setDefaultRole, setModuleEnabledAction, setAuthSettings, type AdminModuleInfo } from "@/modules/core/actions/admin";
@@ -121,7 +122,7 @@ export default function AdminPage() {
                 checked={regEnabled}
                 onCheckedChange={async (checked) => {
                   try {
-                    await setRegistrationEnabled(checked);
+                    unwrap(await setRegistrationEnabled(checked));
                     setRegEnabled(checked);
                     toast.success(checked ? "Registrace povolena." : "Registrace zakázána.");
                   } catch (err) {
@@ -144,7 +145,7 @@ export default function AdminPage() {
                 onValueChange={async (value) => {
                   try {
                     const role = value as "GUEST" | "STUDENT";
-                    await setDefaultRole(role);
+                    unwrap(await setDefaultRole(role));
                     setDefaultRoleState(role);
                     toast.success("Výchozí role byla úspěšně změněna.");
                   } catch (err) {
@@ -186,7 +187,7 @@ export default function AdminPage() {
                   disabled={m.core}
                   onCheckedChange={async (checked) => {
                     try {
-                      await setModuleEnabledAction(m.id, checked);
+                      unwrap(await setModuleEnabledAction(m.id, checked));
                       // Znovu načíst i statistiky – závisí na zapnutých modulech
                       await loadData();
                       toast.success(checked ? `Modul „${m.name}“ zapnut.` : `Modul „${m.name}“ vypnut.`);
@@ -223,7 +224,7 @@ const PASSWORD_SCOPE_LABELS: Record<PasswordLoginScope, string> = {
 function AuthSettingsCard({ auth, onChange }: { auth: AuthSettings; onChange: (a: AuthSettings) => void }) {
   async function save(data: Parameters<typeof setAuthSettings>[0], message: string) {
     try {
-      onChange(await setAuthSettings(data));
+      onChange(unwrap(await setAuthSettings(data)));
       toast.success(message);
     } catch (err) {
       toast.error((err as Error).message || "Nepodařilo se změnit nastavení.");

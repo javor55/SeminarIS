@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import { useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -29,7 +30,7 @@ export default function ProfilePage() {
 
     setIsChanging(true);
     try {
-      await changeOwnPassword(currentPassword, newPassword);
+      unwrap(await changeOwnPassword(currentPassword, newPassword));
       toast.success("Heslo bylo úspěšně změněno.");
       setCurrentPassword("");
       setNewPassword("");

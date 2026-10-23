@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrap } from "@/lib/action-result";
 import { ColumnDef, Row, Table } from "@tanstack/react-table";
 import { User } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -75,7 +76,7 @@ const RoleCell = ({ row, table }: { row: Row<UserRow>, table: Table<UserRow> }) 
   const handleRoleChange = async (v: string) => {
     setLoading(true);
     try {
-      await updateUserRole(u.id, v); 
+      unwrap(await updateUserRole(u.id, v)); 
       toast.success(`Role uživatele ${u.firstName} ${u.lastName} byla změněna na ${v}.`);
       meta?.forceRefresh?.();
     } catch (e: unknown) {
@@ -135,7 +136,7 @@ const ActiveCell = ({ row, table }: { row: Row<UserRow>, table: Table<UserRow> }
   const handleToggleActive = async () => {
     setLoading(true);
     try {
-      await toggleUserActive(u.id); 
+      unwrap(await toggleUserActive(u.id)); 
       toast.success(`Uživatel ${u.firstName} ${u.lastName} byl ${!checked ? "aktivován" : "deaktivován"}.`);
       meta?.forceRefresh?.();
     } catch (e: unknown) {
@@ -238,7 +239,7 @@ const ActionsCell = ({ row }: { row: Row<UserRow> }) => {
                   onClick={async () => {
                     setDeleting(true);
                     try {
-                      await deleteUserPermanently(u.id);
+                      unwrap(await deleteUserPermanently(u.id));
                       toast.success(`Uživatel ${u.firstName} ${u.lastName} byl trvale smazán.`);
                       router.refresh();
                     } catch (err: unknown) {
