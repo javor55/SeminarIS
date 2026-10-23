@@ -66,13 +66,13 @@ export const registrationInclude = {
 
 type RegistrationRow = Prisma.MakeupRegistrationGetPayload<{ include: typeof registrationInclude }>;
 
-export function toRegistrationItem(r: RegistrationRow, currentStartYear: number): MakeupRegistrationItem {
+export function toRegistrationItem(r: RegistrationRow): MakeupRegistrationItem {
   return {
     id: r.id,
     sessionId: r.sessionId,
     studentId: r.studentId,
     studentName: fullName(r.student),
-    classLabel: r.student.classGroup ? classLabel(r.student.classGroup, currentStartYear) : null,
+    classLabel: r.student.classGroup ? classLabel(r.student.classGroup) : null,
     note: r.note,
     attendance: r.attendance,
     subjects: r.subjects
@@ -111,8 +111,9 @@ export async function findStudentConflict(
 }
 
 /**
- * Vyučující, kterému student daný předmět dopisuje – z úvazků (předmět × třída
- * studenta × aktuální školní rok). Null, pokud úvazek není zadaný.
+ * Vyučující, kterému student daný předmět dopisuje: úvazek pro třídu studenta v aktuálním
+ * školním roce. Když úvazek není a student je zapsaný do výskytu toho předmětu v zápisu
+ * (modul Semináře), vezme se učitel výskytu. Jinak null.
  */
 export async function resolveSubjectTeachers(
   db: TxClient,
@@ -122,26 +123,64 @@ export async function resolveSubjectTeachers(
   const result = new Map<string, string | null>(subjectIds.map((id) => [id, null]));
   const student = await db.user.findUnique({ where: { id: studentId }, select: { classGroupId: true } });
   const year = await getCurrentSchoolYear();
-  if (!student?.classGroupId || !year.id) return result;
-  const assignments = await db.teachingAssignment.findMany({
-    where: { classGroupId: student.classGroupId, schoolYearId: year.id, subjectId: { in: subjectIds } },
-    orderBy: { createdAt: "asc" },
-  });
-  for (const a of assignments) {
-    if (!result.get(a.subjectId)) result.set(a.subjectId, a.teacherId);
+  if (student?.classGroupId && year.id) {
+    const assignments = await db.teachingAssignment.findMany({
+      where: { classGroupId: student.classGroupId, schoolYearId: year.id, subjectId: { in: subjectIds } },
+      orderBy: { createdAt: "asc" },
+    });
+    for (const a of assignments) {
+      if (!result.get(a.subjectId)) result.set(a.subjectId, a.teacherId);
+    }
+  }
+
+  const missing = subjectIds.filter((id) => !result.get(id));
+  if (missing.length > 0) {
+    const enrollments = await db.studentEnrollment.findMany({
+      where: {
+        studentId,
+        deletedAt: null,
+        subjectOccurrence: { deletedAt: null, teacherId: { not: null }, subjectId: { in: missing } },
+      },
+      select: { subjectOccurrence: { select: { subjectId: true, teacherId: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    for (const e of enrollments) {
+      if (!result.get(e.subjectOccurrence.subjectId)) result.set(e.subjectOccurrence.subjectId, e.subjectOccurrence.teacherId);
+    }
   }
   return result;
 }
 
-/** Předměty, které student podle úvazků své třídy má (pro zvýraznění v nabídce). */
+/**
+ * Předměty studenta pro zvýraznění v nabídce: předměty s úvazkem pro jeho třídu, předměty jeho
+ * ročníku (podle `grades`) a předměty, do kterých je zapsaný v zápisu.
+ */
 export async function getStudentSubjectIds(studentId: string): Promise<string[]> {
-  const student = await prisma.user.findUnique({ where: { id: studentId }, select: { classGroupId: true } });
-  const year = await getCurrentSchoolYear();
-  if (!student?.classGroupId || !year.id) return [];
-  const rows = await prisma.teachingAssignment.findMany({
-    where: { classGroupId: student.classGroupId, schoolYearId: year.id },
-    select: { subjectId: true },
-    distinct: ["subjectId"],
+  const student = await prisma.user.findUnique({
+    where: { id: studentId },
+    select: { classGroupId: true, classGroup: { select: { grade: true } } },
   });
-  return rows.map((r) => r.subjectId);
+  const year = await getCurrentSchoolYear();
+  const grade = student?.classGroup?.grade;
+  const [byClass, byGrade, byEnrollment] = await Promise.all([
+    student?.classGroupId && year.id
+      ? prisma.teachingAssignment.findMany({
+          where: { classGroupId: student.classGroupId, schoolYearId: year.id },
+          select: { subjectId: true },
+          distinct: ["subjectId"],
+        })
+      : [],
+    grade ? prisma.subject.findMany({ where: { isActive: true, grades: { has: grade } }, select: { id: true } }) : [],
+    prisma.studentEnrollment.findMany({
+      where: { studentId, deletedAt: null, subjectOccurrence: { deletedAt: null } },
+      select: { subjectOccurrence: { select: { subjectId: true } } },
+    }),
+  ]);
+  return [
+    ...new Set([
+      ...byClass.map((r) => r.subjectId),
+      ...byGrade.map((r) => r.id),
+      ...byEnrollment.map((r) => r.subjectOccurrence.subjectId),
+    ]),
+  ];
 }
