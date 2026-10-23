@@ -4,9 +4,10 @@ import { safeAction } from "@/lib/safe-action";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
+import { audit, describeChanges } from "@/lib/audit";
 import { isModuleEnabled } from "@/lib/modules";
 import { can } from "@/modules/registry";
-import { sanitizeGrades, subjectInGrade } from "@/lib/school";
+import { sanitizeGrades, subjectGradesLabel, subjectInGrade } from "@/lib/school";
 import { getCurrentSchoolYear, getStudentGrade } from "@/modules/core/school";
 import { getSubjectWindows, type SubjectWindowRef } from "@/modules/seminars/subject-windows";
 
@@ -180,7 +181,17 @@ export async function createSubject(data: SubjectInput) {
     const user = await requirePermission("core.subjects.edit");
     const clean = cleanInput(data);
     await assertCodeFree(clean.code);
-    const res = await prisma.subject.create({ data: { ...clean, createdById: user.id }, select: { id: true } });
+    const res = await prisma.$transaction(async (tx) => {
+      const created = await tx.subject.create({ data: { ...clean, createdById: user.id }, select: { id: true } });
+      await audit(tx, user, {
+        action: "subjects.subject.create",
+        entityType: "subject",
+        entityId: created.id,
+        summary: `Vytvořen předmět „${clean.name}“${clean.code ? ` (${clean.code})` : ""}, ročníky: ${subjectGradesLabel(clean.grades)}`,
+        data: { name: clean.name, code: clean.code, grades: clean.grades },
+      });
+      return created;
+    });
     revalidateSubjects();
     return res;
   });
@@ -191,7 +202,25 @@ export async function updateSubject(id: string, data: SubjectInput) {
     const user = await requirePermission("core.subjects.edit");
     const clean = cleanInput(data);
     await assertCodeFree(clean.code, id);
-    const res = await prisma.subject.update({ where: { id }, data: { ...clean, updatedById: user.id }, select: { id: true } });
+    const res = await prisma.$transaction(async (tx) => {
+      const before = await tx.subject.findUnique({ where: { id } });
+      if (!before) throw new Error("Předmět nenalezen.");
+      const updated = await tx.subject.update({ where: { id }, data: { ...clean, updatedById: user.id }, select: { id: true } });
+      const changes = describeChanges(
+        { name: before.name, code: before.code, grades: subjectGradesLabel(before.grades), description: before.description, syllabus: before.syllabus },
+        { name: clean.name, code: clean.code, grades: subjectGradesLabel(clean.grades), description: clean.description, syllabus: clean.syllabus },
+        { name: "název", code: "zkratka", grades: "ročníky", description: "popis", syllabus: "sylabus" },
+        (v) => (v == null || v === "" ? "—" : String(v).length > 60 ? "upraveno" : String(v))
+      );
+      await audit(tx, user, {
+        action: "subjects.subject.update",
+        entityType: "subject",
+        entityId: id,
+        summary: `Upraven předmět „${before.name}“${changes ? `: ${changes}` : " (beze změny)"}`,
+        data: { before: { name: before.name, code: before.code, grades: before.grades }, after: { name: clean.name, code: clean.code, grades: clean.grades } },
+      });
+      return updated;
+    });
     revalidateSubjects();
     return res;
   });
@@ -199,10 +228,19 @@ export async function updateSubject(id: string, data: SubjectInput) {
 
 export async function toggleSubjectActive(id: string) {
   return safeAction(async () => {
-    await requirePermission("core.subjects.archive");
+    const admin = await requirePermission("core.subjects.archive");
     const subject = await prisma.subject.findUnique({ where: { id } });
     if (!subject) throw new Error("Předmět nenalezen.");
-    await prisma.subject.update({ where: { id }, data: { isActive: !subject.isActive } });
+    await prisma.$transaction(async (tx) => {
+      await tx.subject.update({ where: { id }, data: { isActive: !subject.isActive } });
+      await audit(tx, admin, {
+        action: "subjects.subject.archive",
+        entityType: "subject",
+        entityId: id,
+        summary: `${subject.isActive ? "Archivován" : "Obnoven"} předmět „${subject.name}“`,
+        data: { before: subject.isActive, after: !subject.isActive },
+      });
+    });
     revalidateSubjects();
   });
 }
@@ -213,10 +251,19 @@ export async function toggleSubjectActive(id: string) {
  */
 export async function deleteSubjectPermanently(id: string) {
   return safeAction(async () => {
-    await requirePermission("core.subjects.archive");
+    const admin = await requirePermission("core.subjects.archive");
     const subject = await prisma.subject.findUnique({ where: { id } });
     if (!subject) throw new Error("Předmět nenalezen.");
-    await prisma.subject.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.subject.delete({ where: { id } });
+      await audit(tx, admin, {
+        action: "subjects.subject.delete",
+        entityType: "subject",
+        entityId: id,
+        summary: `Trvale smazán předmět „${subject.name}“ (včetně výskytů v zápisech, úvazků a vazeb dopisování)`,
+        data: { name: subject.name, code: subject.code },
+      });
+    });
     revalidateSubjects();
   });
 }

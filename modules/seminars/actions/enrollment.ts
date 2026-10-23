@@ -3,14 +3,21 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { computeEnrollmentStatus } from "@/lib/utils";
-import { requirePermission } from "@/lib/session";
+import { assertNotImpersonating, requirePermission } from "@/lib/session";
+import { audit } from "@/lib/audit";
 import { can } from "@/modules/registry";
 import { syncEnrollmentWindowStatus } from "@/modules/seminars/window-status";
 import { isWindowForGrade } from "@/modules/seminars/eligibility";
 import { getStudentGrade } from "@/modules/core/school";
 
+// Pozn.: tyto dvě akce nepoužívají safeAction (vracejí { success } | { error }), proto si
+// režim „zobrazit jako“ (jen pro čtení) hlídají samy.
+
+const fullName = (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`.trim();
+
 export async function enrollStudent(studentId: string, subjectOccurrenceId: string) {
   try {
+    await assertNotImpersonating();
     // Hosté nemohou zapisovat
     const user = await requirePermission("seminars.enroll.self");
     // Zamezit studentům zápis jiných studentů
@@ -100,13 +107,26 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
         }
       }
 
-      return await tx.studentEnrollment.create({
+      const created = await tx.studentEnrollment.create({
         data: {
           studentId,
           subjectOccurrenceId,
           createdById: user.id as string,
         },
       });
+      const student = await tx.user.findUnique({ where: { id: studentId }, select: { firstName: true, lastName: true } });
+      const what = `předmětu „${targetOcc.subject.name}“ (blok „${targetOcc.block.name}“, zápis „${targetOcc.block.enrollmentWindow.name}“)`;
+      await audit(tx, user, {
+        action: "seminars.enrollment.add",
+        entityType: "studentEnrollment",
+        entityId: created.id,
+        summary:
+          user.id === studentId
+            ? `${student ? fullName(student) : "Student"} se zapsal(a) do ${what}`
+            : `${fullName(user)} zapsal(a) studenta ${student ? fullName(student) : studentId} do ${what}`,
+        data: { studentId, subjectOccurrenceId, subjectId: targetOcc.subjectId, blockId: targetOcc.blockId, windowId: targetOcc.block.enrollmentWindowId, byOther: user.id !== studentId },
+      });
+      return created;
     }, {
       isolationLevel: 'Serializable',
     });
@@ -122,13 +142,16 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
 
 export async function unenrollStudent(enrollmentId: string) {
   try {
+    await assertNotImpersonating();
     // Hosté nemohou odepisovat
     const user = await requirePermission("seminars.enroll.self");
     const enrollment = await prisma.studentEnrollment.findUnique({
       where: { id: enrollmentId },
       include: {
+        student: { select: { firstName: true, lastName: true } },
         subjectOccurrence: {
           include: {
+            subject: true,
             block: {
               include: { enrollmentWindow: true }
             }
@@ -160,8 +183,22 @@ export async function unenrollStudent(enrollmentId: string) {
       }
     }
 
-    const res = await prisma.studentEnrollment.delete({
-      where: { id: enrollmentId },
+    // Smazání zápisu a záznam do historie změn v jedné transakci
+    const res = await prisma.$transaction(async (tx) => {
+      const deleted = await tx.studentEnrollment.delete({ where: { id: enrollmentId } });
+      const occ = enrollment.subjectOccurrence;
+      const what = `z předmětu „${occ.subject.name}“ (blok „${occ.block.name}“, zápis „${occ.block.enrollmentWindow.name}“)`;
+      await audit(tx, user, {
+        action: "seminars.enrollment.remove",
+        entityType: "studentEnrollment",
+        entityId: enrollmentId,
+        summary:
+          enrollment.studentId === user.id
+            ? `${fullName(enrollment.student)} se odepsal(a) ${what}`
+            : `${fullName(user)} odepsal(a) studenta ${fullName(enrollment.student)} ${what}`,
+        data: { studentId: enrollment.studentId, subjectOccurrenceId: occ.id, subjectId: occ.subjectId, blockId: occ.blockId, windowId: occ.block.enrollmentWindowId, byOther: enrollment.studentId !== user.id },
+      });
+      return deleted;
     });
     revalidatePath("/", "layout");
     return { success: true, data: res };

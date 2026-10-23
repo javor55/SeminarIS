@@ -9,14 +9,20 @@ import { requireAuth, requirePermission } from "@/lib/session";
 import { can } from "@/modules/registry";
 import { MODULE_SERVERS } from "@/modules/server-registry";
 import { ensureCurrentSchoolYear, findOrCreateClass, setStudentClass } from "@/modules/core/school";
+import { audit } from "@/lib/audit";
 import {
   classLabel as formatClassLabel,
   parseClassLabel,
   schoolYearLabel,
   studyStatusLabel,
+  ROLE_LABELS,
+  STUDY_END_REASON_LABELS,
   DEFAULT_STUDY_YEARS,
   type StudyEndReasonValue,
 } from "@/lib/school";
+
+/** "Jan Novák" pro popisy v historii změn */
+const userName = (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`.trim();
 
 const ROLES: readonly Role[] = ["GUEST", "STUDENT", "TEACHER", "ADMIN"];
 
@@ -60,7 +66,7 @@ export async function importUsers(data: Array<{
 }>) {
   return safeAction(async () => {
     try {
-      await requirePermission("core.users.manage");
+      const admin = await requirePermission("core.users.manage");
       let created = 0;
       let updated = 0;
       let errors = 0;
@@ -145,6 +151,13 @@ export async function importUsers(data: Array<{
         }
       }
 
+      // Import se do historie zapisuje souhrnně (jednotlivé řádky by ji zahltily)
+      await audit(prisma, admin, {
+        action: "users.import",
+        entityType: "user",
+        summary: `Import uživatelů: ${created} nových, ${updated} upravených, ${errors} chyb (řádků celkem ${data.length})`,
+        data: { created, updated, errors, rows: data.length },
+      });
       revalidatePath("/users");
       return { created, updated, errors, messages: messages.slice(0, 20) };
     } catch (err: unknown) {
@@ -222,10 +235,20 @@ export async function updateUserRole(userId: string, role: string) {
       throw new Error("Nemůžete změnit roli sami sobě (prevence ztráty přístupu).");
     }
     const newRole = parseRole(role);
-    return await prisma.user.update({
-      where: { id: userId },
-      // žádost o třídu má smysl jen u hosta čekajícího na schválení
-      data: { role: newRole, ...(newRole !== "GUEST" ? { requestedClassGroupId: null } : {}) },
+    return await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: userId },
+        // žádost o třídu má smysl jen u hosta čekajícího na schválení
+        data: { role: newRole, ...(newRole !== "GUEST" ? { requestedClassGroupId: null } : {}) },
+      });
+      await audit(tx, admin, {
+        action: "users.role",
+        entityType: "user",
+        entityId: userId,
+        summary: `Změněna role uživatele ${userName(target)}: ${ROLE_LABELS[target.role]} → ${ROLE_LABELS[newRole]}`,
+        data: { before: target.role, after: newRole },
+      });
+      return updated;
     });
   });
 }
@@ -237,9 +260,9 @@ export async function updateUserProfile(
   data: { firstName: string; lastName: string; email: string; classGroupId?: string | null }
 ) {
   return safeAction(async () => {
-    await requirePermission("core.users.manage");
+    const admin = await requirePermission("core.users.manage");
 
-    const target = await prisma.user.findUnique({ where: { id: userId } });
+    const target = await prisma.user.findUnique({ where: { id: userId }, include: { classGroup: true } });
     if (!target) throw new Error("Uzivatel nenalezen.");
 
     const emailChanged = data.email.toLowerCase() !== target.email.toLowerCase();
@@ -250,17 +273,37 @@ export async function updateUserProfile(
       }
     }
 
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        firstName: data.firstName.trim(),
-        lastName: data.lastName.trim(),
-        email: data.email.trim().toLowerCase(),
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.user.update({
+        where: { id: userId },
+        data: {
+          firstName: data.firstName.trim(),
+          lastName: data.lastName.trim(),
+          email: data.email.trim().toLowerCase(),
+        },
+      });
+      const changes: string[] = [];
+      if (row.firstName !== target.firstName || row.lastName !== target.lastName) {
+        changes.push(`jméno ${userName(target)} → ${userName(row)}`);
+      }
+      if (row.email !== target.email) changes.push(`e-mail ${target.email} → ${row.email}`);
+      if (data.classGroupId !== undefined && data.classGroupId !== target.classGroupId) {
+        await setStudentClass(tx, { userId, classGroupId: data.classGroupId, schoolYear: await ensureCurrentSchoolYear() });
+        const newClass = data.classGroupId ? await tx.classGroup.findUnique({ where: { id: data.classGroupId } }) : null;
+        changes.push(`třída ${target.classGroup ? formatClassLabel(target.classGroup) : "bez třídy"} → ${newClass ? formatClassLabel(newClass) : "bez třídy"}`);
+      }
+      await audit(tx, admin, {
+        action: "users.update",
+        entityType: "user",
+        entityId: userId,
+        summary: `Upraven uživatel ${userName(target)}${changes.length ? `: ${changes.join("; ")}` : " (beze změny)"}`,
+        data: {
+          before: { firstName: target.firstName, lastName: target.lastName, email: target.email, classGroupId: target.classGroupId },
+          after: { firstName: row.firstName, lastName: row.lastName, email: row.email, classGroupId: data.classGroupId === undefined ? target.classGroupId : data.classGroupId },
+        },
+      });
+      return row;
     });
-    if (data.classGroupId !== undefined && data.classGroupId !== target.classGroupId) {
-      await setStudentClass(prisma, { userId, classGroupId: data.classGroupId, schoolYear: await ensureCurrentSchoolYear() });
-    }
 
     revalidatePath("/", "layout");
     return updated;
@@ -278,20 +321,39 @@ export async function toggleUserActive(userId: string) {
     if (isSelf) {
       throw new Error("Nemůžete deaktivovat svůj vlastní účet.");
     }
-    return await prisma.user.update({
-      where: { id: userId },
-      data: { isActive: !targetUser.isActive },
+    return await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: { isActive: !targetUser.isActive },
+      });
+      await audit(tx, admin, {
+        action: updated.isActive ? "users.activate" : "users.deactivate",
+        entityType: "user",
+        entityId: userId,
+        summary: `${updated.isActive ? "Aktivován" : "Deaktivován"} účet uživatele ${userName(targetUser)}`,
+        data: { before: targetUser.isActive, after: updated.isActive },
+      });
+      return updated;
     });
   });
 }
 
 export async function resetUserPassword(userId: string, newPasswordRaw: string) {
   return safeAction(async () => {
-    await requirePermission("core.users.manage");
+    const admin = await requirePermission("core.users.manage");
     const hashedPassword = await bcrypt.hash(newPasswordRaw, 10);
-    return await prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash: hashedPassword },
+    return await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: { passwordHash: hashedPassword },
+      });
+      await audit(tx, admin, {
+        action: "users.password.reset",
+        entityType: "user",
+        entityId: userId,
+        summary: `Správce nastavil nové heslo uživateli ${userName(updated)}`,
+      });
+      return updated;
     });
   });
 }
@@ -299,11 +361,22 @@ export async function resetUserPassword(userId: string, newPasswordRaw: string) 
 /** Hromadné přeřazení do třídy v aktuálním školním roce (null = vyřadit ze třídy). */
 export async function setUsersClass(userIds: string[], classGroupId: string | null) {
   return safeAction(async () => {
-    await requirePermission("core.users.manage");
+    const admin = await requirePermission("core.users.manage");
     const schoolYear = await ensureCurrentSchoolYear();
     await prisma.$transaction(async (tx) => {
+      const newClass = classGroupId ? await tx.classGroup.findUnique({ where: { id: classGroupId } }) : null;
+      const newLabel = newClass ? formatClassLabel(newClass) : "bez třídy";
       for (const userId of userIds) {
+        const before = await tx.user.findUnique({ where: { id: userId }, include: { classGroup: true } });
+        if (!before) continue;
         await setStudentClass(tx, { userId, classGroupId, schoolYear });
+        await audit(tx, admin, {
+          action: "users.class",
+          entityType: "user",
+          entityId: userId,
+          summary: `Přesun uživatele ${userName(before)} do třídy: ${before.classGroup ? formatClassLabel(before.classGroup) : "bez třídy"} → ${newLabel}`,
+          data: { before: before.classGroupId, after: classGroupId },
+        });
       }
     });
     revalidatePath("/users");
@@ -318,21 +391,30 @@ export async function setUsersClass(userIds: string[], classGroupId: string | nu
  */
 export async function endStudy(userId: string, data: { reason: StudyEndReasonValue; note?: string; endedAt?: string }) {
   return safeAction(async () => {
-    await requirePermission("core.users.manage");
+    const admin = await requirePermission("core.users.manage");
     const target = await prisma.user.findUnique({ where: { id: userId } });
     if (!target) throw new Error("Uživatel nenalezen.");
     if (target.role !== "STUDENT") throw new Error("Studium lze ukončit jen studentovi.");
     const reasons: StudyEndReasonValue[] = ["GRADUATED", "TRANSFER", "WITHDRAWAL", "EXPULSION", "OTHER"];
     if (!reasons.includes(data.reason)) throw new Error("Neplatný důvod.");
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        studyStatus: data.reason === "GRADUATED" ? "GRADUATED" : "LEFT",
-        studyEndReason: data.reason,
-        studyEndedAt: data.endedAt ? new Date(data.endedAt) : new Date(),
-        studyEndNote: data.note?.trim() || null,
-        isActive: false,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          studyStatus: data.reason === "GRADUATED" ? "GRADUATED" : "LEFT",
+          studyEndReason: data.reason,
+          studyEndedAt: data.endedAt ? new Date(data.endedAt) : new Date(),
+          studyEndNote: data.note?.trim() || null,
+          isActive: false,
+        },
+      });
+      await audit(tx, admin, {
+        action: "users.study.end",
+        entityType: "user",
+        entityId: userId,
+        summary: `Ukončeno studium studenta ${userName(target)}: ${STUDY_END_REASON_LABELS[data.reason]}${data.note?.trim() ? ` (${data.note.trim()})` : ""}`,
+        data: { reason: data.reason, note: data.note?.trim() || null },
+      });
     });
     revalidatePath("/", "layout");
   });
@@ -341,10 +423,18 @@ export async function endStudy(userId: string, data: { reason: StudyEndReasonVal
 /** Vrátí ukončení studia (omyl, návrat ke studiu). Účet se znovu aktivuje. */
 export async function restoreStudy(userId: string) {
   return safeAction(async () => {
-    await requirePermission("core.users.manage");
-    await prisma.user.update({
-      where: { id: userId },
-      data: { studyStatus: "ACTIVE", studyEndReason: null, studyEndedAt: null, studyEndNote: null, isActive: true },
+    const admin = await requirePermission("core.users.manage");
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: { studyStatus: "ACTIVE", studyEndReason: null, studyEndedAt: null, studyEndNote: null, isActive: true },
+      });
+      await audit(tx, admin, {
+        action: "users.study.restore",
+        entityType: "user",
+        entityId: userId,
+        summary: `Obnoveno studium studenta ${userName(updated)}`,
+      });
     });
     revalidatePath("/", "layout");
   });
@@ -372,6 +462,13 @@ export async function deleteUserPermanently(userId: string) {
         await server.onUserDelete?.(tx, userId, admin.id);
       }
       await tx.user.delete({ where: { id: userId } });
+      await audit(tx, admin, {
+        action: "users.delete",
+        entityType: "user",
+        entityId: userId,
+        summary: `Trvale smazán uživatel ${userName(targetUser)} (${targetUser.email}, ${ROLE_LABELS[targetUser.role]})`,
+        data: { email: targetUser.email, role: targetUser.role },
+      });
     });
 
     revalidatePath("/", "layout");

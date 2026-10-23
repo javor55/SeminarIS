@@ -6,7 +6,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import type { User } from "@/lib/types";
 import { requirePermission } from "@/lib/session";
-import { formatTimeRange } from "@/lib/datetime";
+import { audit, describeChanges } from "@/lib/audit";
+import { formatMinutes, formatTimeRange } from "@/lib/datetime";
 import { classLabel } from "@/lib/school";
 import { can } from "@/modules/registry";
 import {
@@ -21,11 +22,18 @@ import {
   toRegistrationItem,
   toSessionItem,
 } from "@/modules/makeup/data";
-import type {
-  MakeupAttendanceValue,
-  MakeupRegistrationItem,
-  MakeupSessionItem,
-  SessionInput,
+import {
+  notifyRegistrationMoved,
+  notifyRegistrationRemoved,
+  notifySessionChanged,
+  notifySessionsCancelled,
+} from "@/modules/makeup/notifications";
+import {
+  ATTENDANCE_LABELS,
+  type MakeupAttendanceValue,
+  type MakeupRegistrationItem,
+  type MakeupSessionItem,
+  type SessionInput,
 } from "@/modules/makeup/types";
 
 function revalidateMakeup() {
@@ -203,9 +211,10 @@ export async function createSessions(input: SessionInput & { occurrences: { star
     }
 
     const seriesId = intervals.length > 1 ? randomUUID() : null;
-    await prisma.$transaction(
-      intervals.map((i) =>
-        prisma.makeupSession.create({
+    await prisma.$transaction(async (tx) => {
+      const ids: string[] = [];
+      for (const i of intervals) {
+        const created = await tx.makeupSession.create({
           data: {
             teacherId: clean.teacherId,
             startsAt: i.start,
@@ -218,9 +227,25 @@ export async function createSessions(input: SessionInput & { occurrences: { star
             createdById: user.id,
             subjects: { create: clean.subjectIds.map((subjectId) => ({ subjectId })) },
           },
-        })
-      )
-    );
+          select: { id: true },
+        });
+        ids.push(created.id);
+      }
+      const [teacher, subjects] = await Promise.all([
+        tx.user.findUnique({ where: { id: clean.teacherId }, select: { firstName: true, lastName: true } }),
+        tx.subject.findMany({ where: { id: { in: clean.subjectIds } }, select: { name: true } }),
+      ]);
+      await audit(tx, user, {
+        action: "makeup.session.create",
+        entityType: "makeupSession",
+        entityId: ids[0],
+        summary:
+          intervals.length === 1
+            ? `Vypsán termín dopisování ${formatTimeRange(intervals[0].start, intervals[0].end)}, učebna ${clean.room}, dozor ${teacher ? fullName(teacher) : ""}`
+            : `Vypsána řada ${intervals.length} termínů dopisování od ${formatTimeRange(intervals[0].start, intervals[0].end)}, učebna ${clean.room}, dozor ${teacher ? fullName(teacher) : ""}`,
+        data: { sessionIds: ids, seriesId, room: clean.room, capacity: clean.capacity, subjects: subjects.map((x) => x.name), teacherId: clean.teacherId },
+      });
+    });
     revalidateMakeup();
     return intervals.length;
   });
@@ -229,7 +254,10 @@ export async function createSessions(input: SessionInput & { occurrences: { star
 async function loadManagedSession(user: User, sessionId: string) {
   const s = await prisma.makeupSession.findUnique({
     where: { id: sessionId },
-    include: { registrations: { include: { subjects: true, student: { select: { firstName: true, lastName: true } } } } },
+    include: {
+      teacher: { select: { firstName: true, lastName: true } },
+      registrations: { include: { subjects: true, student: { select: { firstName: true, lastName: true } } } },
+    },
   });
   if (!s || !canManageSession(user, s)) throw new Error("Termín nenalezen.");
   return s;
@@ -261,13 +289,15 @@ export async function updateSession(
     }
     await assertNoSessionConflict(clean.teacherId, clean.room, start, end, s.id);
 
-    await prisma.$transaction([
-      prisma.makeupSessionSubject.deleteMany({ where: { sessionId: s.id, subjectId: { notIn: clean.subjectIds } } }),
-      prisma.makeupSessionSubject.createMany({
+    const timeOrRoomChanged =
+      start.getTime() !== s.startsAt.getTime() || end.getTime() !== s.endsAt.getTime() || clean.room !== s.room;
+    await prisma.$transaction(async (tx) => {
+      await tx.makeupSessionSubject.deleteMany({ where: { sessionId: s.id, subjectId: { notIn: clean.subjectIds } } });
+      await tx.makeupSessionSubject.createMany({
         data: clean.subjectIds.map((subjectId) => ({ sessionId: s.id, subjectId })),
         skipDuplicates: true,
-      }),
-      prisma.makeupSession.update({
+      });
+      await tx.makeupSession.update({
         where: { id: s.id },
         data: {
           teacherId: clean.teacherId,
@@ -278,8 +308,46 @@ export async function updateSession(
           changeDeadlineMinutes: clean.changeDeadlineMinutes,
           note: clean.note,
         },
-      }),
-    ]);
+      });
+      const newTeacher =
+        clean.teacherId === s.teacherId ? s.teacher : await tx.user.findUnique({ where: { id: clean.teacherId }, select: { firstName: true, lastName: true } });
+      const oldSubjects = await tx.makeupSessionSubject.findMany({ where: { sessionId: s.id }, include: { subject: { select: { name: true } } } });
+      const before = {
+        termin: formatTimeRange(s.startsAt, s.endsAt),
+        ucebna: s.room,
+        dozor: fullName(s.teacher),
+        kapacita: s.capacity,
+        uzaverka: formatMinutes(s.changeDeadlineMinutes),
+        poznamka: s.note,
+      };
+      const after = {
+        termin: formatTimeRange(start, end),
+        ucebna: clean.room,
+        dozor: newTeacher ? fullName(newTeacher) : "",
+        kapacita: clean.capacity,
+        uzaverka: formatMinutes(clean.changeDeadlineMinutes),
+        poznamka: clean.note,
+      };
+      const changes = describeChanges(before, after, {
+        termin: "termín",
+        ucebna: "učebna",
+        dozor: "dozor",
+        kapacita: "kapacita",
+        uzaverka: "uzávěrka změn",
+        poznamka: "poznámka",
+      });
+      await audit(tx, user, {
+        action: "makeup.session.update",
+        entityType: "makeupSession",
+        entityId: s.id,
+        summary: `Upraven termín dopisování ${before.termin}${changes ? `: ${changes}` : " (předměty)"}`,
+        data: { before, after, subjects: oldSubjects.map((x) => x.subject.name) },
+      });
+    });
+    // Změna času nebo učebny: dát vědět zapsaným studentům (po commitu)
+    if (timeOrRoomChanged && s.registrations.length > 0) {
+      await notifySessionChanged(s.id, { startsAt: s.startsAt, endsAt: s.endsAt, room: s.room });
+    }
     revalidateMakeup();
   });
 }
@@ -296,12 +364,32 @@ export async function cancelSession(sessionId: string, reason: string, wholeSeri
       wholeSeries && s.seriesId
         ? { seriesId: s.seriesId, startsAt: { gte: s.startsAt }, cancelledAt: null }
         : { id: s.id };
-    const targets = await prisma.makeupSession.findMany({ where });
-    const allowed = targets.filter((t) => canManageSession(user, t)).map((t) => t.id);
-    const res = await prisma.makeupSession.updateMany({
-      where: { id: { in: allowed } },
-      data: { cancelledAt: new Date(), cancelReason: reason.trim() || null },
+    const targets = await prisma.makeupSession.findMany({ where: { ...where, cancelledAt: null }, include: { teacher: { select: { firstName: true, lastName: true } }, _count: { select: { registrations: true } } } });
+    const allowed = targets.filter((t) => canManageSession(user, t));
+    const cancelReason = reason.trim() || null;
+    const res = await prisma.$transaction(async (tx) => {
+      const upd = await tx.makeupSession.updateMany({
+        where: { id: { in: allowed.map((t) => t.id) } },
+        data: { cancelledAt: new Date(), cancelReason },
+      });
+      if (allowed.length > 0) {
+        const first = allowed[0];
+        const registered = allowed.reduce((n, t) => n + t._count.registrations, 0);
+        await audit(tx, user, {
+          action: "makeup.session.cancel",
+          entityType: "makeupSession",
+          entityId: first.id,
+          summary:
+            allowed.length === 1
+              ? `Zrušen termín dopisování ${formatTimeRange(first.startsAt, first.endsAt)} (dozor ${fullName(first.teacher)}, zapsáno ${registered})${cancelReason ? `, důvod: ${cancelReason}` : ""}`
+              : `Zrušena řada ${allowed.length} termínů dopisování od ${formatTimeRange(first.startsAt, first.endsAt)} (dozor ${fullName(first.teacher)}, zapsáno ${registered})${cancelReason ? `, důvod: ${cancelReason}` : ""}`,
+          data: { sessionIds: allowed.map((t) => t.id), reason: cancelReason },
+        });
+      }
+      return upd;
     });
+    // Zapsaným studentům dát vědět (po commitu)
+    await notifySessionsCancelled(allowed.map((t) => t.id), cancelReason);
     revalidateMakeup();
     return res.count;
   });
@@ -313,7 +401,16 @@ export async function deleteSession(sessionId: string) {
     const user = await requirePermission("makeup.sessions.manage");
     const s = await loadManagedSession(user, sessionId);
     if (s.registrations.length > 0) throw new Error("Na termínu jsou zapsaní studenti – termín místo smazání zrušte.");
-    await prisma.makeupSession.delete({ where: { id: s.id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.makeupSession.delete({ where: { id: s.id } });
+      await audit(tx, user, {
+        action: "makeup.session.delete",
+        entityType: "makeupSession",
+        entityId: s.id,
+        summary: `Smazán termín dopisování ${formatTimeRange(s.startsAt, s.endsAt)}, učebna ${s.room} (dozor ${fullName(s.teacher)})`,
+        data: { startsAt: s.startsAt, endsAt: s.endsAt, room: s.room },
+      });
+    });
     revalidateMakeup();
   });
 }
@@ -323,7 +420,11 @@ export async function deleteSession(sessionId: string) {
 async function loadManagedRegistration(user: User, registrationId: string) {
   const r = await prisma.makeupRegistration.findUnique({
     where: { id: registrationId },
-    include: { session: true, subjects: true },
+    include: {
+      session: { include: { teacher: { select: { firstName: true, lastName: true } } } },
+      subjects: { include: { subject: { select: { name: true } } } },
+      student: { select: { id: true, email: true, firstName: true, lastName: true } },
+    },
   });
   if (!r || !canManageSession(user, r.session)) throw new Error("Zápis nenalezen.");
   return r;
@@ -334,7 +435,18 @@ export async function removeRegistration(registrationId: string) {
   return safeAction(async () => {
     const user = await requirePermission("makeup.sessions.manage");
     const r = await loadManagedRegistration(user, registrationId);
-    await prisma.makeupRegistration.delete({ where: { id: r.id } });
+    const subjectNames = r.subjects.map((x) => x.subject.name);
+    await prisma.$transaction(async (tx) => {
+      await tx.makeupRegistration.delete({ where: { id: r.id } });
+      await audit(tx, user, {
+        action: "makeup.registration.remove",
+        entityType: "makeupRegistration",
+        entityId: r.id,
+        summary: `${fullName(user)} odepsal(a) studenta ${fullName(r.student)} z termínu dopisování ${formatTimeRange(r.session.startsAt, r.session.endsAt)} (${subjectNames.join(", ")})`,
+        data: { studentId: r.studentId, sessionId: r.sessionId, subjects: subjectNames, attendance: r.attendance },
+      });
+    });
+    await notifyRegistrationRemoved({ student: r.student, session: r.session, subjectNames }, user);
     revalidateMakeup();
   });
 }
@@ -370,9 +482,17 @@ export async function moveRegistration(registrationId: string, targetSessionId: 
           where: { id: r.id },
           data: { sessionId: target.id, attendance: "REGISTERED" },
         });
+        await audit(tx, user, {
+          action: "makeup.registration.move",
+          entityType: "makeupRegistration",
+          entityId: r.id,
+          summary: `${fullName(user)} přesunul(a) studenta ${fullName(r.student)} z termínu ${formatTimeRange(r.session.startsAt, r.session.endsAt)} na termín ${formatTimeRange(target.startsAt, target.endsAt)}`,
+          data: { studentId: r.studentId, fromSessionId: r.sessionId, toSessionId: target.id },
+        });
       },
       { isolationLevel: "Serializable" }
     );
+    await notifyRegistrationMoved(r.id, r.session, user);
     revalidateMakeup();
   });
 }
@@ -384,7 +504,16 @@ export async function setAttendance(registrationId: string, attendance: MakeupAt
     const r = await loadManagedRegistration(user, registrationId);
     if (!["REGISTERED", "ATTENDED", "NO_SHOW"].includes(attendance)) throw new Error("Neplatný stav.");
     if (r.session.startsAt > new Date()) throw new Error("Docházku lze zapsat až po začátku termínu.");
-    await prisma.makeupRegistration.update({ where: { id: r.id }, data: { attendance } });
+    await prisma.$transaction(async (tx) => {
+      await tx.makeupRegistration.update({ where: { id: r.id }, data: { attendance } });
+      await audit(tx, user, {
+        action: "makeup.attendance.set",
+        entityType: "makeupRegistration",
+        entityId: r.id,
+        summary: `Docházka studenta ${fullName(r.student)} na termínu ${formatTimeRange(r.session.startsAt, r.session.endsAt)}: ${ATTENDANCE_LABELS[r.attendance as MakeupAttendanceValue]} → ${ATTENDANCE_LABELS[attendance]}`,
+        data: { studentId: r.studentId, before: r.attendance, after: attendance },
+      });
+    });
     revalidateMakeup();
   });
 }

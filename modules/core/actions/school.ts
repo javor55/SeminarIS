@@ -4,6 +4,7 @@ import { safeAction } from "@/lib/safe-action";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
+import { audit } from "@/lib/audit";
 import {
   DEFAULT_STUDY_YEARS,
   classLabel,
@@ -30,21 +31,29 @@ const fullName = (u: { firstName: string; lastName: string }) => `${u.lastName} 
  */
 export async function setCurrentSchoolYear(startYear: number) {
   return safeAction(async () => {
-    await requirePermission("core.school.manage");
+    const admin = await requirePermission("core.school.manage");
     if (!Number.isInteger(startYear) || startYear < 2000 || startYear > 2100) {
       throw new Error("Neplatný školní rok.");
     }
     if ((await prisma.classMembership.count()) > 0) {
       throw new Error("Studenti už jsou zařazeni do tříd – školní rok změňte uzavřením roku.");
     }
-    await prisma.$transaction([
-      prisma.schoolYear.updateMany({ where: { isCurrent: true }, data: { isCurrent: false } }),
-      prisma.schoolYear.upsert({
+    await prisma.$transaction(async (tx) => {
+      const before = await tx.schoolYear.findFirst({ where: { isCurrent: true } });
+      await tx.schoolYear.updateMany({ where: { isCurrent: true }, data: { isCurrent: false } });
+      await tx.schoolYear.upsert({
         where: { startYear },
         update: { isCurrent: true },
         create: { startYear, isCurrent: true },
-      }),
-    ]);
+      });
+      await audit(tx, admin, {
+        action: "school.year.set",
+        entityType: "schoolYear",
+        entityId: String(startYear),
+        summary: `Nastaven aktuální školní rok ${schoolYearLabel(startYear)}${before ? ` (dříve ${schoolYearLabel(before.startYear)})` : ""}`,
+        data: { before: before?.startYear ?? null, after: startYear },
+      });
+    });
     revalidatePath("/", "layout");
   });
 }
@@ -183,7 +192,7 @@ export async function closeSchoolYear(input: {
   decisions: YearClosureDecision[];
 }) {
   return safeAction(async () => {
-    await requirePermission("core.school.manage");
+    const admin = await requirePermission("core.school.manage");
     const current = await ensureCurrentSchoolYear();
     if (current.startYear !== input.expectedStartYear) {
       throw new Error("Školní rok se mezitím změnil. Načtěte stránku znovu.");
@@ -299,6 +308,25 @@ export async function closeSchoolYear(input: {
           }
           await tx.teachingAssignment.createMany({ data, skipDuplicates: true });
         }
+
+        // 7. Historie změn (souhrnně; třídy studentů jsou v historii zařazení)
+        await audit(tx, admin, {
+          action: "school.year.close",
+          entityType: "schoolYear",
+          entityId: String(nextStart),
+          summary:
+            `Uzavřen školní rok ${schoolYearLabel(current.startYear)}, nový rok ${schoolYearLabel(nextStart)}: ` +
+            `postoupilo ${move.filter((m) => m.reason === "PROMOTED").length}, opakuje ${move.filter((m) => m.reason === "REPEATED").length}, ` +
+            `absolvovalo ${graduate.length}, ukončilo studium ${leave.length}, přenesených úvazků ${assignmentPlan.length}`,
+          data: {
+            promoted: move.filter((m) => m.reason === "PROMOTED").length,
+            repeated: move.filter((m) => m.reason === "REPEATED").length,
+            graduated: graduate.map((id) => id),
+            left: leave.map((l) => ({ userId: l.userId, reason: l.reason })),
+            assignmentMode: input.assignmentMode,
+            assignments: assignmentPlan.length,
+          },
+        });
       },
       // Stovky studentů v jedné transakci – delší limit než výchozích 5 s
       { timeout: 120_000, maxWait: 10_000 }

@@ -6,6 +6,9 @@ import { revalidatePath } from "next/cache";
 import { requireAuth, requirePermission } from "@/lib/session";
 import { ensureCurrentSchoolYear, setStudentClass } from "@/modules/core/school";
 import { getRegistrationClassMode } from "@/modules/core/settings";
+import { audit, type AuditActor } from "@/lib/audit";
+import { classLabel } from "@/lib/school";
+import { notifyAccountsApproved } from "@/modules/core/notifications";
 
 // Schvalování nově registrovaných uživatelů (hostů) a jejich žádost o třídu.
 
@@ -14,7 +17,7 @@ function revalidateApprovals() {
   revalidatePath("/", "layout");
 }
 
-async function approveInTx(tx: TxClient, userId: string, classGroupId: string | null, schoolYear: { id: string }) {
+async function approveInTx(tx: TxClient, actor: AuditActor, userId: string, classGroupId: string | null, schoolYear: { id: string }) {
   const target = await tx.user.findUnique({ where: { id: userId } });
   if (!target) throw new Error("Uživatel nenalezen.");
   if (target.role !== "GUEST") throw new Error(`${target.firstName} ${target.lastName} už není host, schválení není potřeba.`);
@@ -22,17 +25,28 @@ async function approveInTx(tx: TxClient, userId: string, classGroupId: string | 
     where: { id: userId },
     data: { role: "STUDENT", isActive: true, requestedClassGroupId: null },
   });
+  let label = "";
   if (classGroupId) {
     await setStudentClass(tx, { userId, classGroupId, schoolYear, reason: "ASSIGNED" });
+    const cls = await tx.classGroup.findUnique({ where: { id: classGroupId } });
+    label = cls ? ` do třídy ${classLabel(cls)}` : "";
   }
+  await audit(tx, actor, {
+    action: "users.approve",
+    entityType: "user",
+    entityId: userId,
+    summary: `Schválen účet ${target.firstName} ${target.lastName} jako student${label}`,
+    data: { role: "STUDENT", classGroupId },
+  });
 }
 
 /** Schválí hosta jako studenta: role STUDENT, zařazení do vybrané třídy, smaže žádost. */
 export async function approveUser(userId: string, classGroupId: string | null) {
   return safeAction(async () => {
-    await requirePermission("core.users.manage");
+    const admin = await requirePermission("core.users.manage");
     const schoolYear = await ensureCurrentSchoolYear();
-    await prisma.$transaction((tx) => approveInTx(tx, userId, classGroupId || null, schoolYear));
+    await prisma.$transaction((tx) => approveInTx(tx, admin, userId, classGroupId || null, schoolYear));
+    await notifyAccountsApproved([userId]);
     revalidateApprovals();
   });
 }
@@ -40,12 +54,13 @@ export async function approveUser(userId: string, classGroupId: string | null) {
 /** Hromadné schválení; každý student do své vybrané třídy. Vše nebo nic. */
 export async function approveUsers(items: { userId: string; classGroupId: string | null }[]) {
   return safeAction(async () => {
-    await requirePermission("core.users.manage");
+    const admin = await requirePermission("core.users.manage");
     if (items.length === 0) throw new Error("Nikdo není vybrán.");
     const schoolYear = await ensureCurrentSchoolYear();
     await prisma.$transaction(async (tx) => {
-      for (const item of items) await approveInTx(tx, item.userId, item.classGroupId || null, schoolYear);
+      for (const item of items) await approveInTx(tx, admin, item.userId, item.classGroupId || null, schoolYear);
     });
+    await notifyAccountsApproved(items.map((i) => i.userId));
     revalidateApprovals();
     return items.length;
   });
@@ -54,14 +69,24 @@ export async function approveUsers(items: { userId: string; classGroupId: string
 /** Schválí hosta jako učitele (bez třídy). */
 export async function approveAsTeacher(userId: string) {
   return safeAction(async () => {
-    await requirePermission("core.users.manage");
+    const admin = await requirePermission("core.users.manage");
     const target = await prisma.user.findUnique({ where: { id: userId } });
     if (!target) throw new Error("Uživatel nenalezen.");
     if (target.role !== "GUEST") throw new Error("Schvalovat lze jen hosty.");
-    await prisma.user.update({
-      where: { id: userId },
-      data: { role: "TEACHER", isActive: true, requestedClassGroupId: null },
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { role: "TEACHER", isActive: true, requestedClassGroupId: null },
+      });
+      await audit(tx, admin, {
+        action: "users.approve",
+        entityType: "user",
+        entityId: userId,
+        summary: `Schválen účet ${target.firstName} ${target.lastName} jako učitel`,
+        data: { role: "TEACHER" },
+      });
     });
+    await notifyAccountsApproved([userId]);
     revalidateApprovals();
   });
 }
@@ -74,7 +99,15 @@ export async function rejectUser(userId: string) {
     if (!target) throw new Error("Uživatel nenalezen.");
     if (target.role !== "GUEST") throw new Error("Zamítnout lze jen hosty.");
     if (target.id === admin.id) throw new Error("Nemůžete deaktivovat svůj vlastní účet.");
-    await prisma.user.update({ where: { id: userId }, data: { isActive: false, requestedClassGroupId: null } });
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: userId }, data: { isActive: false, requestedClassGroupId: null } });
+      await audit(tx, admin, {
+        action: "users.reject",
+        entityType: "user",
+        entityId: userId,
+        summary: `Zamítnuta žádost o účet ${target.firstName} ${target.lastName} (účet deaktivován)`,
+      });
+    });
     revalidateApprovals();
   });
 }
