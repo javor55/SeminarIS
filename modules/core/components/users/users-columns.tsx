@@ -13,11 +13,14 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { toast } from "sonner";
 import { Eye, Trash2 } from "lucide-react";
 import { cn, computeEnrollmentStatus } from "@/lib/utils";
+import { can } from "@/modules/registry";
+import { formatDateTime } from "@/lib/datetime";
 import { ConfirmAction } from "./ConfirmAction";
 import { ResetPasswordDialog } from "./ResetPasswordDialog";
 import { UserDetailsDialog } from "./UserDetailsDialog";
 import { EditUserDialog } from "./EditUserDialog";
 import { StudyStatusDialog } from "./StudyStatusDialog";
+import { TeacherAssignmentsDialog } from "./TeacherAssignmentsDialog";
 import type { ClassChangeReasonValue, StudyStatusValue } from "@/lib/school";
 import {
   AlertDialog,
@@ -40,6 +43,10 @@ export type UserRow = User & {
   studyLabel?: string | null;
   studyEndedAt?: string | null;
   studyEndNote?: string | null;
+  requestedClassGroupId?: string | null;
+  requestedClassLabel?: string | null;
+  // Úvazky učitele v aktuálním školním roce (jen počet)
+  assignmentCount?: number;
   classHistory?: { yearLabel: string; classLabel: string; reason: ClassChangeReasonValue }[];
   lastLoginAt?: string;
   studentEnrollments?: Array<{
@@ -170,6 +177,11 @@ const ActiveCell = ({ row, table }: { row: Row<UserRow>, table: Table<UserRow> }
   );
 };
 
+const AssignmentsCell = ({ user }: { user: UserRow }) => {
+  const { user: currentUser } = useAuth();
+  return <TeacherAssignmentsDialog user={user} editable={can(currentUser?.role, "core.school.manage")} />;
+};
+
 const ActionsCell = ({ row }: { row: Row<UserRow> }) => {
   const u = row.original;
   const { user: currentUser } = useAuth();
@@ -295,10 +307,7 @@ export const usersColumns: ColumnDef<UserRow>[] = [
     cell: ({ row }) => {
       const val = row.original.createdAt;
       if (!val) return "—";
-      return new Date(val).toLocaleString("cs-CZ", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
+      return formatDateTime(val);
     },
   },
   {
@@ -307,10 +316,7 @@ export const usersColumns: ColumnDef<UserRow>[] = [
     cell: ({ row }) => {
       const val = row.original.lastLoginAt;
       if (!val) return "—";
-      return new Date(val).toLocaleString("cs-CZ", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
+      return formatDateTime(val);
     },
   },
   {
@@ -377,6 +383,15 @@ export const usersColumns: ColumnDef<UserRow>[] = [
       }
 
       return value.includes(currentIs);
+    },
+  },
+  {
+    id: "assignments",
+    header: "Úvazky",
+    cell: ({ row }) => {
+      const u = row.original;
+      if (u.role !== "TEACHER" && u.role !== "ADMIN") return <span className="text-muted-foreground">—</span>;
+      return <AssignmentsCell user={u} />;
     },
   },
   {

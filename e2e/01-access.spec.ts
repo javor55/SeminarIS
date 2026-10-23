@@ -13,11 +13,11 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
 
   // --- Student ---
   let p = await login(browser, 'jan.student@skola.cz');
-  check('student nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Semináře', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(p)));
+  check('student nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Předměty', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(p)));
   check('student dashboard shows window', (await p.content()).includes('Zápis LS 2025'));
   await p.goto('/users'); check('student /users redirected', p.url().endsWith('/dashboard'), p.url());
   await p.goto('/enrollments'); check('student /enrollments redirected', p.url().endsWith('/dashboard'), p.url());
-  const subjId = sql(`select "seminarId" from "SubjectOccurrence" limit 1`);
+  const subjId = sql(`select "subjectId" from "SubjectOccurrence" limit 1`);
   await p.goto('/subjects/' + subjId);
   const html = await p.content();
   check('no password hash in student page', !html.includes('passwordHash') && !html.includes('$2a$') && !html.includes('$2b$'));
@@ -42,29 +42,31 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
 
   // --- Teacher ---
   p = await login(browser, 'teacher@skola.cz');
-  check('teacher nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Zápisy', 'Semináře', 'Dopisování', 'Uživatelé', 'Můj profil']), JSON.stringify(await navLabels(p)));
+  check('teacher nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Dopisování', 'Uživatelé', 'Můj profil']), JSON.stringify(await navLabels(p)));
   await p.goto('/admin'); check('teacher /admin redirected', p.url().endsWith('/dashboard'), p.url());
   await p.goto('/users'); await p.waitForLoadState('networkidle');
   check('teacher /users ok', p.url().endsWith('/users') && !(await p.content()).includes('$2'));
 
   // --- Admin ---
   const pa = await login(browser, 'admin@skola.cz');
-  check('admin nav', JSON.stringify(await navLabels(pa)) === JSON.stringify(['Dashboard', 'Zápisy', 'Semináře', 'Dopisování', 'Uživatelé', 'Škola', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(pa)));
+  check('admin nav', JSON.stringify(await navLabels(pa)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Dopisování', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(pa)));
   await pa.goto('/admin'); await pa.waitForSelector('#module-seminars');
   await pa.waitForTimeout(1000);
   const text = await pa.locator('main').innerText();
-  check('admin stats', text.includes('Uživatelé celkem') && text.includes('Aktivní semináře') && text.includes('Otevřené zápisy'));
+  check('admin stats', text.includes('Uživatelé celkem') && text.includes('Aktivní předměty') && text.includes('Otevřené zápisy'));
   // vypnout semináře
   await pa.click('#module-seminars'); await pa.waitForTimeout(2500);
   check('setting stored', sql(`select value from "SystemSetting" where key='module.seminars.enabled'`) === 'false');
-  check('admin nav without seminars', JSON.stringify(await navLabels(pa)) === JSON.stringify(['Dashboard', 'Dopisování', 'Uživatelé', 'Škola', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(pa)));
+  check('admin nav without seminars', JSON.stringify(await navLabels(pa)) === JSON.stringify(['Dashboard', 'Předměty', 'Dopisování', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(pa)));
   const text2 = await pa.locator('main').innerText();
-  check('stats without seminars', !text2.includes('Aktivní semináře'));
-  const r = await pa.goto('/subjects'); check('/subjects 404 when disabled', r.status() === 404, String(r.status()));
+  check('stats without seminars', !text2.includes('Aktivní předměty'));
+  // předměty jsou v jádru, jdou vypnout jen zápisy
+  const r = await pa.goto('/subjects'); check('/subjects stays when seminars disabled', r.status() === 200, String(r.status()));
+  const r2 = await pa.goto('/enrollments'); check('/enrollments 404 when disabled', r2.status() === 404, String(r2.status()));
   await pa.goto('/dashboard'); check('dashboard empty when disabled', (await pa.content()).includes('Vítejte'));
   // student: zápis přes action musí selhat → ověř přes dashboard a nav
   const ps = await login(browser, 'eva.studentova@skola.cz');
-  check('student nav without seminars', JSON.stringify(await navLabels(ps)) === JSON.stringify(['Dashboard', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(ps)));
+  check('student nav without seminars', JSON.stringify(await navLabels(ps)) === JSON.stringify(['Dashboard', 'Předměty', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(ps)));
   // zapnout zpět
   await pa.goto('/admin'); await pa.waitForSelector('#module-seminars'); await pa.waitForTimeout(800);
   await pa.click('#module-seminars'); await pa.waitForTimeout(2500);

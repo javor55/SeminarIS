@@ -58,7 +58,7 @@ test("dopisování: termíny, řady, kolize, zápis, přepis, přesun, uzávěrk
   check('student registered', sql(`select count(*) from "MakeupRegistration" where "sessionId"='${s1}'`) === '1', t);
   check('subject teacher resolved from assignments', sql(`select "subjectTeacherId" from "MakeupRegistrationSubject"`) === 'usr_teacher');
   await pj.reload(); await pj.waitForLoadState('networkidle');
-  check('Jan sees my registration', (await pj.locator('[data-testid=my-registrations]').innerText()).includes('test z derivací'));
+  check('Jan sees my registration highlighted in the table', (await pj.locator(`tr[data-session="${s1}"]`).innerText()).includes('test z derivací') && (await pj.locator(`tr[data-session="${s1}"]`).getAttribute('data-registered')) === 'true');
   check('Jan dashboard widget', await (async () => { await pj.goto('/dashboard'); return (await pj.locator('[data-testid=makeup-widget]').count()) === 1; })());
 
   // 5) Eva vidí plno

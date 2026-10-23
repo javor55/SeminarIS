@@ -3,11 +3,13 @@
 import { unwrap, unwrapAsync } from "@/lib/action-result";
 import * as React from "react";
 import { updateUserRole, toggleUserActive, setUsersClass, deleteUserPermanently } from "@/modules/core/actions/users";
-import { getClassOptions, type ClassOption } from "@/modules/core/actions/school";
+import type { ClassOverview } from "@/modules/core/actions/classes";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
 import { usersColumns, UserRow } from "@/modules/core/components/users/users-columns";
 import { ImportUsersDialog } from "@/modules/core/components/users/ImportUsersDialog";
+import { ClassesTab } from "@/modules/core/components/users/ClassesTab";
+import { ApprovalsTab, pendingApprovals } from "@/modules/core/components/users/ApprovalsTab";
 import { Download, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -34,18 +36,29 @@ import {
 } from "@/components/ui/select";
 import { User } from "@/lib/types";
 import { PageHeader } from "@/components/page-header";
+import { formatDateTime } from "@/lib/datetime";
+import { can } from "@/modules/registry";
 
 const NO_CLASS = "__none";
+
+export type UsersTab = "users" | "classes" | "approvals";
 
 export function UsersClientView({
   users,
   currentUser,
+  classes,
+  initialTab = "users",
 }: {
   users: UserRow[];
   currentUser: User;
+  classes: ClassOverview[];
+  initialTab?: UsersTab;
 }) {
   const router = useRouter();
+  const canManage = can(currentUser.role, "core.users.manage");
+  const [tab, setTab] = React.useState<UsersTab>(initialTab === "approvals" && !canManage ? "users" : initialTab);
   const [showImport, setShowImport] = React.useState(false);
+  const pendingCount = pendingApprovals(users).length;
   // Removed unused loading state
 
   const handleExport = () => {
@@ -62,8 +75,8 @@ export function UsersClientView({
         u.email,
         u.classLabel ?? "",
         u.studyLabel ?? "",
-        u.createdAt ? new Date(u.createdAt).toLocaleString("cs-CZ") : "",
-        u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("cs-CZ") : "nikdy",
+        u.createdAt ? formatDateTime(u.createdAt) : "",
+        u.lastLoginAt ? formatDateTime(u.lastLoginAt) : "nikdy",
         u.isActive ? "ANO" : "NE",
         u.role,
         `"${enrollments}"`
@@ -95,9 +108,7 @@ export function UsersClientView({
   ];
 
   const classFilterOptions = [
-    ...Array.from(new Set(users.map(u => u.classLabel).filter(Boolean)))
-      .sort((a, b) => String(a).localeCompare(String(b), "cs"))
-      .map(c => ({ label: String(c), value: String(c) })),
+    ...classes.map(c => ({ label: c.label, value: c.label })),
     { label: "Bez třídy", value: NO_CLASS },
   ];
 
@@ -108,10 +119,6 @@ export function UsersClientView({
     const router = useRouter(); // Moved router here
     const [selectedRole, setSelectedRole] = React.useState<string | null>(null);
     const [selectedClass, setSelectedClass] = React.useState<string>("");
-    const [classOptions, setClassOptions] = React.useState<ClassOption[]>([]);
-    React.useEffect(() => {
-      getClassOptions().then(setClassOptions).catch(() => setClassOptions([]));
-    }, []);
     const [loading, setLoading] = React.useState(false); // New loading state for bulk actions
 
     const handleBulkSetRole = async () => {
@@ -135,7 +142,7 @@ export function UsersClientView({
       setLoading(true);
       try {
         unwrap(await setUsersClass(filteredRows.map(u => u.id), selectedClass === NO_CLASS ? null : selectedClass));
-        toast.success(`Třída byla změněna pro ${filteredRows.length} uživatelů.`);
+        toast.success(`Přesunuto do třídy: ${filteredRows.length} uživatelů.`);
         router.refresh();
         forceRefresh();
       } catch (e: unknown) {
@@ -224,7 +231,7 @@ export function UsersClientView({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs">Přeřadit do třídy</Label>
+            <Label className="text-xs">Přesunout do třídy</Label>
             <div className="flex gap-2">
               <Select value={selectedClass} onValueChange={setSelectedClass}>
                 <SelectTrigger className="h-8">
@@ -232,7 +239,7 @@ export function UsersClientView({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_CLASS}>Bez třídy</SelectItem>
-                  {classOptions.filter(c => c.status !== "graduated").map(c => (
+                  {classes.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -313,115 +320,140 @@ export function UsersClientView({
         }
       />
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-md">Statistiky a přehled</CardTitle>
-        </CardHeader>
-        <CardContent>
-           <div className="flex gap-8 text-center items-center h-full pt-2 overflow-x-auto no-scrollbar">
-              <div className="flex-shrink-0">
-                <p className="text-2xl font-bold">{studying.length}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Studujících</p>
-              </div>
-              <div className="border-l pl-8 flex-shrink-0">
-                <p className="text-2xl font-bold text-amber-600">{studying.filter(u => !u.classLabel).length}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Bez třídy</p>
-              </div>
-              <div className="border-l pl-8 flex-shrink-0">
-                <p className="text-2xl font-bold text-orange-600">
-                  {users.filter(u => u.role === "GUEST" && u.isActive !== false).length}
-                </p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Čeká na schválení</p>
-              </div>
-              <div className="border-l pl-8 flex-shrink-0">
-                <p className="text-2xl font-bold text-emerald-600">
-                  {studying.filter(u => (u.studentEnrollments?.length ?? 0) > 0).length}
-                </p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Se zápisem</p>
-              </div>
-              <div className="border-l pl-8 flex-shrink-0">
-                <p className="text-2xl font-bold text-rose-600">
-                  {studying.filter(u => (u.studentEnrollments?.length ?? 0) === 0).length}
-                </p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Bez zápisu</p>
-              </div>
-           </div>
-        </CardContent>
-      </Card>
+      <div className="flex gap-1 border-b" role="tablist">
+        {([
+          ["users", "Uživatelé"],
+          ["classes", "Třídy"],
+          ...(canManage ? [["approvals", `Ke schválení (${pendingCount})`]] : []),
+        ] as [UsersTab, string][]).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            data-tab={id}
+            onClick={() => setTab(id)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${tab === id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-      <ImportUsersDialog
-        open={showImport}
-        onOpenChange={setShowImport}
-        onSuccess={() => router.refresh()}
-      />
+      {tab === "classes" && <ClassesTab classes={classes} users={users} canManage={canManage} />}
+      {tab === "approvals" && canManage && <ApprovalsTab users={users} classes={classes} />}
 
-      {users.length <= 1 ? (
-        <Card className="border-dashed py-12">
-          <CardContent className="flex flex-col items-center justify-center text-center space-y-4">
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-              <Upload className="w-6 h-6 text-slate-400" />
-            </div>
-            <div className="max-w-[400px]">
-              <h3 className="text-lg font-semibold">Zatím žádní další uživatelé</h3>
-              <p className="text-sm text-muted-foreground">
-                V systému jste zatím jen vy. Chcete-li pokračovat, importujte seznam studentů
-                ze souboru CSV nebo nechte studenty, aby se registrovali sami.
-              </p>
-            </div>
-            <Button onClick={() => setShowImport(true)} className="gap-2">
-              <Upload className="w-4 h-4" />
-              Importovat první studenty
-            </Button>
+      {tab === "users" && (
+        <>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-md">Statistiky a přehled</CardTitle>
+          </CardHeader>
+          <CardContent>
+             <div className="flex gap-8 text-center items-center h-full pt-2 overflow-x-auto no-scrollbar">
+                <div className="flex-shrink-0">
+                  <p className="text-2xl font-bold">{studying.length}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Studujících</p>
+                </div>
+                <div className="border-l pl-8 flex-shrink-0">
+                  <p className="text-2xl font-bold text-amber-600">{studying.filter(u => !u.classLabel).length}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Bez třídy</p>
+                </div>
+                <div className="border-l pl-8 flex-shrink-0">
+                  <p className="text-2xl font-bold text-orange-600">{pendingCount}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Čeká na schválení</p>
+                </div>
+                <div className="border-l pl-8 flex-shrink-0">
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {studying.filter(u => (u.studentEnrollments?.length ?? 0) > 0).length}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Se zápisem</p>
+                </div>
+                <div className="border-l pl-8 flex-shrink-0">
+                  <p className="text-2xl font-bold text-rose-600">
+                    {studying.filter(u => (u.studentEnrollments?.length ?? 0) === 0).length}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 text-balance">Bez zápisu</p>
+                </div>
+             </div>
           </CardContent>
         </Card>
-      ) : (
-        <DataTable<UserRow>
-          data={users}
-          columns={usersColumns}
-          searchPlaceholder="Hledat podle jména nebo e-mailu…"
-          searchKeys = {["firstName", "lastName", "email"]}
-          selectFilters={[
-            {
-              columnId: "role",
-              label: "Role",
-              options: roleFilterOptions,
-            },
-            {
-              columnId: "isActive",
-              label: "Stav účtu",
-              options: activeFilterOptions,
-            },
-            {
-              columnId: "classLabel",
-              label: "Třída",
-              options: classFilterOptions,
-            },
-            {
-              columnId: "enrollmentStatus",
-              label: "Stav zápisů",
-              options: [
-                { label: "S aktivním zápisem", value: "active" },
-                { label: "S naplánovaným zápisem", value: "scheduled" },
-                { label: "Pouze historie", value: "history" },
-                { label: "Bez zápisů", value: "none" },
-              ],
-            }
-          ]}
-          dateFilters={[
-            {
-              id: "createdAt",
-              label: "Datum registrace",
-              getDate: (u) => u.createdAt ? new Date(u.createdAt) : null,
-            },
-            {
-              id: "lastLoginAt",
-              label: "Poslední přihlášení",
-              getDate: (u) => u.lastLoginAt ? new Date(u.lastLoginAt) : null,
-            },
-          ]}
-          forceRefresh={() => router.refresh()}
-          bulkPopoverRender={currentUser.role === "ADMIN" ? (args) => <BulkActionsPanel {...args} /> : undefined}
+
+        <ImportUsersDialog
+          open={showImport}
+          onOpenChange={setShowImport}
+          onSuccess={() => router.refresh()}
         />
+
+        {users.length <= 1 ? (
+          <Card className="border-dashed py-12">
+            <CardContent className="flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                <Upload className="w-6 h-6 text-slate-400" />
+              </div>
+              <div className="max-w-[400px]">
+                <h3 className="text-lg font-semibold">Zatím žádní další uživatelé</h3>
+                <p className="text-sm text-muted-foreground">
+                  V systému jste zatím jen vy. Chcete-li pokračovat, importujte seznam studentů
+                  ze souboru CSV nebo nechte studenty, aby se registrovali sami.
+                </p>
+              </div>
+              <Button onClick={() => setShowImport(true)} className="gap-2">
+                <Upload className="w-4 h-4" />
+                Importovat první studenty
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <DataTable<UserRow>
+            data={users}
+            columns={usersColumns}
+            searchPlaceholder="Hledat podle jména nebo e-mailu…"
+            searchKeys = {["firstName", "lastName", "email"]}
+            selectFilters={[
+              {
+                columnId: "role",
+                label: "Role",
+                options: roleFilterOptions,
+              },
+              {
+                columnId: "isActive",
+                label: "Stav účtu",
+                options: activeFilterOptions,
+              },
+              {
+                columnId: "classLabel",
+                label: "Třída",
+                options: classFilterOptions,
+              },
+              {
+                columnId: "enrollmentStatus",
+                label: "Stav zápisů",
+                options: [
+                  { label: "S aktivním zápisem", value: "active" },
+                  { label: "S naplánovaným zápisem", value: "scheduled" },
+                  { label: "Pouze historie", value: "history" },
+                  { label: "Bez zápisů", value: "none" },
+                ],
+              }
+            ]}
+            dateFilters={[
+              {
+                id: "createdAt",
+                label: "Datum registrace",
+                getDate: (u) => u.createdAt ? new Date(u.createdAt) : null,
+              },
+              {
+                id: "lastLoginAt",
+                label: "Poslední přihlášení",
+                getDate: (u) => u.lastLoginAt ? new Date(u.lastLoginAt) : null,
+              },
+            ]}
+            forceRefresh={() => router.refresh()}
+            bulkPopoverRender={currentUser.role === "ADMIN" ? (args) => <BulkActionsPanel {...args} /> : undefined}
+          />
+        )}
+        </>
       )}
     </div>
   );

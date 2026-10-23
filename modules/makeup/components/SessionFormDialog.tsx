@@ -192,7 +192,7 @@ export function SessionFormDialog({ session, trigger }: { session?: MakeupSessio
                     <button
                       key={s.id}
                       type="button"
-                      data-subject={s.code}
+                      data-subject={s.code ?? s.id}
                       onClick={() => toggleSubject(s.id)}
                       className={`rounded-md border px-3 py-1 text-sm ${subjectIds.includes(s.id) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
                     >

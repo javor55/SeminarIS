@@ -64,11 +64,11 @@ export const seminarsServer: ModuleServer = {
 
   async getAdminStats() {
     const [subjectCount, activeEnrollmentCount] = await Promise.all([
-      prisma.seminar.count({ where: { isActive: true } }),
+      prisma.subject.count({ where: { isActive: true } }),
       prisma.enrollmentWindow.count({ where: { status: "OPEN" } }),
     ]);
     return [
-      { label: "Aktivní semináře", value: subjectCount, hint: "Nabízené v aktuálním katalogu", icon: "book" as const },
+      { label: "Aktivní předměty", value: subjectCount, hint: "Nabízené v aktuálním katalogu", icon: "book" as const },
       { label: "Otevřené zápisy", value: activeEnrollmentCount, hint: "Aktuálně probíhající zápisová okna", icon: "calendar" as const },
     ];
   },
@@ -85,8 +85,7 @@ export const seminarsServer: ModuleServer = {
       where: { studentId: userId },
     });
 
-    // 3. Přepsat povinná createdById → adminId
-    await tx.seminar.updateMany({ where: { createdById: userId }, data: { createdById: adminId } });
+    // 3. Přepsat povinná createdById → adminId (předměty jsou v jádru, autor se tam sám nuluje)
     await tx.enrollmentWindow.updateMany({ where: { createdById: userId }, data: { createdById: adminId } });
     await tx.block.updateMany({ where: { createdById: userId }, data: { createdById: adminId } });
     await tx.subjectOccurrence.updateMany({ where: { createdById: userId }, data: { createdById: adminId } });
@@ -94,7 +93,6 @@ export const seminarsServer: ModuleServer = {
     await tx.studentEnrollment.updateMany({ where: { createdById: userId }, data: { createdById: adminId } });
 
     // 4. Nullovat volitelná audit pole
-    await tx.seminar.updateMany({ where: { updatedById: userId }, data: { updatedById: null } });
     await tx.enrollmentWindow.updateMany({ where: { updatedById: userId }, data: { updatedById: null } });
     await tx.block.updateMany({ where: { updatedById: userId }, data: { updatedById: null } });
     await tx.block.updateMany({ where: { deletedById: userId }, data: { deletedById: null } });

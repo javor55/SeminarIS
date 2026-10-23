@@ -3,7 +3,7 @@
 import { unwrap } from "@/lib/action-result";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
-import { getAdminOverview, setRegistrationEnabled, setDefaultRole, setModuleEnabledAction, setAuthSettings, type AdminModuleInfo } from "@/modules/core/actions/admin";
+import { getAdminOverview, setRegistrationEnabled, setDefaultRole, setRegistrationClassMode, setModuleEnabledAction, setAuthSettings, type AdminModuleInfo } from "@/modules/core/actions/admin";
 import type { AuthSettings, PasswordLoginScope } from "@/lib/auth-settings";
 import type { AdminStat } from "@/modules/server-types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -15,12 +15,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { Users, BookOpen, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { PerformanceBenchmarks } from "@/modules/core/components/admin/PerformanceBenchmarks";
 import { can } from "@/modules/registry";
 import { PageHeader } from "@/components/page-header";
+import { SchoolYearCard } from "@/modules/core/components/admin/SchoolYearCard";
+import type { SchoolYearInfo } from "@/modules/core/school";
+import type { RegistrationClassMode } from "@/modules/core/settings";
 
 const STAT_ICONS = {
   users: <Users className="h-4 w-4 text-slate-500" />,
@@ -36,6 +40,8 @@ export default function AdminPage() {
   const [auth, setAuth] = useState<AuthSettings | null>(null);
   const [regEnabled, setRegEnabled] = useState(true);
   const [defaultRole, setDefaultRoleState] = useState<"GUEST" | "STUDENT">("GUEST");
+  const [classMode, setClassMode] = useState<RegistrationClassMode>("off");
+  const [schoolYear, setSchoolYear] = useState<SchoolYearInfo | null>(null);
 
 
   useEffect(() => {
@@ -50,6 +56,8 @@ export default function AdminPage() {
       setStats(overview.stats);
       setRegEnabled(overview.registrationEnabled);
       setDefaultRoleState(overview.defaultRole);
+      setClassMode(overview.classMode);
+      setSchoolYear(overview.schoolYear);
       setModules(overview.modules);
       setAuth(overview.auth);
     } catch {
@@ -162,6 +170,34 @@ export default function AdminPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="flex items-center justify-between gap-4 pt-2 border-t">
+              <div>
+                <Label htmlFor="classMode">Výběr třídy při registraci</Label>
+                <p className="text-xs text-muted-foreground">
+                  Nový uživatel uvede svou třídu; správce ji pak potvrdí při schválení.
+                </p>
+              </div>
+              <NativeSelect
+                id="classMode"
+                className="w-[160px]"
+                value={classMode}
+                onChange={async (e) => {
+                  const mode = e.target.value as RegistrationClassMode;
+                  try {
+                    unwrap(await setRegistrationClassMode(mode));
+                    setClassMode(mode);
+                    toast.success("Nastavení uloženo.");
+                  } catch (err) {
+                    toast.error((err as Error).message || "Nepodařilo se změnit nastavení.");
+                  }
+                }}
+              >
+                <option value="off">Vypnuto</option>
+                <option value="optional">Volitelný</option>
+                <option value="required">Povinný</option>
+              </NativeSelect>
+            </div>
           </CardContent>
         </Card>
 
@@ -203,6 +239,9 @@ export default function AdminPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ŠKOLNÍ ROK */}
+      {schoolYear && <SchoolYearCard info={schoolYear} onChange={loadData} />}
 
       {/* PŘIHLÁŠENÍ */}
       {auth && <AuthSettingsCard auth={auth} onChange={setAuth} />}

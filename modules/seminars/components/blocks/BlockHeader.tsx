@@ -72,7 +72,7 @@ export function BlockHeader({
                 } as SubjectOccurrence)
               }
             >
-              Přidat seminář
+              Přidat předmět
             </Button>
 
             <Button

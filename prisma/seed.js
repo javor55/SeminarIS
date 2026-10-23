@@ -58,7 +58,7 @@ async function main() {
   const subjAjId = "subj_aj";
   const subjIoTId = "subj_iot";
 
-  await prisma.seminar.createMany({
+  await prisma.subject.createMany({
     data: [
       {
         id: subjProgId,

@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatTimeRange } from "@/lib/datetime";
 import { ConfirmAction } from "@/modules/core/components/users/ConfirmAction";
 import {
@@ -17,7 +19,7 @@ import {
   updateMyRegistration,
 } from "@/modules/makeup/actions/registrations";
 import { ATTENDANCE_LABELS, type MakeupSessionItem, type MyRegistrationItem } from "@/modules/makeup/types";
-import { SessionsTable, deadlineText, isPastDeadline } from "./common";
+import { CapacityBadge, SubjectBadges, deadlineText, isPastDeadline } from "./common";
 import { MoveDialog, RegisterDialog } from "./RegistrationDialogs";
 import { PageHeader } from "@/components/page-header";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -25,6 +27,10 @@ import { NativeSelect } from "@/components/ui/native-select";
 const overlaps = (a: MakeupSessionItem, b: MakeupSessionItem) =>
   new Date(a.startsAt) < new Date(b.endsAt) && new Date(a.endsAt) > new Date(b.startsAt);
 
+/**
+ * Student: jedna tabulka termínů ve stylu zápisu seminářů. Nadcházející nezrušené termíny
+ * a termíny, kde je zapsaný (i zrušené, zvýrazněné); proběhlé zápisy jsou sbalené pod tabulkou.
+ */
 export function StudentMakeupView({
   sessions,
   registrations,
@@ -36,10 +42,12 @@ export function StudentMakeupView({
 }) {
   const router = useRouter();
   const [subjectFilter, setSubjectFilter] = useState("");
+  const [onlyMine, setOnlyMine] = useState(false);
   const now = new Date();
   const upcoming = registrations.filter((r) => new Date(r.session.endsAt) >= now);
   const past = registrations.filter((r) => new Date(r.session.endsAt) < now).reverse();
   const activeRegs = upcoming.filter((r) => !r.session.cancelledAt);
+  const regBySession = useMemo(() => new Map(upcoming.map((r) => [r.sessionId, r])), [upcoming]);
 
   const allSubjects = useMemo(() => {
     const map = new Map<string, string>();
@@ -47,7 +55,10 @@ export function StudentMakeupView({
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1], "cs"));
   }, [sessions]);
 
-  const open = sessions.filter((s) => !s.cancelledAt && (!subjectFilter || s.subjects.some((x) => x.id === subjectFilter)));
+  // Termíny ze serveru jsou nadcházející; zrušené tu jsou jen ty, kde je student zapsaný
+  const rows = sessions.filter(
+    (s) => (!subjectFilter || s.subjects.some((x) => x.id === subjectFilter)) && (!onlyMine || s.myRegistrationId)
+  );
 
   // Kam se lze přepsat: volné místo, před uzávěrkou, povoluje zvolené předměty, bez kolize s jinými zápisy
   const moveCandidates = (r: MyRegistrationItem) =>
@@ -62,11 +73,52 @@ export function StudentMakeupView({
         !activeRegs.some((o) => o.id !== r.id && overlaps(o.session, s))
     );
 
-  function actionFor(s: MakeupSessionItem) {
-    if (s.myRegistrationId) return <Badge variant="success">Zapsáno</Badge>;
+  function actionFor(s: MakeupSessionItem, r: MyRegistrationItem | undefined) {
+    if (r) {
+      const locked = !s.cancelledAt && isPastDeadline(s);
+      if (locked) return <span className="text-xs text-muted-foreground">zapsáno, změny uzavřeny</span>;
+      return (
+        <div className="flex flex-wrap justify-end gap-2">
+          {!s.cancelledAt && (
+            <RegisterDialog
+              session={s}
+              mySubjectIds={mySubjectIds}
+              initialSubjectIds={r.subjects.map((x) => x.id)}
+              initialNote={r.note}
+              title="Upravit zápis"
+              submitLabel="Uložit"
+              onSubmit={(ids, note) => unwrapAsync(updateMyRegistration(r.id, ids, note))}
+              trigger={<Button size="sm" variant="outline">Upravit</Button>}
+            />
+          )}
+          <MoveDialog
+            title="Přepsat na jiný termín"
+            description="Zápis i se zvolenými předměty a poznámkou se přesune na vybraný termín."
+            candidates={moveCandidates(r)}
+            onMove={(target) => unwrapAsync(moveMyRegistration(r.id, target))}
+            trigger={<Button size="sm" variant="outline">Přepsat</Button>}
+          />
+          <ConfirmAction
+            title="Odhlásit se z termínu?"
+            description={`${formatTimeRange(s.startsAt, s.endsAt)}, učebna ${s.room}.`}
+            actionLabel="Odhlásit"
+            onConfirm={async () => {
+              try {
+                unwrap(await cancelMyRegistration(r.id));
+                toast.success("Odhlášeno.");
+                router.refresh();
+              } catch (err) {
+                toast.error((err as Error).message);
+              }
+            }}
+            trigger={<Button size="sm" variant="outline" className="text-destructive">Odhlásit</Button>}
+          />
+        </div>
+      );
+    }
     if (isPastDeadline(s)) return <span className="text-xs text-muted-foreground">po uzávěrce</span>;
     if (s.registeredCount >= s.capacity) return <span className="text-xs text-destructive">plno</span>;
-    if (activeRegs.some((r) => overlaps(r.session, s))) return <span className="text-xs text-muted-foreground">kolize s jiným zápisem</span>;
+    if (activeRegs.some((o) => overlaps(o.session, s))) return <span className="text-xs text-muted-foreground">kolize s jiným zápisem</span>;
     return (
       <RegisterDialog
         session={s}
@@ -87,76 +139,99 @@ export function StudentMakeupView({
       />
 
       <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle>Moje zápisy</CardTitle>
+        <CardHeader className="flex flex-row flex-wrap items-end justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle>Termíny</CardTitle>
+            <CardDescription>
+              Zvýrazněné řádky jsou termíny, na které jste zapsaní. Zvýrazněné předměty jsou předměty vašeho ročníku a třídy.
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="subject-filter" className="text-xs">Předmět</Label>
+              <NativeSelect
+                id="subject-filter"
+                className="w-[200px]"
+                value={subjectFilter}
+                onChange={(e) => setSubjectFilter(e.target.value)}
+              >
+                <option value="">Všechny</option>
+                {allSubjects.map(([id, name]) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div className="flex items-center gap-2 pb-1.5">
+              <Switch id="only-mine" checked={onlyMine} onCheckedChange={setOnlyMine} />
+              <Label htmlFor="only-mine" className="text-sm">Jen moje zápisy</Label>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-3" data-testid="my-registrations">
-          {upcoming.length === 0 && <p className="text-sm text-muted-foreground">Nejste zapsaní na žádný termín.</p>}
-          {upcoming.map((r) => {
-            const s = r.session;
-            const locked = !s.cancelledAt && isPastDeadline(s);
-            return (
-              <div key={r.id} className={`rounded-md border p-3 ${s.cancelledAt ? "border-destructive/50 bg-destructive/5" : ""}`}>
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="text-sm">
-                    <div className="font-medium">
-                      {formatTimeRange(s.startsAt, s.endsAt)}, učebna {s.room}
-                      {s.cancelledAt && <Badge variant="destructive" className="ml-2">termín zrušen</Badge>}
-                    </div>
-                    <div className="text-muted-foreground">
-                      Dozor {s.teacherName} · {r.subjects.map((x) => x.name + (x.subjectTeacherName ? ` (${x.subjectTeacherName})` : "")).join(", ")}
-                    </div>
-                    {s.cancelledAt && s.cancelReason && <div className="text-destructive">Důvod: {s.cancelReason}</div>}
-                    {r.note && <div className="text-muted-foreground italic">„{r.note}“</div>}
-                    {!s.cancelledAt && (
-                      <div className="text-xs text-muted-foreground">Změny do {deadlineText(s.changeDeadlineMinutes)}</div>
-                    )}
-                  </div>
-                  {!locked && (
-                    <div className="flex flex-wrap gap-2">
-                      {!s.cancelledAt && (
-                        <RegisterDialog
-                          session={s}
-                          mySubjectIds={mySubjectIds}
-                          initialSubjectIds={r.subjects.map((x) => x.id)}
-                          initialNote={r.note}
-                          title="Upravit zápis"
-                          submitLabel="Uložit"
-                          onSubmit={(ids, note) => unwrapAsync(updateMyRegistration(r.id, ids, note))}
-                          trigger={<Button size="sm" variant="outline">Upravit</Button>}
-                        />
-                      )}
-                      <MoveDialog
-                        title="Přepsat na jiný termín"
-                        description="Zápis i se zvolenými předměty a poznámkou se přesune na vybraný termín."
-                        candidates={moveCandidates(r)}
-                        onMove={(target) => unwrapAsync(moveMyRegistration(r.id, target))}
-                        trigger={<Button size="sm" variant="outline">Přepsat</Button>}
-                      />
-                      <ConfirmAction
-                        title="Odhlásit se z termínu?"
-                        description={`${formatTimeRange(s.startsAt, s.endsAt)}, učebna ${s.room}.`}
-                        actionLabel="Odhlásit"
-                        onConfirm={async () => {
-                          try {
-                            unwrap(await cancelMyRegistration(r.id));
-                            toast.success("Odhlášeno.");
-                            router.refresh();
-                          } catch (err) {
-                            toast.error((err as Error).message);
-                          }
-                        }}
-                        trigger={<Button size="sm" variant="outline" className="text-destructive">Odhlásit</Button>}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+        <CardContent>
+          {rows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {onlyMine ? "Nejste zapsaní na žádný termín." : "Žádné vypsané termíny."}
+            </p>
+          ) : (
+            <Table data-testid="makeup-table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Termín</TableHead>
+                  <TableHead>Učebna</TableHead>
+                  <TableHead>Dozor</TableHead>
+                  <TableHead>Předměty</TableHead>
+                  <TableHead>Obsazeno</TableHead>
+                  <TableHead className="text-right" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((s) => {
+                  const r = regBySession.get(s.id);
+                  const rowClass = s.cancelledAt
+                    ? "bg-destructive/5"
+                    : r
+                      ? "bg-emerald-500/10"
+                      : "";
+                  return (
+                    <TableRow key={s.id} data-session={s.id} data-registered={r ? "true" : "false"} className={rowClass}>
+                      <TableCell className="whitespace-nowrap font-medium">
+                        {formatTimeRange(s.startsAt, s.endsAt)}
+                        {s.cancelledAt && <Badge variant="destructive" className="ml-2">termín zrušen</Badge>}
+                        {r && !s.cancelledAt && <Badge variant="success" className="ml-2">Zapsáno</Badge>}
+                        {s.cancelledAt && s.cancelReason && (
+                          <div className="text-xs font-normal text-destructive">Důvod: {s.cancelReason}</div>
+                        )}
+                        {s.note && <div className="text-xs text-muted-foreground font-normal">{s.note}</div>}
+                        {!s.cancelledAt && (
+                          <div className="text-xs text-muted-foreground font-normal">Změny do {deadlineText(s.changeDeadlineMinutes)}</div>
+                        )}
+                      </TableCell>
+                      <TableCell>{s.room}</TableCell>
+                      <TableCell className="whitespace-nowrap">{s.teacherName}</TableCell>
+                      <TableCell>
+                        {r ? (
+                          <div className="space-y-1 text-sm" data-testid="my-subjects">
+                            <div>
+                              {r.subjects.map((x) => x.name + (x.subjectTeacherName ? ` (${x.subjectTeacherName})` : "")).join(", ")}
+                            </div>
+                            {r.note && <div className="italic text-muted-foreground">„{r.note}“</div>}
+                          </div>
+                        ) : (
+                          <SubjectBadges subjects={s.subjects} highlight={mySubjectIds} />
+                        )}
+                      </TableCell>
+                      <TableCell><CapacityBadge s={s} /></TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{actionFor(s, r)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+
           {past.length > 0 && (
-            <details className="text-sm">
-              <summary className="cursor-pointer text-muted-foreground">Proběhlé ({past.length})</summary>
+            <details className="mt-4 text-sm" data-testid="past-registrations">
+              <summary className="cursor-pointer text-muted-foreground">Proběhlé zápisy ({past.length})</summary>
               <ul className="mt-2 space-y-1">
                 {past.map((r) => (
                   <li key={r.id}>
@@ -167,32 +242,6 @@ export function StudentMakeupView({
               </ul>
             </details>
           )}
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-sm">
-        <CardHeader className="flex flex-row flex-wrap items-end justify-between gap-2 space-y-0">
-          <div>
-            <CardTitle>Vypsané termíny</CardTitle>
-            <CardDescription>Zvýrazněné jsou předměty vaší třídy.</CardDescription>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="subject-filter" className="text-xs">Předmět</Label>
-            <NativeSelect
-              id="subject-filter"
-              className="w-[200px]"
-              value={subjectFilter}
-              onChange={(e) => setSubjectFilter(e.target.value)}
-            >
-              <option value="">Všechny</option>
-              {allSubjects.map(([id, name]) => (
-                <option key={id} value={id}>{name}</option>
-              ))}
-            </NativeSelect>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <SessionsTable sessions={open} highlightSubjects={mySubjectIds} action={actionFor} empty="Žádné vypsané termíny." />
         </CardContent>
       </Card>
     </div>

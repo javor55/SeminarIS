@@ -7,132 +7,19 @@ import { requirePermission } from "@/lib/session";
 import {
   DEFAULT_STUDY_YEARS,
   classLabel,
-  classStatus,
-  gradeOf,
+  compareClasses,
   schoolYearLabel,
-  type ClassStatus,
+  subjectInGrade,
   type StudyEndReasonValue,
 } from "@/lib/school";
 import {
   activeStudentsWhere,
   ensureCurrentSchoolYear,
   findOrCreateClass,
-  getCurrentSchoolYear,
   setStudentClass,
 } from "@/modules/core/school";
 
-export type ClassOption = {
-  id: string;
-  label: string;
-  status: ClassStatus;
-};
-
-export type SchoolOverview = {
-  currentYear: { startYear: number; label: string };
-  // Rok lze nastavit ručně jen před prvním zařazením studentů (pak jen uzavřením roku)
-  canSetYearManually: boolean;
-  years: { startYear: number; label: string; isCurrent: boolean }[];
-  classes: (ClassOption & { letter: string; entryYear: number; grade: number; studentCount: number })[];
-  subjects: { id: string; name: string; code: string; isActive: boolean; assignmentCount: number }[];
-  teachers: { id: string; name: string }[];
-  assignments: { id: string; teacherId: string; teacherName: string; subjectId: string; subjectName: string; classGroupId: string; classLabel: string }[];
-};
-
 const fullName = (u: { firstName: string; lastName: string }) => `${u.lastName} ${u.firstName}`.trim();
-
-function revalidateSchool() {
-  revalidatePath("/school");
-  revalidatePath("/users");
-}
-
-// === PŘEHLED ===
-
-export async function getSchoolOverview(): Promise<SchoolOverview> {
-  await requirePermission("core.school.manage");
-  const current = await ensureCurrentSchoolYear();
-  const startYear = current.startYear;
-
-  const [years, classes, subjects, teachers, assignments, membershipCount] = await Promise.all([
-    prisma.schoolYear.findMany({ orderBy: { startYear: "desc" } }),
-    prisma.classGroup.findMany({
-      orderBy: [{ entryYear: "desc" }, { letter: "asc" }],
-      // počítají se jen studující (ne absolventi a ukončení)
-      include: { _count: { select: { students: { where: { role: "STUDENT", studyStatus: "ACTIVE" } } } } },
-    }),
-    prisma.subject.findMany({
-      orderBy: { name: "asc" },
-      include: { _count: { select: { teachingAssignments: { where: { schoolYearId: current.id } } } } },
-    }),
-    prisma.user.findMany({
-      where: { role: { in: ["TEACHER", "ADMIN"] }, isActive: true },
-      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-      select: { id: true, firstName: true, lastName: true },
-    }),
-    prisma.teachingAssignment.findMany({
-      where: { schoolYearId: current.id },
-      include: {
-        teacher: { select: { firstName: true, lastName: true } },
-        subject: { select: { name: true } },
-        classGroup: true,
-      },
-    }),
-    prisma.classMembership.count(),
-  ]);
-
-  // Nabídka sousedních školních let pro přepnutí, i když ještě nejsou v DB
-  const yearSet = new Map(years.map((y) => [y.startYear, y.isCurrent]));
-  for (const y of [startYear - 1, startYear, startYear + 1]) {
-    if (!yearSet.has(y)) yearSet.set(y, false);
-  }
-
-  return {
-    currentYear: { startYear, label: schoolYearLabel(startYear) },
-    canSetYearManually: membershipCount === 0,
-    years: [...yearSet.entries()]
-      .sort((a, b) => b[0] - a[0])
-      .map(([y, isCurrent]) => ({ startYear: y, label: schoolYearLabel(y), isCurrent })),
-    classes: classes.map((c) => ({
-      id: c.id,
-      letter: c.letter,
-      entryYear: c.entryYear,
-      grade: gradeOf(c, startYear),
-      label: classLabel(c, startYear),
-      status: classStatus(c, startYear),
-      studentCount: c._count.students,
-    })),
-    subjects: subjects.map((s) => ({
-      id: s.id,
-      name: s.name,
-      code: s.code,
-      isActive: s.isActive,
-      assignmentCount: s._count.teachingAssignments,
-    })),
-    teachers: teachers.map((t) => ({ id: t.id, name: fullName(t) })),
-    assignments: assignments
-      .map((a) => ({
-        id: a.id,
-        teacherId: a.teacherId,
-        teacherName: fullName(a.teacher),
-        subjectId: a.subjectId,
-        subjectName: a.subject.name,
-        classGroupId: a.classGroupId,
-        classLabel: classLabel(a.classGroup, startYear),
-      }))
-      .sort((a, b) =>
-        a.teacherName.localeCompare(b.teacherName, "cs") ||
-        a.subjectName.localeCompare(b.subjectName, "cs") ||
-        a.classLabel.localeCompare(b.classLabel, "cs")
-      ),
-  };
-}
-
-/** Třídy pro výběr u uživatele (aktuální a budoucí; absolventi jen pokud už tam uživatel je). */
-export async function getClassOptions(): Promise<ClassOption[]> {
-  await requirePermission("core.users.manage");
-  const { startYear } = await getCurrentSchoolYear();
-  const classes = await prisma.classGroup.findMany({ orderBy: [{ entryYear: "desc" }, { letter: "asc" }] });
-  return classes.map((c) => ({ id: c.id, label: classLabel(c, startYear), status: classStatus(c, startYear) }));
-}
 
 // === ŠKOLNÍ ROK ===
 
@@ -166,6 +53,9 @@ export async function setCurrentSchoolYear(startYear: number) {
 
 export type YearOutcome = "PROMOTE" | "GRADUATE" | "REPEAT" | "LEAVE";
 
+/** Co s úvazky do nového roku: nepřebírat / ponechat u stejných tříd / jít se třídou (2.A → 3.A). */
+export type AssignmentMode = "NONE" | "SAME" | "WITH_CLASS";
+
 export type YearClosureStudent = {
   id: string;
   name: string;
@@ -173,10 +63,8 @@ export type YearClosureStudent = {
   classLabel: string;
   grade: number;
   letter: string;
-  // Co se stane bez zásahu: poslední ročník absolvuje, ostatní postoupí
+  // Co se stane bez zásahu: poslední ročník absolvuje, ostatní postoupí do (g+1).<stejné písmeno>
   defaultOutcome: "PROMOTE" | "GRADUATE";
-  // Písmena tříd, kam lze přeřadit při opakování (třídy o rok mladší)
-  repeatLetters: string[];
 };
 
 export type YearClosurePreview = {
@@ -185,17 +73,51 @@ export type YearClosurePreview = {
   students: YearClosureStudent[];
   // Studující bez třídy – uzavření se jich netýká
   unassignedCount: number;
-  // Písmena 1. ročníků, které už pro příští rok existují
-  existingFirstGradeLetters: string[];
+  // Existující třídy (cíle postupu a opakování); chybějící se při uzavření založí
+  classes: { grade: number; letter: string; label: string }[];
   assignmentCount: number;
+  // Kolik úvazků se přenese při jednotlivých volbách
+  assignmentCopyCounts: Record<AssignmentMode, number>;
 };
+
+type AssignmentLite = {
+  teacherId: string;
+  subjectId: string;
+  grade: number;
+  letter: string;
+  subjectGrades: number[];
+};
+
+/** Úvazky, které se podle zvolené možnosti přenesou do nového roku (třída = cílový ročník + písmeno). */
+function planAssignments(mode: AssignmentMode, list: AssignmentLite[]) {
+  if (mode === "NONE") return [];
+  if (mode === "SAME") return list.map((a) => ({ ...a, targetGrade: a.grade }));
+  // jít se třídou: ne ze 4. ročníku a jen tam, kde se předmět v novém ročníku vyučuje
+  return list
+    .filter((a) => a.grade < DEFAULT_STUDY_YEARS && subjectInGrade(a.subjectGrades, a.grade + 1))
+    .map((a) => ({ ...a, targetGrade: a.grade + 1 }));
+}
+
+async function loadAssignments(schoolYearId: string): Promise<AssignmentLite[]> {
+  const rows = await prisma.teachingAssignment.findMany({
+    where: { schoolYearId },
+    include: { classGroup: true, subject: { select: { grades: true } } },
+  });
+  return rows.map((a) => ({
+    teacherId: a.teacherId,
+    subjectId: a.subjectId,
+    grade: a.classGroup.grade,
+    letter: a.classGroup.letter,
+    subjectGrades: a.subject.grades,
+  }));
+}
 
 export async function getYearClosurePreview(): Promise<YearClosurePreview> {
   await requirePermission("core.school.manage");
   const current = await ensureCurrentSchoolYear();
   const next = current.startYear + 1;
 
-  const [students, unassignedCount, classes, assignmentCount] = await Promise.all([
+  const [students, unassignedCount, classes, assignments] = await Promise.all([
     prisma.user.findMany({
       where: { ...activeStudentsWhere, classGroupId: { not: null } },
       include: { classGroup: true },
@@ -203,13 +125,8 @@ export async function getYearClosurePreview(): Promise<YearClosurePreview> {
     }),
     prisma.user.count({ where: { ...activeStudentsWhere, classGroupId: null } }),
     prisma.classGroup.findMany(),
-    prisma.teachingAssignment.count({ where: { schoolYearId: current.id } }),
+    loadAssignments(current.id),
   ]);
-
-  const lettersByEntry = new Map<number, string[]>();
-  for (const c of classes) {
-    lettersByEntry.set(c.entryYear, [...(lettersByEntry.get(c.entryYear) ?? []), c.letter].sort());
-  }
 
   return {
     currentYear: { startYear: current.startYear, label: schoolYearLabel(current.startYear) },
@@ -217,49 +134,53 @@ export async function getYearClosurePreview(): Promise<YearClosurePreview> {
     students: students
       .map((u) => {
         const cls = u.classGroup!;
-        const grade = gradeOf(cls, current.startYear);
-        const studyYears = cls.studyYears ?? DEFAULT_STUDY_YEARS;
         return {
           id: u.id,
           name: fullName(u),
           classGroupId: cls.id,
-          classLabel: classLabel(cls, current.startYear),
-          grade,
+          classLabel: classLabel(cls),
+          grade: cls.grade,
           letter: cls.letter,
-          defaultOutcome: grade >= studyYears ? ("GRADUATE" as const) : ("PROMOTE" as const),
-          repeatLetters: [...new Set([cls.letter, ...(lettersByEntry.get(cls.entryYear + 1) ?? [])])].sort(),
+          defaultOutcome: cls.grade >= DEFAULT_STUDY_YEARS ? ("GRADUATE" as const) : ("PROMOTE" as const),
         };
       })
-      .sort((a, b) => a.classLabel.localeCompare(b.classLabel, "cs") || a.name.localeCompare(b.name, "cs")),
+      .sort((a, b) => a.grade - b.grade || a.classLabel.localeCompare(b.classLabel, "cs") || a.name.localeCompare(b.name, "cs")),
     unassignedCount,
-    existingFirstGradeLetters: lettersByEntry.get(next) ?? [],
-    assignmentCount,
+    classes: classes.sort(compareClasses).map((c) => ({ grade: c.grade, letter: c.letter, label: classLabel(c) })),
+    assignmentCount: assignments.length,
+    assignmentCopyCounts: {
+      NONE: 0,
+      SAME: planAssignments("SAME", assignments).length,
+      WITH_CLASS: planAssignments("WITH_CLASS", assignments).length,
+    },
   };
 }
 
-export type YearClosureException = {
+export type YearClosureDecision = {
   userId: string;
   outcome: YearOutcome;
-  // REPEAT: písmeno třídy o rok mladší (výchozí stejné písmeno)
+  // PROMOTE / REPEAT: písmeno cílové třídy (výchozí stejné písmeno)
   targetLetter?: string;
-  // LEAVE: důvod ukončení
+  // LEAVE: důvod ukončení a poznámka
   leaveReason?: StudyEndReasonValue;
+  leaveNote?: string;
 };
 
 /**
  * Uzavře aktuální školní rok a přejde na další, vše v jedné transakci:
- * - postupující: záznam do historie s ročníkem +1 (třída zůstává, ročník se dopočítá),
+ * - postupující: přesun do třídy o ročník výš (výchozí stejné písmeno, lze změnit),
+ * - opakující: třída stejného ročníku (výchozí stejná, lze změnit písmeno),
  * - absolventi (poslední ročník): stav GRADUATED a deaktivace účtu,
- * - opakující (libovolný ročník): přeřazení do třídy o rok mladší,
  * - odcházející: ukončení studia s důvodem a deaktivace účtu,
- * - založení nových 1. ročníků a volitelně převzetí úvazků do nového roku.
+ * - chybějící cílové třídy se založí, úvazky se podle volby přenesou do nového roku.
+ * Hosté a učitelé se nemění.
  */
 export async function closeSchoolYear(input: {
   // Ochrana proti dvojímu odeslání: rok, který uživatel viděl v náhledu
   expectedStartYear: number;
-  newFirstGradeLetters: string;
-  copyAssignments: boolean;
-  exceptions: YearClosureException[];
+  assignmentMode: AssignmentMode;
+  // Jen výjimky oproti výchozímu výsledku; kdo tu není, postoupí / absolvuje
+  decisions: YearClosureDecision[];
 }) {
   return safeAction(async () => {
     await requirePermission("core.school.manage");
@@ -267,9 +188,9 @@ export async function closeSchoolYear(input: {
     if (current.startYear !== input.expectedStartYear) {
       throw new Error("Školní rok se mezitím změnil. Načtěte stránku znovu.");
     }
+    if (!["NONE", "SAME", "WITH_CLASS"].includes(input.assignmentMode)) throw new Error("Neplatná volba úvazků.");
     const nextStart = current.startYear + 1;
-    const firstGradeLetters = input.newFirstGradeLetters.trim() ? parseLetters(input.newFirstGradeLetters) : [];
-    const exceptions = new Map(input.exceptions.map((e) => [e.userId, e]));
+    const decisions = new Map(input.decisions.map((e) => [e.userId, e]));
     const now = new Date();
 
     const students = await prisma.user.findMany({
@@ -278,34 +199,38 @@ export async function closeSchoolYear(input: {
     });
 
     // Rozdělení studentů podle výsledku (s kontrolou přípustnosti)
-    const promote: { userId: string; classGroupId: string; grade: number }[] = [];
+    const move: { userId: string; grade: number; letter: string; reason: "PROMOTED" | "REPEATED" }[] = [];
     const graduate: string[] = [];
-    const repeat: { userId: string; entryYear: number; letter: string; grade: number }[] = [];
-    const leave = new Map<StudyEndReasonValue, string[]>();
+    const leave: { userId: string; reason: StudyEndReasonValue; note: string | null }[] = [];
     for (const u of students) {
       const cls = u.classGroup!;
-      const grade = gradeOf(cls, current.startYear);
-      const isLast = grade >= (cls.studyYears ?? DEFAULT_STUDY_YEARS);
-      const ex = exceptions.get(u.id);
-      const outcome: YearOutcome = ex?.outcome ?? (isLast ? "GRADUATE" : "PROMOTE");
+      const isLast = cls.grade >= DEFAULT_STUDY_YEARS;
+      const d = decisions.get(u.id);
+      const outcome: YearOutcome = d?.outcome ?? (isLast ? "GRADUATE" : "PROMOTE");
       const name = fullName(u);
+      const letter = (d?.targetLetter || cls.letter).trim().toUpperCase();
+      if ((outcome === "PROMOTE" || outcome === "REPEAT") && !/^[A-Z]$/.test(letter)) {
+        throw new Error(`${name}: neplatné písmeno třídy.`);
+      }
 
       if (outcome === "PROMOTE") {
         if (isLast) throw new Error(`${name}: z posledního ročníku nelze postoupit – absolvuje, opakuje, nebo ukončí studium.`);
-        promote.push({ userId: u.id, classGroupId: cls.id, grade: grade + 1 });
+        move.push({ userId: u.id, grade: cls.grade + 1, letter, reason: "PROMOTED" });
+      } else if (outcome === "REPEAT") {
+        move.push({ userId: u.id, grade: cls.grade, letter, reason: "REPEATED" });
       } else if (outcome === "GRADUATE") {
         if (!isLast) throw new Error(`${name}: absolvovat lze jen z posledního ročníku.`);
         graduate.push(u.id);
-      } else if (outcome === "REPEAT") {
-        const letter = (ex?.targetLetter || cls.letter).trim().toUpperCase();
-        if (!/^[A-Z]$/.test(letter)) throw new Error(`${name}: neplatné písmeno třídy.`);
-        repeat.push({ userId: u.id, entryYear: cls.entryYear + 1, letter, grade });
       } else if (outcome === "LEAVE") {
-        const reason = ex?.leaveReason;
+        const reason = d?.leaveReason;
         if (!reason || reason === "GRADUATED") throw new Error(`${name}: vyberte důvod ukončení studia.`);
-        leave.set(reason, [...(leave.get(reason) ?? []), u.id]);
+        leave.push({ userId: u.id, reason, note: d?.leaveNote?.trim() || null });
+      } else {
+        throw new Error(`${name}: neplatný výsledek.`);
       }
     }
+
+    const assignmentPlan = planAssignments(input.assignmentMode, await loadAssignments(current.id));
 
     await prisma.$transaction(
       async (tx) => {
@@ -315,7 +240,7 @@ export async function closeSchoolYear(input: {
             userId: u.id,
             classGroupId: u.classGroupId!,
             schoolYearId: current.id,
-            grade: gradeOf(u.classGroup!, current.startYear),
+            grade: u.classGroup!.grade,
             reason: "ASSIGNED" as const,
           })),
           skipDuplicates: true,
@@ -329,73 +254,50 @@ export async function closeSchoolYear(input: {
           create: { startYear: nextStart, isCurrent: true },
         });
 
-        // 3. Nové 1. ročníky
-        for (const letter of firstGradeLetters) {
-          await tx.classGroup.upsert({
-            where: { entryYear_letter: { entryYear: nextStart, letter } },
-            update: {},
-            create: { entryYear: nextStart, letter, studyYears: DEFAULT_STUDY_YEARS },
-          });
-        }
+        // 3. Cílové třídy (chybějící se založí)
+        const classIds = new Map<string, string>();
+        const classFor = async (grade: number, letter: string) => {
+          const key = `${grade}.${letter}`;
+          if (!classIds.has(key)) classIds.set(key, (await findOrCreateClass(grade, letter, tx)).id);
+          return classIds.get(key)!;
+        };
 
-        // 4. Postup – třída zůstává, jen záznam do historie
-        await tx.classMembership.createMany({
-          data: promote.map((p) => ({
-            userId: p.userId,
-            classGroupId: p.classGroupId,
-            schoolYearId: next.id,
-            grade: p.grade,
-            reason: "PROMOTED" as const,
-          })),
-          skipDuplicates: true,
-        });
-
-        // 5. Opakování – třída o rok mladší (založí se, pokud neexistuje)
-        for (const r of repeat) {
-          const target = await tx.classGroup.upsert({
-            where: { entryYear_letter: { entryYear: r.entryYear, letter: r.letter } },
-            update: {},
-            create: { entryYear: r.entryYear, letter: r.letter, studyYears: DEFAULT_STUDY_YEARS },
-          });
+        // 4. Postup a opakování – přesun do cílové třídy, v historii nového roku s důvodem
+        for (const m of move) {
           await setStudentClass(tx, {
-            userId: r.userId,
-            classGroupId: target.id,
+            userId: m.userId,
+            classGroupId: await classFor(m.grade, m.letter),
             schoolYear: next,
-            reason: "REPEATED",
+            reason: m.reason,
           });
         }
 
-        // 6. Absolventi a odcházející – ukončení studia a deaktivace účtu
+        // 5. Absolventi a odcházející – ukončení studia a deaktivace účtu
         if (graduate.length > 0) {
           await tx.user.updateMany({
             where: { id: { in: graduate } },
             data: { studyStatus: "GRADUATED", studyEndReason: "GRADUATED", studyEndedAt: now, isActive: false },
           });
         }
-        for (const [reason, ids] of leave) {
-          await tx.user.updateMany({
-            where: { id: { in: ids } },
-            data: { studyStatus: "LEFT", studyEndReason: reason, studyEndedAt: now, isActive: false },
+        for (const l of leave) {
+          await tx.user.update({
+            where: { id: l.userId },
+            data: { studyStatus: "LEFT", studyEndReason: l.reason, studyEndedAt: now, studyEndNote: l.note, isActive: false },
           });
         }
 
-        // 7. Úvazky do nového roku (jen třídy, které v něm ještě studují)
-        if (input.copyAssignments) {
-          const assignments = await tx.teachingAssignment.findMany({
-            where: { schoolYearId: current.id },
-            include: { classGroup: true },
-          });
-          await tx.teachingAssignment.createMany({
-            data: assignments
-              .filter((a) => classStatus(a.classGroup, nextStart) === "active")
-              .map((a) => ({
-                teacherId: a.teacherId,
-                subjectId: a.subjectId,
-                classGroupId: a.classGroupId,
-                schoolYearId: next.id,
-              })),
-            skipDuplicates: true,
-          });
+        // 6. Úvazky do nového roku
+        if (assignmentPlan.length > 0) {
+          const data = [];
+          for (const a of assignmentPlan) {
+            data.push({
+              teacherId: a.teacherId,
+              subjectId: a.subjectId,
+              classGroupId: await classFor(a.targetGrade, a.letter),
+              schoolYearId: next.id,
+            });
+          }
+          await tx.teachingAssignment.createMany({ data, skipDuplicates: true });
         }
       },
       // Stovky studentů v jedné transakci – delší limit než výchozích 5 s
@@ -404,135 +306,12 @@ export async function closeSchoolYear(input: {
 
     revalidatePath("/", "layout");
     return {
-      promoted: promote.length,
+      promoted: move.filter((m) => m.reason === "PROMOTED").length,
+      repeated: move.filter((m) => m.reason === "REPEATED").length,
       graduated: graduate.length,
-      repeated: repeat.length,
-      left: [...leave.values()].reduce((n, ids) => n + ids.length, 0),
+      left: leave.length,
+      assignments: assignmentPlan.length,
       nextYearLabel: schoolYearLabel(nextStart),
     };
-  });
-}
-
-// === TŘÍDY ===
-
-function parseLetters(letters: string): string[] {
-  const list = letters
-    .split(/[\s,;]+/)
-    .map((l) => l.trim().toUpperCase())
-    .filter(Boolean);
-  if (list.length === 0 || list.some((l) => !/^[A-Z]$/.test(l))) {
-    throw new Error("Zadejte písmena tříd, např. „A, B, C“.");
-  }
-  return [...new Set(list)];
-}
-
-/** Založí třídy daného ročníku v aktuálním školním roce, např. 1. ročník „A, B, C“. */
-export async function createClasses(grade: number, letters: string) {
-  return safeAction(async () => {
-    await requirePermission("core.school.manage");
-    if (!Number.isInteger(grade) || grade < 1 || grade > DEFAULT_STUDY_YEARS) {
-      throw new Error(`Ročník musí být 1–${DEFAULT_STUDY_YEARS}.`);
-    }
-    const { startYear } = await ensureCurrentSchoolYear();
-    const list = parseLetters(letters);
-    for (const letter of list) {
-      await findOrCreateClass(grade, letter, startYear);
-    }
-    revalidateSchool();
-    return list.length;
-  });
-}
-
-/** Smaže třídu. Studenti zůstanou, jen nebudou zařazeni; úvazky třídy se smažou. */
-export async function deleteClass(classGroupId: string) {
-  return safeAction(async () => {
-    await requirePermission("core.school.manage");
-    await prisma.classGroup.delete({ where: { id: classGroupId } });
-    revalidateSchool();
-  });
-}
-
-// === ŠKOLNÍ PŘEDMĚTY ===
-
-function cleanSubjectInput(data: { name: string; code: string }) {
-  const name = data.name.trim();
-  const code = data.code.trim().toUpperCase();
-  if (!name || !code) throw new Error("Vyplňte název i zkratku předmětu.");
-  return { name, code };
-}
-
-export async function createSchoolSubject(data: { name: string; code: string }) {
-  return safeAction(async () => {
-    await requirePermission("core.school.manage");
-    const clean = cleanSubjectInput(data);
-    const exists = await prisma.subject.findUnique({ where: { code: clean.code } });
-    if (exists) throw new Error(`Předmět se zkratkou ${clean.code} už existuje.`);
-    await prisma.subject.create({ data: clean });
-    revalidateSchool();
-  });
-}
-
-export async function updateSchoolSubject(id: string, data: { name: string; code: string }) {
-  return safeAction(async () => {
-    await requirePermission("core.school.manage");
-    const clean = cleanSubjectInput(data);
-    const exists = await prisma.subject.findUnique({ where: { code: clean.code } });
-    if (exists && exists.id !== id) throw new Error(`Předmět se zkratkou ${clean.code} už existuje.`);
-    await prisma.subject.update({ where: { id }, data: clean });
-    revalidateSchool();
-  });
-}
-
-export async function toggleSchoolSubjectActive(id: string) {
-  return safeAction(async () => {
-    await requirePermission("core.school.manage");
-    const subject = await prisma.subject.findUnique({ where: { id } });
-    if (!subject) throw new Error("Předmět nenalezen.");
-    await prisma.subject.update({ where: { id }, data: { isActive: !subject.isActive } });
-    revalidateSchool();
-  });
-}
-
-export async function deleteSchoolSubject(id: string) {
-  return safeAction(async () => {
-    await requirePermission("core.school.manage");
-    await prisma.subject.delete({ where: { id } });
-    revalidateSchool();
-  });
-}
-
-// === ÚVAZKY (kdo co učí) ===
-
-/** Přidá úvazky učitele pro předmět ve vybraných třídách v aktuálním školním roce. */
-export async function createTeachingAssignments(data: { teacherId: string; subjectId: string; classGroupIds: string[] }) {
-  return safeAction(async () => {
-    await requirePermission("core.school.manage");
-    if (!data.teacherId || !data.subjectId || data.classGroupIds.length === 0) {
-      throw new Error("Vyberte učitele, předmět a alespoň jednu třídu.");
-    }
-    const teacher = await prisma.user.findUnique({ where: { id: data.teacherId }, select: { role: true } });
-    if (!teacher || (teacher.role !== "TEACHER" && teacher.role !== "ADMIN")) {
-      throw new Error("Vybraný uživatel není učitel.");
-    }
-    const year = await ensureCurrentSchoolYear();
-    const res = await prisma.teachingAssignment.createMany({
-      data: data.classGroupIds.map((classGroupId) => ({
-        teacherId: data.teacherId,
-        subjectId: data.subjectId,
-        classGroupId,
-        schoolYearId: year.id,
-      })),
-      skipDuplicates: true,
-    });
-    revalidateSchool();
-    return res.count;
-  });
-}
-
-export async function deleteTeachingAssignment(id: string) {
-  return safeAction(async () => {
-    await requirePermission("core.school.manage");
-    await prisma.teachingAssignment.delete({ where: { id } });
-    revalidateSchool();
   });
 }

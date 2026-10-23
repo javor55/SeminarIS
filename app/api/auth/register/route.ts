@@ -1,7 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { isRegistrationEnabled, getDefaultRole } from "@/modules/core/settings";
+import { isRegistrationEnabled, getDefaultRole, getRegistrationClassMode } from "@/modules/core/settings";
+import { getPublicClassOptions } from "@/modules/core/school";
+
+/** Nastavení registračního formuláře: zda se vybírá třída a které třídy jsou k dispozici. */
+export async function GET() {
+  try {
+    const classMode = await getRegistrationClassMode();
+    const classes = classMode === "off" ? [] : await getPublicClassOptions();
+    return NextResponse.json({ classMode, classes });
+  } catch {
+    return NextResponse.json({ classMode: "off", classes: [] });
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -17,7 +29,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { email, password, firstName, lastName } = await req.json();
+    const { email, password, firstName, lastName, classGroupId } = await req.json();
 
     if (!email || !password || !firstName || !lastName) {
       return NextResponse.json(
@@ -46,6 +58,19 @@ export async function POST(req: Request) {
       );
     }
 
+    // Výběr třídy (nastavuje admin): jen žádost, role ani zařazení se tím nemění
+    let requestedClassGroupId: string | null = null;
+    const classMode = await getRegistrationClassMode();
+    if (classMode !== "off" && !isFirstUser) {
+      if (classGroupId) {
+        const cls = typeof classGroupId === "string" ? await prisma.classGroup.findUnique({ where: { id: classGroupId } }) : null;
+        if (!cls) return NextResponse.json({ message: "Vybraná třída neexistuje." }, { status: 400 });
+        requestedClassGroupId = cls.id;
+      } else if (classMode === "required" && (await prisma.classGroup.count()) > 0) {
+        return NextResponse.json({ message: "Vyberte svou třídu." }, { status: 400 });
+      }
+    }
+
     // Výchozí role nového uživatele
     const defaultRole = await getDefaultRole();
 
@@ -61,6 +86,7 @@ export async function POST(req: Request) {
         lastName,
         isActive: true,
         role: isFirstUser ? "ADMIN" : defaultRole,
+        requestedClassGroupId,
       },
     });
 

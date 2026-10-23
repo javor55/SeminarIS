@@ -114,7 +114,7 @@ export function EnrollmentsClientView({ enrollments, currentUser }: EnrollmentsC
               <h3 className="text-lg font-semibold">Žádná zápisová období</h3>
               <p className="text-sm text-muted-foreground">
                 Zatím jste nevytvořili žádné zápisové období. Začněte vytvořením prvního, 
-                definujte časové rozmezí a přidejte do něj bloky se semináři.
+                definujte časové rozmezí a přidejte do něj bloky s předměty.
               </p>
             </div>
             {currentUser.role === "ADMIN" && (

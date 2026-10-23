@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { can } from "@/modules/registry";
 import { getYearClosurePreview } from "@/modules/core/actions/school";
-import { YearClosureWizard } from "@/modules/core/components/school/YearClosureWizard";
+import { YearClosureWizard } from "@/modules/core/components/admin/YearClosureWizard";
 
 export default async function CloseYearPage() {
   const user = await getCurrentUser();

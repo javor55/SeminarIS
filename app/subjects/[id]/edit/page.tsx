@@ -5,55 +5,50 @@ import * as React from "react";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
-import { getSubjects, updateSubject, createSubject } from "@/modules/seminars/actions/subjects";
+import { getSubjectDetail, updateSubject, createSubject } from "@/modules/core/actions/subjects";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea"; 
 import { Button } from "@/components/ui/button";
 import { TiptapEditor } from "@/components/editor/TiptapEditor";
-import { Subject } from "@/lib/types";
 import { toast } from "sonner";
 import { can } from "@/modules/registry";
 import { PageHeader } from "@/components/page-header";
+import { GRADES } from "@/lib/school";
 
 function EditSubjectForm({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
-  const [subject, setSubject] = useState<Subject | undefined>();
+  const [found, setFound] = useState(false);
+  const [title, setTitle] = useState<string | undefined>();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [syllabus, setSyllabus] = useState("");
+  const [grades, setGrades] = useState<number[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
   const duplicateId = searchParams.get("duplicate");
+  const isNew = params.id === "new";
 
   useEffect(() => {
     async function loadData() {
        setDataLoading(true);
        try {
-         if (params.id === "new") {
-           if (duplicateId) {
-             const subjects = await getSubjects();
-             const found = subjects.find((s) => s.id === duplicateId);
-             if (found) {
-               setName((found.name ?? "") + " (Kopie)");
-               setCode(found.code ?? "");
-               setDescription(found.description ?? "");
-               setSyllabus(found.syllabus ?? "");
-             }
-           }
-         } else {
-           const subjects = await getSubjects();
-           const found = subjects.find((s) => s.id === params.id);
-           if (found) {
-             setSubject(found);
-             setName(found.name ?? "");
-             setCode(found.code ?? "");
-             setDescription(found.description ?? "");
-             setSyllabus(found.syllabus ?? "");
+         const sourceId = isNew ? duplicateId : params.id;
+         if (sourceId) {
+           const subject = await getSubjectDetail(sourceId);
+           if (subject) {
+             setFound(true);
+             setTitle(subject.name);
+             setName(isNew ? (subject.name ?? "") + " (Kopie)" : subject.name ?? "");
+             // zkratka je jedinečná, kopie ji proto nepřebírá
+             setCode(isNew ? "" : subject.code ?? "");
+             setDescription(subject.description ?? "");
+             setSyllabus(subject.syllabus ?? "");
+             setGrades(subject.grades);
            }
          }
        } catch {
@@ -63,26 +58,28 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
        }
     }
     loadData();
-  }, [params.id, duplicateId]);
+  }, [params.id, duplicateId, isNew]);
 
   if (authLoading || dataLoading) {
     return <p>Načítám...</p>;
   }
 
-  if (!subject && params.id !== "new") {
+  if (!found && !isNew) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Seminář nenalezen</h1>
+        <h1 className="text-2xl font-semibold">Předmět nenalezen</h1>
         <p className="text-muted-foreground">
-          Seminář s ID <code>{params.id}</code> nebyl nalezen.
+          Předmět s ID <code>{params.id}</code> nebyl nalezen.
         </p>
       </div>
     );
   }
 
-  if (!user || !can(user.role, "seminars.subjects.edit")) {
-    return <p>Nemáte oprávnění upravovat tento seminář.</p>;
+  if (!user || !can(user.role, "core.subjects.edit")) {
+    return <p>Nemáte oprávnění upravovat tento předmět.</p>;
   }
+
+  const toggleGrade = (g: number) => setGrades((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
 
   async function handleSave() {
     if (!user) return;
@@ -90,32 +87,10 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
     setError(null);
 
     try {
-      const isNew = params.id === "new";
-      let ok: Subject | null = null;
-      
-      const payload = {
-        name,
-        code,
-        syllabus,
-        description,
-      };
-
-      if (isNew) {
-        ok = unwrap(await createSubject(payload));
-      } else if (subject) {
-        ok = unwrap(await updateSubject({
-          id: subject.id,
-          ...payload,
-        }));
-      }
-
-      if (!ok) {
-        setError("Nepodařilo se uložit seminář.");
-      } else {
-        toast.success(isNew ? "Seminář byl úspěšně vytvořen." : "Seminář byl úspěšně uložen.");
-        const redirectId = ok.id;
-        router.push(`/subjects/${redirectId}`);
-      }
+      const payload = { name, code, syllabus, description, grades };
+      const saved = isNew ? unwrap(await createSubject(payload)) : unwrap(await updateSubject(params.id, payload));
+      toast.success(isNew ? "Předmět byl úspěšně vytvořen." : "Předmět byl úspěšně uložen.");
+      router.push(`/subjects/${saved.id}`);
     } catch (e: unknown) {
       const err = e as Error;
       setError(err.message ?? "Chyba při ukládání.");
@@ -127,9 +102,9 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        back={{ href: params.id === "new" ? "/subjects" : `/subjects/${params.id}`, label: "Zpět" }}
-        title={params.id === "new" ? "Nový seminář" : "Upravit seminář"}
-        description={subject?.name}
+        back={{ href: isNew ? "/subjects" : `/subjects/${params.id}`, label: "Zpět" }}
+        title={isNew ? "Nový předmět" : "Upravit předmět"}
+        description={isNew ? undefined : title}
       />
 
       <div className="grid gap-4">
@@ -146,13 +121,26 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
 
         <div className="space-y-1">
           <label className="text-sm font-medium" htmlFor="code">
-            Kód
+            Zkratka (nepovinná)
           </label>
           <Input
             id="code"
             value={code}
             onChange={(e) => setCode(e.target.value)}
           />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Ročníky</label>
+          <div className="flex flex-wrap items-center gap-3" id="subject-grades">
+            {GRADES.map((g) => (
+              <label key={g} className="flex items-center gap-1.5 text-sm">
+                <input type="checkbox" data-grade={g} checked={grades.includes(g)} onChange={() => toggleGrade(g)} />
+                {g}. ročník
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">Ročníky, ve kterých se předmět vyučuje. Nic nezaškrtnuto = všechny.</p>
         </div>
 
         <div className="space-y-1">
@@ -164,7 +152,7 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
             rows={4}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Krátký hlavičkový popis semináře před sylabem..."
+            placeholder="Krátký hlavičkový popis předmětu před sylabem..."
           />
         </div>
 
@@ -182,7 +170,7 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => params.id === "new" ? router.push(`/subjects`) : router.push(`/subjects/${subject?.id}`)}
+            onClick={() => router.push(isNew ? "/subjects" : `/subjects/${params.id}`)}
           >
             Zrušit
           </Button>

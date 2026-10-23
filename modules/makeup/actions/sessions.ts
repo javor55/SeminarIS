@@ -9,7 +9,6 @@ import { requirePermission } from "@/lib/session";
 import { formatTimeRange } from "@/lib/datetime";
 import { classLabel } from "@/lib/school";
 import { can } from "@/modules/registry";
-import { getCurrentSchoolYear } from "@/modules/core/school";
 import {
   MAX_CAPACITY,
   MAX_SERIES_SIZE,
@@ -68,11 +67,10 @@ export async function getSessionDetail(
     },
   });
   if (!s || !canManageSession(user, s)) return null;
-  const { startYear } = await getCurrentSchoolYear();
   return {
     session: toSessionItem(s, user),
     registrations: s.registrations
-      .map((r) => toRegistrationItem(r, startYear))
+      .map((r) => toRegistrationItem(r))
       .sort((a, b) => a.studentName.localeCompare(b.studentName, "cs")),
   };
 }
@@ -114,12 +112,11 @@ export async function getMySubjectRegistrations() {
       },
     },
   });
-  const { startYear } = await getCurrentSchoolYear();
   return rows
     .map((r) => ({
       registrationId: r.registrationId,
       studentName: fullName(r.registration.student),
-      classLabel: r.registration.student.classGroup ? classLabel(r.registration.student.classGroup, startYear) : null,
+      classLabel: r.registration.student.classGroup ? classLabel(r.registration.student.classGroup) : null,
       subjectName: r.subject.name,
       note: r.registration.note,
       attendance: r.registration.attendance as MakeupAttendanceValue,

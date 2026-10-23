@@ -60,7 +60,6 @@ export function EnrollmentBlockCard({
 
   const [sameSubjectAlert, setSameSubjectAlert] = useState<{
     subjectName: string;
-    subjectCode: string;
     blockName: string;
     occurrenceCode: string;
   } | null>(null);
@@ -87,24 +86,22 @@ export function EnrollmentBlockCard({
 
   const findSameSubjectInOtherBlocks = React.useCallback((targetOccurrenceId: string) => {
     const target = block.occurrences.find((o) => o.id === targetOccurrenceId);
-    if (!target || !target.subject?.code) return null;
+    if (!target || !target.subject?.id) return null;
 
-    const code = target.subject.code;
+    const subjectId = target.subject.id;
 
     for (const b of allBlocks) {
       for (const occ of b.occurrences) {
         if (occ.id === targetOccurrenceId) continue;
-        if (!occ.subject?.code) continue;
-        if (occ.subject.code !== code) continue;
+        if (occ.subject?.id !== subjectId) continue;
 
         const already = occ.enrollments?.some(
           (e) => e.studentId === currentUser.id && !e.deletedAt
         );
         if (already) {
-          const occCode = `${occ.subject.code}/${occ.subCode ?? ""}`;
+          const occCode = occ.subject.code ? `${occ.subject.code}/${occ.subCode ?? ""}` : occ.subCode ?? "—";
           return {
             subjectName: occ.subject.name,
-            subjectCode: occ.subject.code,
             blockName: b.name,
             occurrenceCode: occCode,
           };
@@ -150,7 +147,7 @@ export function EnrollmentBlockCard({
   const handleUnenroll = React.useCallback(async (occId: string) => {
     const occ = block.occurrences.find((o) => o.id === occId);
     if (!occ) return;
-    setUnenrollConfirm({ occId, subjectName: occ.subject?.name || "seminář" });
+    setUnenrollConfirm({ occId, subjectName: occ.subject?.name || "předmět" });
   }, [block.occurrences]);
 
   async function confirmUnenroll() {
@@ -306,9 +303,8 @@ export function EnrollmentBlockCard({
               <AlertDialogTitle>Nelze se zapsat</AlertDialogTitle>
               <AlertDialogDescription className="space-y-2">
                 <p>
-                  Už jste zapsán na seminář{" "}
-                  <strong>{sameSubjectAlert.subjectName}</strong> se stejným
-                  kódem <strong>{sameSubjectAlert.subjectCode}</strong> v jiném
+                  Už jste zapsán na předmět{" "}
+                  <strong>{sameSubjectAlert.subjectName}</strong> v jiném
                   bloku.
                 </p>
                 <p>
@@ -417,9 +413,9 @@ export function EnrollmentBlockCard({
         <AlertDialog open onOpenChange={() => setDeleteOccurrence(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Opravdu smazat seminář z bloku?</AlertDialogTitle>
+              <AlertDialogTitle>Opravdu smazat předmět z bloku?</AlertDialogTitle>
               <AlertDialogDescription>
-                Tato akce trvale odstraní výskyt semináře{" "}
+                Tato akce trvale odstraní výskyt předmětu{" "}
                 <strong>{deleteOccurrence.teacherName}</strong>{" "}
                 (nebo code) z bloku <strong>{block.name}</strong>.
               </AlertDialogDescription>
@@ -431,11 +427,11 @@ export function EnrollmentBlockCard({
                 onClick={async () => {
                   try {
                     unwrap(await deleteSubjectOccurrence(deleteOccurrence.id));
-                    toast.success("Seminář byl z bloku smazán.");
+                    toast.success("Předmět byl z bloku smazán.");
                     router.refresh();
                   } catch (err: unknown) {
                     const error = err as Error;
-                    toast.error(error.message || "Nepodařilo se smazat seminář.");
+                    toast.error(error.message || "Nepodařilo se smazat předmět.");
                   } finally {
                     setDeleteOccurrence(null);
                   }
@@ -454,7 +450,7 @@ export function EnrollmentBlockCard({
             <AlertDialogHeader>
               <AlertDialogTitle>Opravdu se chcete odhlásit?</AlertDialogTitle>
               <AlertDialogDescription>
-                Budete odhlášeni ze semináře{" "}
+                Budete odhlášeni z předmětu{" "}
                 <strong>{unenrollConfirm.subjectName}</strong> v bloku{" "}
                 <strong>{block.name}</strong>.
               </AlertDialogDescription>
