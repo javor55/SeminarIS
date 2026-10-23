@@ -26,15 +26,21 @@ modules/
     server.tsx          widget na dashboard, statistiky, úklid při mazání uživatele
     window-status.ts    synchronizace stavu zápisového okna s časem
     eligibility.ts      cílení zápisových oken na ročníky
+    unenrolled.ts       nezapsaní studenti okna a ruční/automatická připomínka
+    notifications.ts    e-maily modulu (zápis otevřen, připomínka nezapsaným) a jeho denní úloha
     subject-windows.ts  „v zápisu“: ve kterých oknech je předmět nabízen (pro jádro)
   makeup/               dopisování písemek (termíny, zápisy, docházka)
-    manifest.ts, server.tsx, data.ts (interní dotazy), types.ts
+    manifest.ts, server.tsx, data.ts (interní dotazy), types.ts, notifications.ts (e-maily a denní úloha)
     actions/            sessions.ts (dozor), registrations.ts (student)
     components/
     actions/            subjects.ts, windows.ts, enrollment.ts
     components/         blocks/, enrollment/, occurrences/, subjects/
 lib/
-  session.ts            getCurrentUser, requireAuth, requireModule, requirePermission
+  session.ts            getCurrentUser, requireAuth, requireModule, requirePermission, isImpersonating
+  email/                odesílání e-mailů: send.ts (jediná funkce sendEventEmail), events.ts (seznam upozornění
+                        a výchozí texty), settings.ts (nastavení a limity), transport.ts (Resend), template.ts
+  audit.ts              audit(tx, uživatel, záznam) – historie změn; audit-settings.ts (doba uchování)
+  impersonation*.ts     „zobrazit jako uživatel“ (podepsaná cookie)
   modules.ts            zapnuté moduly (SystemSetting `module.<id>.enabled`), ensureModulePage
   settings.ts           getSetting / setSetting
   prisma.ts             Prisma klient (passwordHash se nikdy nevrací bez výslovného omit: false)
@@ -204,24 +210,148 @@ Po uložení je potřeba nové nasazení (Redeploy).
 - **Kdo se smí přihlásit heslem**: všichni / učitelé a admini / jen admini. Admin vždy.
   Omezení platí jen při zapnutém M365, takže se nikdo nemůže zamknout venku.
 
-## E-maily (Resend)
+## Upozornění (e-maily přes Resend)
 
-E-maily se posílají přes [Resend](https://resend.com) z ověřené domény. Kód: `lib/email.ts`
-(`sendEmail`, jen pro server), akce `modules/core/actions/email.ts`.
+E-maily se posílají přes [Resend](https://resend.com) z ověřené domény (REST API, bez SDK).
+Všechna odesílání jdou přes **jednu funkci** `sendEventEmail(událost, příjemci[])`
+(`lib/email/send.ts`), která postupně zkontroluje:
+
+1. hlavní vypínač a zapnutí události (jinak záznam `SKIPPED_DISABLED`),
+2. odhlášení příjemce z nepovinných upozornění (`SKIPPED_DISABLED`),
+3. denní a měsíční limit (co se nevejde, je `SKIPPED_LIMIT`),
+
+pak e-maily odešle (u více příjemců batch API Resendu `POST /emails/batch`, po nejvýš 100) a **každý
+pokus zapíše do `EmailLog`** (příjemce, událost, předmět, stav `SENT` / `FAILED` / `SKIPPED_LIMIT` /
+`SKIPPED_DISABLED`, chyba, čas). Podle `EmailLog` se počítají limity (jen `SENT`; den a měsíc podle
+pásma Europe/Prague).
+
+Pravidla pro autory kódu:
+
+- Volat **až po commitu** transakce, která změnu provedla, nikdy uvnitř ní.
+- `sendEventEmail` **nikdy nevyhodí výjimku**: chyba odeslání se zaloguje a akce proběhne.
+- V režimu „zobrazit jako“ se neodešle nic.
+- Novou událost přidat do `lib/email/events.ts` (výchozí zapnutí, povinná/nepovinná, proměnné, výchozí
+  text) a volat `sendEventEmail("id", …)`.
 
 | Proměnná | Hodnota |
 |---|---|
-| `RESEND_API_KEY` | API klíč z Resendu (Resend → API Keys, stačí oprávnění „Sending access“) |
-| `EMAIL_FROM` | odesílatel z ověřené domény, např. `Školní IS <noreply@skola.cz>` |
+| `RESEND_API_KEY` | API klíč z Resendu (Resend → API Keys, stačí „Sending access“). **Jen v env**, tajný, v databázi ani v administraci se nezobrazuje. Bez klíče se nic neposílá a Administrace → Upozornění to ukáže. |
+| `EMAIL_FROM` | výchozí odesílatel z ověřené domény, např. `Školní IS <noreply@skola.cz>` |
 | `EMAIL_REPLY_TO` | volitelně adresa, kam chodí odpovědi |
-| `EMAIL_TRANSPORT` | `log` = nic neposílat, jen vypsat do logu (CI, vývoj) |
+| `EMAIL_TRANSPORT` | `log` = nic neposílat, jen zapsat do `EmailLog` jako `SENT` (CI, vývoj, E2E testy) |
 
-Klíč patří jen do proměnných prostředí (je tajný, v databázi ani v administraci se nezobrazuje).
-Odesílatel je zatím také v env; nastavení, která se mění častěji (události, texty, limity),
-přibudou v administraci – viz `Dokumentace/zadani/2026-10-notifikace-audit-nahled.md`.
+### Administrace → Upozornění (`/admin/notifications`)
 
-Administrace → E-maily ukazuje stav konfigurace a umožňuje odeslat zkušební e-mail
-(adresát, předmět, text).
+- **Hlavní vypínač**, **odesílatel** a **reply-to** (přepíše env; prázdné pole = hodnota z env).
+- **Limity**: denní (výchozí 90) a měsíční (výchozí 2 900) – free plán Resendu má 100/den a 3 000/měsíc.
+  Ukazatel „dnes X / limit, tento měsíc Y / limit“; po dosažení limitu se další e-maily neposílají
+  (`SKIPPED_LIMIT`) a administrace to ukáže varováním.
+- **Seznam upozornění**: zapnuto/vypnuto, předmět a text šablony s proměnnými (`{{jmeno}}`,
+  `{{termin}}`, `{{ucebna}}`, …; neznámá proměnná se při uložení odmítne), tlačítko „Obnovit výchozí“
+  a u hromadných odhad počtu příjemců při příštím spuštění.
+- **Poslat zkušební e-mail sobě** (posílá se i při vypnutých upozorněních, počítá se do limitů).
+- **Přehled odeslaných e-mailů** (`EmailLog`) s filtrem stavu, upozornění a hledáním.
+- Záznamy o e-mailech se mažou po nastavené době (výchozí 90 dní, nejméně 35 – podle záznamů se
+  počítá měsíční limit).
+
+### Upozornění (výchozí stav)
+
+| Upozornění | Komu | Výchozí | Povinné |
+|---|---|---|---|
+| Termín dopisování zrušen | zapsaným studentům | zapnuto | ano |
+| Termín změněn (čas, učebna) | zapsaným studentům | zapnuto | ano |
+| Student odepsán / přesunut dozorem | dotčenému studentovi | zapnuto | ano |
+| Připomínka den předem | zapsaným studentům (cron) | vypnuto | ne |
+| Denní souhrn „zítra dopisují“ | dozoru a vyučujícím předmětů (cron) | vypnuto | ne |
+| Účet schválen | uživateli | zapnuto | ano |
+| Souhrn účtů ke schválení | adminům, jen když N > 0 (cron) | zapnuto | ne |
+| Zápis otevřen | studentům cílových ročníků | vypnuto | ne |
+| Připomínka nezapsaným | nezapsaným studentům (ručně / cron) | vypnuto | ne |
+
+**Povinná** upozornění chodí vždy, když je událost zapnutá. **Nepovinná** (připomínky, souhrny, zápis
+otevřen) nedostane ten, kdo si v **profilu** vypnul „Dostávat nepovinná upozornění“
+(`User.receiveOptionalEmails`). Ruční tlačítko „Poslat připomínku nezapsaným“ obchází jen vypnutí
+*události*; hlavní vypínač, limity i odhlášení příjemců platí vždy.
+
+„Zápis otevřen“ se pošle jednou za okno (`EnrollmentWindow.openedNotifiedAt`), a to při vytvoření nebo
+úpravě již otevřeného okna, při prvním zobrazení po otevření a nejpozději denní úlohou.
+
+## Plánované úlohy (cron)
+
+Jeden endpoint **`GET /api/cron/daily`** (`app/api/cron/daily/route.ts`) chráněný hlavičkou
+`Authorization: Bearer ${CRON_SECRET}` – přesně takovou posílá Vercel Cron, když je v projektu
+nastavená proměnná `CRON_SECRET`. Bez ní (nebo s jinou hodnotou) vrací 401. `vercel.json` obsahuje
+jedno denní spuštění (`0 5 * * *` UTC, tj. 6:00 v zimě a 7:00 v létě; Vercel Hobby umí cron jen 1× denně
+a spouští ho v rámci zvolené hodiny).
+
+Každý zapnutý modul přispívá svým krokem (`ModuleServer.runDailyJob`):
+
+- **Dopisování**: připomínky na zítřek (studentům) a souhrny „zítra dopisují“ (dozoru a vyučujícím),
+  „zítra“ podle pásma Europe/Prague (`lib/datetime.ts`),
+- **Semináře**: doběhnutí upozornění „zápis otevřen“ a automatické připomínky nezapsaným (u okna
+  nastavení „připomenout N dní před koncem“; pošle se **jednou za okno** v den *konec − N dní*, případně
+  první úlohou po něm, dokud okno běží),
+- **Jádro**: souhrn čekajících účtů adminům a **mazání starých záznamů** (historie změn podle
+  nastavené doby uchování, `EmailLog` podle nastavení).
+
+**Idempotence:** úloha si na začátku atomicky zabere dnešní den (`SystemSetting` `cron.daily.lastRun`,
+datum v pásmu Europe/Prague). Druhé volání téhož dne vrátí `{ skipped: true }` a nic neposílá.
+Při chybě celé úlohy se značka uvolní. Jednotlivé kroky si hlídají chyby samy a výsledek vrací odpověď.
+Vypnuté události se přeskočí (nic se nepočítá ani neloguje).
+
+## Nezapsaní studenti (Zápisy → detail okna → záložka Nezapsaní)
+
+Aktivní studenti cílových ročníků, kteří nemají zápis ve všech blocích (bloky bez nabízeného předmětu se
+nepočítají); u každého jsou vidět chybějící bloky. Filtr třídy a export CSV. Tlačítko **Poslat
+připomínku nezapsaným (N e-mailů)** (s potvrzením, jen admin) pošle e-maily a zapíše souhrn do historie.
+Na dashboardu admina a učitele je u otevřeného okna počet nezapsaných.
+
+## Historie změn (Administrace → Historie, `/admin/history`)
+
+`AuditLog`: kdo (`actorId`, `actorName`), případně `impersonatorId`, `action` (`oblast.entita.akce`,
+např. `makeup.registration.remove`), `entityType`, `entityId`, **`summary`** (čitelný popis česky),
+`data` (JSON před/po) a čas. Záznam se píše pomocí `audit(tx, uživatel, {…})` **ve stejné transakci**
+jako změna, takže nemůže vzniknout jedno bez druhého:
+
+```ts
+await prisma.$transaction(async (tx) => {
+  await tx.user.update({ … });
+  await audit(tx, admin, { action: "users.role", entityType: "user", entityId: id, summary: "Změněna role …" });
+});
+```
+
+Loguje se: uživatelé (role, aktivace, schválení a zamítnutí, třída, úprava, ukončení a obnovení studia,
+reset hesla, smazání, import souhrnně), třídy, školní rok a jeho uzavření (souhrnně), nastavení a moduly,
+předměty a úvazky, zápisová okna, bloky a předměty v nich, zápis a odepsání v seminářích (sám i jiným),
+termíny dopisování, zápisy, přesuny, docházka, ruční připomínky a spuštění a ukončení náhledu.
+Automatické přepnutí stavu okna podle času se nezapisuje.
+
+Stránka má filtr (kdo, oblast, období, hledání v popisu) a detail s daty před/po. U uživatele v seznamu je
+ikona **Historie** (`/admin/history?user=<id>`): co dělal on a co se s ním dělo. **Doba uchování**
+(výchozí 2 roky) se nastavuje na stránce Historie, starší záznamy maže denní úloha.
+
+## Zobrazit jako uživatel (náhled, jen admin)
+
+V seznamu uživatelů akce **Zobrazit jako** (ne na jiného admina, na sebe ani na neaktivní účet). Admin pak
+vidí celou aplikaci očima uživatele (menu, oprávnění, data) a nahoře je výrazný pruh „Prohlížíte jako Jan
+Novák (student 2.A) – Ukončit náhled“. Začátek a konec náhledu jsou v historii.
+
+Jak to funguje (a čeho se držet):
+
+- Cookie `seminaris_impersonate` je **httpOnly**, podepsaná HMAC-SHA256 s `NEXTAUTH_SECRET`, platí 1 hodinu
+  a obsahuje id admina, id cíle a čas konce (`lib/impersonation-token.ts`).
+- Cookie se uplatní **jen když platí vše současně** (`lib/impersonation.ts`, volá ho `session` callback
+  v `lib/auth.ts`): platný podpis a platnost, cookie patří právě přihlášenému adminovi, ten je v DB stále
+  **aktivní ADMIN** (role se načítá při každém požadavku), cíl existuje, je aktivní a není admin. Jinak se
+  tiše ignoruje.
+- Protože se uživatel zamění v session, `getCurrentUser()`, `requirePermission`, `getServerSession` na
+  stránkách, `useAuth()` i menu v prohlížeči vidí cílového uživatele (s `impersonatedBy`). Middleware
+  hlídá cesty podle role z ověřené cookie, takže `/admin` se v náhledu studenta chová jako u studenta.
+- **Jen pro čtení:** `safeAction` v náhledu odmítne každou akci hláškou „V režimu náhledu nelze nic měnit.“
+  Přímé zápisy mimo `safeAction` si to hlídají samy (`assertNotImpersonating()` v zápisu a odepsání
+  semináře, `isImpersonating()` v registračním API). `sendEventEmail` v náhledu nic neposílá. Při psaní
+  nové akce mimo `safeAction` nebo nového API zápisu na to nezapomeňte.
+- Odhlášení náhled ukončí.
 
 ## Manifest modulu
 
@@ -241,6 +371,8 @@ klient i server:
 - `getAdminStats()` vrací karty se statistikami v administraci,
 - `onUserDelete(tx, userId, replacementUserId)` uklidí data modulu v transakci před
   trvalým smazáním uživatele. Běží i u vypnutého modulu.
+- `runDailyJob(now)` je krok denní úlohy (cron, viz Plánované úlohy); vrací seznam kroků s výsledkem,
+- `getEmailEstimates()` vrací odhad počtu příjemců hromadných upozornění pro Administraci → Upozornění.
 
 ## Oprávnění
 
@@ -347,8 +479,9 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
   - `makeup.sessions.manage` (učitelé, vlastní termíny),
   - `makeup.sessions.manageAll` (admin),
   - `makeup.subjectTeacher`.
+- **E-mailová upozornění:** zrušení a změna termínu, odepsání a přesun studenta dozorem, denní
+  připomínka a souhrn (viz Upozornění).
 - **Zatím chybí:**
-  - e-mailové notifikace,
   - import termínů z Excelu (čeká na ukázku tabulky),
   - omezení počtu zápisů na studenta.
 
@@ -368,6 +501,20 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
 - **Název aplikace:** `lib/app-config.ts`. Změna bez úpravy kódu přes proměnnou prostředí
   `NEXT_PUBLIC_APP_NAME` (na Vercelu, pak nový build). Výchozí je „Školní informační systém“.
 
+## Proměnné prostředí
+
+| Proměnná | Význam |
+|---|---|
+| `DATABASE_URL` | PostgreSQL |
+| `NEXTAUTH_SECRET` | tajemství pro session; podepisuje i cookie náhledu „zobrazit jako“ |
+| `NEXTAUTH_URL` | veřejná adresa aplikace (odkazy v e-mailech, Microsoft 365) |
+| `RESEND_API_KEY` | klíč k Resendu (tajný, jen env) |
+| `EMAIL_FROM`, `EMAIL_REPLY_TO` | výchozí odesílatel a reply-to, v administraci přepsatelné |
+| `EMAIL_TRANSPORT` | `log` = e-maily se jen zapisují do `EmailLog` (testy) |
+| `CRON_SECRET` | tajemství pro `/api/cron/daily`; na Vercelu ho Vercel Cron posílá jako `Authorization: Bearer …`. Bez něj cron nic nespustí. Dlouhá náhodná hodnota. |
+| `AZURE_AD_*` | přihlášení přes Microsoft 365 (viz výše) |
+| `NEXT_PUBLIC_APP_NAME` | název aplikace |
+
 ## Testy a CI
 
 - **E2E testy** (`e2e/*.spec.ts`, Playwright) proklikají aplikaci v prohlížeči nad skutečnou
@@ -377,7 +524,14 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
   3. dopisování (termíny, zápisy, docházka),
   4. uzavření roku (změna třídy, opakování, absolvování, odchod, úvazky),
   5. registrace se třídou a schvalování hostů,
-  6. tabulka dopisování pro studenta.
+  6. tabulka dopisování pro studenta,
+  7. zkušební e-mail a přehled odeslaných e-mailů,
+  8. upozornění: limity, vypnuté události, odhlášení z nepovinných, nezapsaní studenti a ruční připomínka,
+  9. denní cron (autorizace, připomínky, souhrny, idempotence, úklid),
+  10. historie změn,
+  11. náhled „zobrazit jako“ (data studenta, odmítnutí změn, podvržené cookie).
+- E-maily se v testech neposílají: `EMAIL_TRANSPORT=log` jen zapisuje `EmailLog`. Test cronu potřebuje
+  `CRON_SECRET` (v CI je nastavený, lokálně např. `CRON_SECRET=test-cron`).
 - **Před každou sadou se databáze vyprázdní a naplní seedem.** Proto
   **nikdy neukazujte `DATABASE_URL` na produkci**.
 
