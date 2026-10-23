@@ -60,8 +60,12 @@ model User {
   // Aktuální (u absolventů a ukončených poslední) třída studenta; null = není zařazen / není student.
   // Historie po letech je v ClassMembership – mění se vždy společně (modules/core/school.ts).
   classGroupId     String?
-  classGroup       ClassGroup?       @relation(fields: [classGroupId], references: [id], onDelete: SetNull)
+  classGroup       ClassGroup?       @relation("StudentClass", fields: [classGroupId], references: [id], onDelete: SetNull)
   classMemberships ClassMembership[]
+
+  // Třída, kterou si uživatel přál při registraci (host čeká na schválení; po schválení se smaže)
+  requestedClassGroupId String?
+  requestedClassGroup   ClassGroup? @relation("RequestedClass", fields: [requestedClassGroupId], references: [id], onDelete: SetNull)
 
   // Stav studia (jen u studentů)
   studyStatus    StudyStatus     @default(ACTIVE)
@@ -78,9 +82,9 @@ model User {
   makeupSubjectsTaught     MakeupRegistrationSubject[] @relation("MakeupSubjectTeacher")
 
   // ====== zpětné relace ======
-  // Seminar
-  subjectsCreated Seminar[] @relation("SubjectCreatedBy")
-  subjectsUpdated Seminar[] @relation("SubjectUpdatedBy")
+  // Subject
+  subjectsCreated Subject[] @relation("SubjectCreatedBy")
+  subjectsUpdated Subject[] @relation("SubjectUpdatedBy")
 
   // EnrollmentWindow
   enrollmentWindowsCreated EnrollmentWindow[] @relation("EnrollmentWindowCreatedBy")
@@ -107,28 +111,6 @@ model User {
 // =====================================================================
 // MODUL SEMINÁŘE
 // =====================================================================
-
-// Seminář (volitelný předmět do vyššího ročníku)
-model Seminar {
-  id          String  @id @default(cuid())
-  name        String
-  code        String?
-  description String?
-  syllabus    String
-  isActive    Boolean @default(true)
-
-  createdById String
-  createdBy   User   @relation("SubjectCreatedBy", fields: [createdById], references: [id])
-
-  updatedById String?
-  updatedBy   User?   @relation("SubjectUpdatedBy", fields: [updatedById], references: [id])
-
-  // výskyty tohoto předmětu
-  subjectOccurrences SubjectOccurrence[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
 
 model EnrollmentWindow {
   id                String   @id @default(cuid())
@@ -183,9 +165,8 @@ model Block {
 model SubjectOccurrence {
   id String @id @default(cuid())
 
-  // seminář (v kódu historicky "subject")
-  subjectId String  @map("seminarId")
-  subject   Seminar @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
   blockId String
   block   Block  @relation(fields: [blockId], references: [id], onDelete: Cascade)
@@ -261,33 +242,46 @@ model SchoolYear {
   updatedAt DateTime @updatedAt
 }
 
-// Třída. Ročník se dopočítává z roku nástupu a aktuálního školního roku
-// (entryYear 2024 + letter "A" je ve školním roce 2026/27 třída 3.A).
+// Pevná třída (1.A … 4.C). Studenti se mezi třídami jen přesouvají, třídy se zakládají jednou.
+// Ročník studenta = grade jeho třídy; historie po letech je v ClassMembership.
 model ClassGroup {
-  id         String @id @default(cuid())
-  letter     String
-  // startYear školního roku, ve kterém byla třída v 1. ročníku
-  entryYear  Int
-  studyYears Int    @default(4)
+  id     String @id @default(cuid())
+  grade  Int
+  letter String
 
-  students            User[]
+  students            User[]               @relation("StudentClass")
+  requestedBy         User[]               @relation("RequestedClass")
   teachingAssignments TeachingAssignment[]
   classMemberships    ClassMembership[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([entryYear, letter])
+  @@unique([grade, letter])
 }
 
-// Školní předmět (Matematika, Čeština, …)
+// Předmět (Matematika, Čeština, volitelný seminář, …). Do zápisu (blok zápisového okna)
+// lze zařadit jakýkoli aktivní předmět; nemá žádný „typ“.
 model Subject {
-  id       String  @id @default(cuid())
-  name     String
-  code     String  @unique
-  isActive Boolean @default(true)
+  id          String  @id @default(cuid())
+  name        String
+  // Zkratka; nepovinná, ale jedinečná
+  code        String? @unique
+  description String?
+  syllabus    String?
+  // Ročníky (1–4), ve kterých se předmět vyučuje; prázdné = všechny
+  grades      Int[]   @default([])
+  isActive    Boolean @default(true)
+
+  createdById String?
+  createdBy   User?   @relation("SubjectCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  updatedById String?
+  updatedBy   User?   @relation("SubjectUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
   teachingAssignments TeachingAssignment[]
+  // výskyty předmětu v zápisových oknech (modul Semináře)
+  subjectOccurrences  SubjectOccurrence[]
   makeupSessions      MakeupSessionSubject[]
   makeupRegistrations MakeupRegistrationSubject[]
 
