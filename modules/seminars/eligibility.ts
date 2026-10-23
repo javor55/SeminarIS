@@ -1,7 +1,7 @@
 import type { User } from "@/lib/types";
 import { sanitizeGrades } from "@/lib/school";
 import { can } from "@/modules/registry";
-import { getStudentGrade } from "@/modules/core/school";
+import { activeStudentsWhere, getStudentGrade, studentsInGradesWhere } from "@/modules/core/school";
 
 // Cílení zápisových oken na ročníky (EnrollmentWindow.targetGrades, prázdné = všichni).
 
@@ -27,4 +27,9 @@ export function windowsForGradeWhere(grade: number | null) {
 export function isWindowForGrade(targetGrades: readonly number[] | null | undefined, grade: number | null): boolean {
   if (!targetGrades || targetGrades.length === 0) return true;
   return grade != null && targetGrades.includes(grade);
+}
+
+/** Aktivní studenti, pro které je okno určeno (všichni, nebo jen cílové ročníky). */
+export function eligibleStudentsWhere(targetGrades: readonly number[]) {
+  return targetGrades.length === 0 ? activeStudentsWhere : studentsInGradesWhere(targetGrades);
 }

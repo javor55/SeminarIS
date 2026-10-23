@@ -18,6 +18,8 @@ env:
   # E-maily se v testech neodesílají, jen zapisují do logu
   EMAIL_TRANSPORT: log
   EMAIL_FROM: "Školní IS <test@example.com>"
+  # Test endpointu /api/cron/daily
+  CRON_SECRET: ci-cron-secret-not-for-production
 
 jobs:
   checks:

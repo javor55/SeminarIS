@@ -17,13 +17,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
-import { Users, BookOpen, Calendar } from "lucide-react";
+import { Users, BookOpen, Calendar, Bell, History } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { PerformanceBenchmarks } from "@/modules/core/components/admin/PerformanceBenchmarks";
 import { can } from "@/modules/registry";
 import { PageHeader } from "@/components/page-header";
 import { SchoolYearCard } from "@/modules/core/components/admin/SchoolYearCard";
-import { EmailCard } from "@/modules/core/components/admin/EmailCard";
 import type { SchoolYearInfo } from "@/modules/core/school";
 import type { RegistrationClassMode } from "@/modules/core/settings";
 
@@ -247,8 +247,29 @@ export default function AdminPage() {
       {/* PŘIHLÁŠENÍ */}
       {auth && <AuthSettingsCard auth={auth} onChange={setAuth} />}
 
-      {/* E-MAILY */}
-      <EmailCard defaultTo={user.email} />
+      {/* UPOZORNĚNÍ A HISTORIE */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="shadow-sm" data-testid="notifications-link">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" /> Upozornění</CardTitle>
+            <CardDescription>
+              E-mailová upozornění přes Resend: zapnutí, odesílatel, limity, texty, zkušební e-mail a přehled odeslaných e-mailů.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/notifications" className="text-sm font-medium underline underline-offset-4">Otevřít nastavení upozornění</Link>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm" data-testid="history-link">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Historie změn</CardTitle>
+            <CardDescription>Kdo, co a kdy v systému změnil. Nastavení, jak dlouho se historie uchovává.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/history" className="text-sm font-medium underline underline-offset-4">Otevřít historii</Link>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* BENCHMARK A DIAGNOSTIKA */}
       <PerformanceBenchmarks />

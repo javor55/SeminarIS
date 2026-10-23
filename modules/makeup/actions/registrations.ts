@@ -2,13 +2,15 @@
 
 import { safeAction } from "@/lib/safe-action";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { prisma, type TxClient } from "@/lib/prisma";
 import type { User } from "@/lib/types";
 import { requirePermission } from "@/lib/session";
+import { audit } from "@/lib/audit";
 import { formatMinutes, formatTimeRange } from "@/lib/datetime";
 import {
   changeDeadlineOf,
   findStudentConflict,
+  fullName,
   getStudentSubjectIds,
   registrationInclude,
   resolveSubjectTeachers,
@@ -46,6 +48,11 @@ async function requireStudyingStudent() {
   const student = await prisma.user.findUnique({ where: { id: user.id }, select: { studyStatus: true } });
   if (student?.studyStatus !== "ACTIVE") throw new Error("Zapisovat se mohou jen studující studenti.");
   return user;
+}
+
+async function subjectNames(tx: TxClient, ids: string[]) {
+  const subjects = await tx.subject.findMany({ where: { id: { in: ids } }, select: { name: true } });
+  return subjects.map((x) => x.name).sort((a, b) => a.localeCompare(b, "cs")).join(", ");
 }
 
 function assertSubjectsAllowed(subjectIds: string[], allowed: { subjectId: string }[]) {
@@ -101,7 +108,7 @@ export async function registerForSession(sessionId: string, subjectIds: string[]
         }
 
         const teachers = await resolveSubjectTeachers(tx, user.id, ids);
-        await tx.makeupRegistration.create({
+        const created = await tx.makeupRegistration.create({
           data: {
             sessionId,
             studentId: user.id,
@@ -111,6 +118,13 @@ export async function registerForSession(sessionId: string, subjectIds: string[]
               create: ids.map((subjectId) => ({ subjectId, subjectTeacherId: teachers.get(subjectId) ?? null })),
             },
           },
+        });
+        await audit(tx, user, {
+          action: "makeup.registration.add",
+          entityType: "makeupRegistration",
+          entityId: created.id,
+          summary: `${fullName(user)} se zapsal(a) na termín dopisování ${formatTimeRange(s.startsAt, s.endsAt)} (${await subjectNames(tx, ids)})`,
+          data: { sessionId, subjectIds: ids, note: cleanedNote },
         });
       },
       // Souběžné zápisy na poslední volné místo
@@ -142,11 +156,19 @@ export async function updateMyRegistration(registrationId: string, subjectIds: s
 
     await prisma.$transaction(async (tx) => {
       const teachers = await resolveSubjectTeachers(tx, user.id, ids);
+      const before = await subjectNames(tx, r.subjects.map((x) => x.subjectId));
       await tx.makeupRegistrationSubject.deleteMany({ where: { registrationId: r.id } });
       await tx.makeupRegistrationSubject.createMany({
         data: ids.map((subjectId) => ({ registrationId: r.id, subjectId, subjectTeacherId: teachers.get(subjectId) ?? null })),
       });
       await tx.makeupRegistration.update({ where: { id: r.id }, data: { note: cleanedNote } });
+      await audit(tx, user, {
+        action: "makeup.registration.update",
+        entityType: "makeupRegistration",
+        entityId: r.id,
+        summary: `${fullName(user)} upravil(a) svůj zápis na termín ${formatTimeRange(r.session.startsAt, r.session.endsAt)}: předměty ${before} → ${await subjectNames(tx, ids)}`,
+        data: { before: { subjectIds: r.subjects.map((x) => x.subjectId), note: r.note }, after: { subjectIds: ids, note: cleanedNote } },
+      });
     });
     revalidateMakeup();
   });
@@ -158,7 +180,16 @@ export async function cancelMyRegistration(registrationId: string) {
     const user = await requirePermission("makeup.register");
     const r = await loadMyRegistration(user, registrationId);
     if (!r.session.cancelledAt) assertBeforeDeadline(r.session, "Odhlášení");
-    await prisma.makeupRegistration.delete({ where: { id: r.id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.makeupRegistration.delete({ where: { id: r.id } });
+      await audit(tx, user, {
+        action: "makeup.registration.cancel",
+        entityType: "makeupRegistration",
+        entityId: r.id,
+        summary: `${fullName(user)} se odhlásil(a) z termínu dopisování ${formatTimeRange(r.session.startsAt, r.session.endsAt)}${r.session.cancelledAt ? " (zrušený termín)" : ""}`,
+        data: { sessionId: r.sessionId, subjectIds: r.subjects.map((x) => x.subjectId) },
+      });
+    });
     revalidateMakeup();
   });
 }
@@ -192,6 +223,13 @@ export async function moveMyRegistration(registrationId: string, targetSessionId
           throw new Error(`V tu dobu už máte jiný zápis (${formatTimeRange(conflict.session.startsAt, conflict.session.endsAt)}).`);
         }
         await tx.makeupRegistration.update({ where: { id: r.id }, data: { sessionId: target.id } });
+        await audit(tx, user, {
+          action: "makeup.registration.move",
+          entityType: "makeupRegistration",
+          entityId: r.id,
+          summary: `${fullName(user)} se přepsal(a) z termínu ${formatTimeRange(r.session.startsAt, r.session.endsAt)} na termín ${formatTimeRange(target.startsAt, target.endsAt)}`,
+          data: { fromSessionId: r.sessionId, toSessionId: target.id },
+        });
       },
       { isolationLevel: "Serializable" }
     );

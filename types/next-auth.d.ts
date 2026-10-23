@@ -18,6 +18,9 @@ declare module "next-auth" {
       firstName: string;
       lastName: string;
       isActive: boolean;
+      // Jen v režimu „zobrazit jako“: session ukazuje cílového uživatele, tady je skutečný admin
+      classLabel?: string | null;
+      impersonatedBy?: { id: string; name: string } | null;
     };
     // Id zapnutých modulů (pro sestavení menu na klientovi)
     enabledModules: string[];

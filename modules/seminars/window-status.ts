@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { computeEnrollmentStatus } from "@/lib/utils";
+import { notifyWindowOpened } from "@/modules/seminars/notifications";
 
 // === Synchronizace stavu zápisového okna s časem ===
 export async function syncEnrollmentWindowStatus(ew: { id: string; status: string; startsAt: string | Date; endsAt: string | Date }) {
@@ -17,6 +18,8 @@ export async function syncEnrollmentWindowStatus(ew: { id: string; status: strin
       where: { id: ew.id },
       data: { status: newDbStatus as "DRAFT" | "SCHEDULED" | "OPEN" | "CLOSED" },
     });
+    // Okno se právě otevřelo: upozornit studenty (jednou za okno; v náhledu „zobrazit jako“ se nic neděje)
+    if (newDbStatus === "OPEN") await notifyWindowOpened(ew.id);
     return newDbStatus;
   }
   return ew.status;

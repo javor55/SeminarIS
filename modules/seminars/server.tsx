@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { can } from "@/modules/registry";
+import { computeUnenrolled } from "@/modules/seminars/unenrolled";
 import type { EnrollmentWindow, User } from "@/lib/types";
 import type { ModuleServer } from "@/modules/server-types";
 import { EnrollmentView } from "@/modules/seminars/components/enrollment/EnrollmentView";
@@ -6,6 +9,7 @@ import {
   getEnrollmentWindowsVisible,
   getEnrollmentWindowByIdWithBlocks,
 } from "@/modules/seminars/actions/windows";
+import { getSeminarsEmailEstimates, runSeminarsDailyJob } from "@/modules/seminars/notifications";
 
 function findDashboardEnrollment(
   allWindows: EnrollmentWindow[],
@@ -42,6 +46,9 @@ function findDashboardEnrollment(
 }
 
 export const seminarsServer: ModuleServer = {
+  runDailyJob: runSeminarsDailyJob,
+  getEmailEstimates: () => getSeminarsEmailEstimates(),
+
   async getDashboardWidget(user) {
     const visible = await getEnrollmentWindowsVisible();
     const found = findDashboardEnrollment(visible as EnrollmentWindow[], user);
@@ -59,7 +66,27 @@ export const seminarsServer: ModuleServer = {
       );
     }
 
-    return <EnrollmentView enrollmentWindow={ew} currentUser={user} />;
+    // Učitel a admin: u otevřeného okna kolik studentů ještě nemá zapsáno vše
+    let unenrolled: number | null = null;
+    if (ew.status === "OPEN" && can(user.role, "seminars.windows.view")) {
+      unenrolled = (await computeUnenrolled(ew.id))?.students.length ?? null;
+    }
+
+    return (
+      <div className="space-y-6">
+        {unenrolled != null && (
+          <div className="rounded-lg border bg-card p-4 text-sm flex flex-wrap items-center justify-between gap-2" data-testid="unenrolled-widget">
+            <span>
+              V otevřeném zápisu „{ew.name}“ {unenrolled === 0 ? "mají zapsáno všichni studenti." : <>zbývá zapsat <strong>{unenrolled}</strong> {unenrolled === 1 ? "student" : "studentů"}.</>}
+            </span>
+            {unenrolled > 0 && (
+              <Link href={`/enrollments/${ew.id}`} className="font-medium underline underline-offset-4">Zobrazit nezapsané</Link>
+            )}
+          </div>
+        )}
+        <EnrollmentView enrollmentWindow={ew} currentUser={user} />
+      </div>
+    );
   },
 
   async getAdminStats() {

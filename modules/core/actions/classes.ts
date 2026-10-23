@@ -4,6 +4,7 @@ import { safeAction } from "@/lib/safe-action";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
+import { audit } from "@/lib/audit";
 import { DEFAULT_STUDY_YEARS, classLabel, compareClasses, parseLetters, sanitizeGrades } from "@/lib/school";
 
 export type ClassOption = {
@@ -44,23 +45,35 @@ export async function getClassesOverview(): Promise<ClassOverview[]> {
 /** Generátor tříd: všechny kombinace vybraných ročníků a písmen (např. 1–4 × A, B, C). Existující se přeskočí. */
 export async function createClasses(input: { grades: number[]; letters: string }) {
   return safeAction(async () => {
-    await requirePermission("core.users.manage");
+    const admin = await requirePermission("core.users.manage");
     const grades = sanitizeGrades(input.grades);
     if (grades.length === 0) throw new Error(`Vyberte alespoň jeden ročník (1–${DEFAULT_STUDY_YEARS}).`);
     const letters = parseLetters(input.letters);
-    const res = await prisma.classGroup.createMany({
-      data: grades.flatMap((grade) => letters.map((letter) => ({ grade, letter }))),
-      skipDuplicates: true,
+    const wanted = grades.flatMap((grade) => letters.map((letter) => ({ grade, letter })));
+    const res = await prisma.$transaction(async (tx) => {
+      const existing = await tx.classGroup.findMany({ where: { OR: wanted } });
+      const have = new Set(existing.map((c) => classLabel(c)));
+      const missing = wanted.filter((c) => !have.has(classLabel(c)));
+      const created = await tx.classGroup.createMany({ data: missing, skipDuplicates: true });
+      if (created.count > 0) {
+        await audit(tx, admin, {
+          action: "school.class.create",
+          entityType: "classGroup",
+          summary: `Založeny třídy: ${missing.map((c) => classLabel(c)).sort().join(", ")}`,
+          data: { classes: missing.map((c) => classLabel(c)) },
+        });
+      }
+      return created;
     });
     revalidateClasses();
-    return { created: res.count, total: grades.length * letters.length };
+    return { created: res.count, total: wanted.length };
   });
 }
 
 /** Smaže prázdnou třídu (bez studentů a bez historie zařazení). Úvazky třídy se smažou. */
 export async function deleteClass(classGroupId: string) {
   return safeAction(async () => {
-    await requirePermission("core.users.manage");
+    const admin = await requirePermission("core.users.manage");
     const cls = await prisma.classGroup.findUnique({
       where: { id: classGroupId },
       include: { _count: { select: { students: true, classMemberships: true } } },
@@ -68,7 +81,15 @@ export async function deleteClass(classGroupId: string) {
     if (!cls) throw new Error("Třída nenalezena.");
     if (cls._count.students > 0) throw new Error(`Ve třídě ${classLabel(cls)} jsou studenti – nejdřív je přesuňte.`);
     if (cls._count.classMemberships > 0) throw new Error(`Třída ${classLabel(cls)} má historii zařazení studentů, smazat ji nelze.`);
-    await prisma.classGroup.delete({ where: { id: classGroupId } });
+    await prisma.$transaction(async (tx) => {
+      await tx.classGroup.delete({ where: { id: classGroupId } });
+      await audit(tx, admin, {
+        action: "school.class.delete",
+        entityType: "classGroup",
+        entityId: classGroupId,
+        summary: `Smazána prázdná třída ${classLabel(cls)}`,
+      });
+    });
     revalidateClasses();
   });
 }

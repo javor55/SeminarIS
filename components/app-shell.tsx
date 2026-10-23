@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Toaster } from "sonner";
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppTopbar } from "@/components/app-topbar";
+import { ImpersonationBanner } from "@/components/impersonation-banner";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
   <>
+    {user?.impersonatedBy && <ImpersonationBanner user={user} />}
     <header className="print:hidden">
       <AppTopbar user={user} />
     </header>

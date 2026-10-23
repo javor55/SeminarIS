@@ -103,3 +103,12 @@ export function studyStatusLabel(status: StudyStatusValue, reason?: StudyEndReas
   if (status === "LEFT") return `ukončil${reason ? ` (${STUDY_END_REASON_LABELS[reason]})` : ""}`;
   return null;
 }
+
+// === Role ===
+
+export const ROLE_LABELS: Record<string, string> = {
+  GUEST: "host",
+  STUDENT: "student",
+  TEACHER: "učitel",
+  ADMIN: "administrátor",
+};

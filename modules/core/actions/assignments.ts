@@ -4,6 +4,7 @@ import { safeAction } from "@/lib/safe-action";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
+import { audit } from "@/lib/audit";
 import { can } from "@/modules/registry";
 import { classLabel, compareClasses, schoolYearLabel, subjectInGrade, DEFAULT_STUDY_YEARS } from "@/lib/school";
 import { ensureCurrentSchoolYear } from "@/modules/core/school";
@@ -104,7 +105,7 @@ async function assertTeacher(teacherId: string) {
 /** Přidá úvazky učitele pro předmět ve vybraných třídách v aktuálním školním roce. */
 export async function createTeachingAssignments(data: { teacherId: string; subjectId: string; classGroupIds: string[] }) {
   return safeAction(async () => {
-    await requirePermission("core.school.manage");
+    const admin = await requirePermission("core.school.manage");
     if (!data.teacherId || !data.subjectId || data.classGroupIds.length === 0) {
       throw new Error("Vyberte učitele, předmět a alespoň jednu třídu.");
     }
@@ -119,16 +120,46 @@ export async function createTeachingAssignments(data: { teacherId: string; subje
     if (bad) throw new Error(`Předmět ${subject.name} se v ${bad.grade}. ročníku nevyučuje.`);
 
     const year = await ensureCurrentSchoolYear();
-    const res = await prisma.teachingAssignment.createMany({
-      data: classes.map((c) => ({
-        teacherId: data.teacherId,
-        subjectId: data.subjectId,
-        classGroupId: c.id,
-        schoolYearId: year.id,
-      })),
-      skipDuplicates: true,
+    const count = await createAssignments(admin, {
+      teacherId: data.teacherId,
+      subject,
+      classes,
+      yearId: year.id,
+      yearLabel: schoolYearLabel(year.startYear),
     });
     revalidateAssignments();
+    return count;
+  });
+}
+
+type AdminActor = Awaited<ReturnType<typeof requirePermission>>;
+
+/** Založí úvazky a zapíše je do historie změn (jen nově vzniklé; existující se přeskočí). */
+async function createAssignments(
+  admin: AdminActor,
+  a: { teacherId: string; subject: { id: string; name: string }; classes: { id: string; grade: number; letter: string }[]; yearId: string; yearLabel: string }
+) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.teachingAssignment.findMany({
+      where: { teacherId: a.teacherId, subjectId: a.subject.id, schoolYearId: a.yearId, classGroupId: { in: a.classes.map((c) => c.id) } },
+      select: { classGroupId: true },
+    });
+    const have = new Set(existing.map((e) => e.classGroupId));
+    const fresh = a.classes.filter((c) => !have.has(c.id));
+    const res = await tx.teachingAssignment.createMany({
+      data: fresh.map((c) => ({ teacherId: a.teacherId, subjectId: a.subject.id, classGroupId: c.id, schoolYearId: a.yearId })),
+      skipDuplicates: true,
+    });
+    if (res.count > 0) {
+      const teacher = await tx.user.findUnique({ where: { id: a.teacherId }, select: { firstName: true, lastName: true } });
+      await audit(tx, admin, {
+        action: "subjects.assignment.create",
+        entityType: "teachingAssignment",
+        entityId: a.subject.id,
+        summary: `Úvazek ${a.yearLabel}: učitel ${teacher ? `${teacher.firstName} ${teacher.lastName}` : ""} učí předmět „${a.subject.name}“ ve třídách ${fresh.sort(compareClasses).map(classLabel).join(", ")}`,
+        data: { teacherId: a.teacherId, subjectId: a.subject.id, classGroupIds: fresh.map((c) => c.id) },
+      });
+    }
     return res.count;
   });
 }
@@ -136,7 +167,7 @@ export async function createTeachingAssignments(data: { teacherId: string; subje
 /** Stejný učitel pro všechny třídy daného ročníku (detail předmětu, tlačítko u řádku). */
 export async function assignTeacherToGrade(data: { teacherId: string; subjectId: string; grade: number }) {
   return safeAction(async () => {
-    await requirePermission("core.school.manage");
+    const admin = await requirePermission("core.school.manage");
     await assertTeacher(data.teacherId);
     const classes = await prisma.classGroup.findMany({ where: { grade: data.grade } });
     if (classes.length === 0) throw new Error(`V ${data.grade}. ročníku nejsou žádné třídy.`);
@@ -144,24 +175,36 @@ export async function assignTeacherToGrade(data: { teacherId: string; subjectId:
     if (!subject) throw new Error("Předmět nenalezen.");
     if (!subjectInGrade(subject.grades, data.grade)) throw new Error(`Předmět ${subject.name} se v ${data.grade}. ročníku nevyučuje.`);
     const year = await ensureCurrentSchoolYear();
-    const res = await prisma.teachingAssignment.createMany({
-      data: classes.map((c) => ({
-        teacherId: data.teacherId,
-        subjectId: data.subjectId,
-        classGroupId: c.id,
-        schoolYearId: year.id,
-      })),
-      skipDuplicates: true,
+    const count = await createAssignments(admin, {
+      teacherId: data.teacherId,
+      subject,
+      classes,
+      yearId: year.id,
+      yearLabel: schoolYearLabel(year.startYear),
     });
     revalidateAssignments();
-    return res.count;
+    return count;
   });
 }
 
 export async function deleteTeachingAssignment(id: string) {
   return safeAction(async () => {
-    await requirePermission("core.school.manage");
-    await prisma.teachingAssignment.deleteMany({ where: { id } });
+    const admin = await requirePermission("core.school.manage");
+    await prisma.$transaction(async (tx) => {
+      const a = await tx.teachingAssignment.findUnique({
+        where: { id },
+        include: { teacher: { select: { firstName: true, lastName: true } }, subject: { select: { name: true } }, classGroup: true, schoolYear: true },
+      });
+      if (!a) return;
+      await tx.teachingAssignment.delete({ where: { id } });
+      await audit(tx, admin, {
+        action: "subjects.assignment.delete",
+        entityType: "teachingAssignment",
+        entityId: id,
+        summary: `Úvazek ${schoolYearLabel(a.schoolYear.startYear)}: učitel ${a.teacher.firstName} ${a.teacher.lastName} už neučí předmět „${a.subject.name}“ ve třídě ${classLabel(a.classGroup)}`,
+        data: { teacherId: a.teacherId, subjectId: a.subjectId, classGroupId: a.classGroupId },
+      });
+    });
     revalidateAssignments();
   });
 }
