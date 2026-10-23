@@ -9,14 +9,12 @@ import { requireAuth, requireModule, requirePermission } from "@/lib/session";
 import { can } from "@/modules/registry";
 import { syncEnrollmentWindowStatus } from "@/modules/seminars/window-status";
 import { getViewerGrade, isWindowForGrade, sanitizeTargetGrades, windowsForGradeWhere } from "@/modules/seminars/eligibility";
-import { activeStudentsWhere, getCurrentSchoolYear, studentsInGradesWhere } from "@/modules/core/school";
+import { activeStudentsWhere, studentsInGradesWhere } from "@/modules/core/school";
 import { classLabel } from "@/lib/school";
 
 /** Aktivní studenti, pro které je okno určeno (všichni, nebo jen cílové ročníky). */
-async function eligibleStudentsWhere(targetGrades: number[]) {
-  if (targetGrades.length === 0) return activeStudentsWhere;
-  const { startYear } = await getCurrentSchoolYear();
-  return studentsInGradesWhere(targetGrades, startYear);
+function eligibleStudentsWhere(targetGrades: number[]) {
+  return targetGrades.length === 0 ? activeStudentsWhere : studentsInGradesWhere(targetGrades);
 }
 
 // === ČTENÍ DAT ===
@@ -204,9 +202,8 @@ export async function getEnrollmentMatrixData(windowId: string) {
   if (!window) throw new Error("Zápisové okno nenalezeno.");
 
   // 2. Získáme aktivní studenty, pro které je okno určeno
-  const { startYear } = await getCurrentSchoolYear();
   const students = await prisma.user.findMany({
-    where: await eligibleStudentsWhere(window.targetGrades),
+    where: eligibleStudentsWhere(window.targetGrades),
     include: { classGroup: true },
     orderBy: [
       { lastName: "asc" },
@@ -253,7 +250,7 @@ export async function getEnrollmentMatrixData(windowId: string) {
     firstName: s.firstName,
     lastName: s.lastName,
     email: s.email,
-    classLabel: s.classGroup ? classLabel(s.classGroup, startYear) : null,
+    classLabel: s.classGroup ? classLabel(s.classGroup) : null,
     choices: enrollmentMap.get(s.id) || {}
   }));
 
@@ -295,20 +292,19 @@ export async function getEnrollmentDetails(windowId: string) {
 
     // Také potřebujeme všechny studenty (cílových ročníků) pro report nezapsaných
     const allStudents = await prisma.user.findMany({
-        where: await eligibleStudentsWhere(window.targetGrades),
+        where: eligibleStudentsWhere(window.targetGrades),
         include: { classGroup: true },
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }]
     });
 
     // Třída každého studenta ("3.A") pro exporty
-    const { startYear } = await getCurrentSchoolYear();
     const classLabels: Record<string, string> = {};
     const students = [
         ...allStudents,
         ...window.blocks.flatMap(b => b.subjectOccurrences.flatMap(o => o.studentEnrollments.map(e => e.student))),
     ];
     for (const s of students) {
-        if (s.classGroup) classLabels[s.id] = classLabel(s.classGroup, startYear);
+        if (s.classGroup) classLabels[s.id] = classLabel(s.classGroup);
     }
 
     return {
@@ -457,7 +453,7 @@ export async function deleteEnrollmentWindow(windowId: string) {
   return safeAction(async () => {
     await requirePermission("seminars.windows.manage");
     // V schema.prisma je nastaveno onDelete: Cascade, takže Prisma automaticky
-    // smaže i všechny bloky a výskyty seminářů spojené s tímto oknem.
+    // smaže i všechny bloky a výskyty předmětů spojené s tímto oknem.
     const res = await prisma.enrollmentWindow.delete({
       where: { id: windowId },
     });

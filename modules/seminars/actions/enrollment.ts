@@ -34,7 +34,7 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
         }
       });
 
-      if (!targetOcc || targetOcc.deletedAt) throw new Error("Seminář nenalezen.");
+      if (!targetOcc || targetOcc.deletedAt) throw new Error("Předmět nenalezen.");
 
       // 0. Zápis musí být určen pro ročník studenta (učitel/admin může zapsat kohokoliv)
       if (!can(user.role, "seminars.enroll.others")) {
@@ -46,7 +46,7 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
 
       // 1. Kontrola kapacity
       if (targetOcc.capacity !== null && targetOcc.studentEnrollments.length >= targetOcc.capacity) {
-        throw new Error("Kapacita semináře je již naplněna.");
+        throw new Error("Kapacita předmětu je již naplněna.");
       }
 
       // 2. Kontrola, zda už není zapsán v tomto bloku
@@ -60,7 +60,7 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
         }
       });
       if (alreadyInBlock) {
-        throw new Error("V tomto bloku již máte zapsaný jiný seminář. Nejdříve se odepište.");
+        throw new Error("V tomto bloku již máte zapsaný jiný předmět. Nejdříve se odepište.");
       }
 
       // 3. Kontrola duplicity predmetu v ramci stejneho okna (podle subjectId, nezavisle na subCode)
@@ -78,7 +78,7 @@ export async function enrollStudent(studentId: string, subjectOccurrenceId: stri
       });
 
       if (sameSubjectInWindow) {
-        throw new Error("Tento seminář už máte zapsaný v jiném bloku tohoto zápisu.");
+        throw new Error("Tento předmět už máte zapsaný v jiném bloku tohoto zápisu.");
       }
 
       // 4. Kontrola, zda je zápisové okno otevřené (pokud uživatel není ADMIN)

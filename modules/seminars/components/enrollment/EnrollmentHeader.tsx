@@ -114,7 +114,7 @@ export function EnrollmentHeader({
   const handleExportStudentList = async () => {
     try {
       const { window, classLabels } = await getEnrollmentDetails(ew.id);
-      const headers = ["Příjmení", "Jméno", "Email", "Třída", "Blok", "Seminář", "Kód semináře", "Vyučující", "Zapsáno dne"];
+      const headers = ["Příjmení", "Jméno", "Email", "Třída", "Blok", "Předmět", "Kód předmětu", "Vyučující", "Zapsáno dne"];
       const rows: string[][] = [];
 
       window.blocks.forEach(b => {
@@ -147,7 +147,7 @@ export function EnrollmentHeader({
   const handleExportSubjectOccupancy = async () => {
     try {
       const { window } = await getEnrollmentDetails(ew.id);
-      const headers = ["Blok", "Seminář", "Kód semináře", "Vyučující", "Kapacita", "Obsazeno", "Studenti"];
+      const headers = ["Blok", "Předmět", "Kód předmětu", "Vyučující", "Kapacita", "Obsazeno", "Studenti"];
       const rows: string[][] = [];
 
       window.blocks.forEach(b => {
@@ -166,7 +166,7 @@ export function EnrollmentHeader({
       });
 
       const csv = [headers.map(h => `"${h}"`), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`))].map(e => e.join(";")).join("\n");
-      downloadCSV(csv, `obsazenost_seminaru_${ew.name.replace(/\s+/g, "_")}.csv`);
+      downloadCSV(csv, `obsazenost_predmetu_${ew.name.replace(/\s+/g, "_")}.csv`);
       toast.success("Obsazenost exportována.");
     } catch (err: unknown) {
       const error = err as Error;
@@ -177,7 +177,7 @@ export function EnrollmentHeader({
   const handleExportTeacherReports = async () => {
     try {
       const { window, classLabels } = await getEnrollmentDetails(ew.id);
-      const headers = ["Učitel", "Blok", "Seminář", "Kód", "Student", "Email", "Třída"];
+      const headers = ["Učitel", "Blok", "Předmět", "Kód", "Student", "Email", "Třída"];
       const rows: string[][] = [];
 
       window.blocks.forEach(b => {
@@ -344,7 +344,7 @@ export function EnrollmentHeader({
           </div>
           <div>
             <p className="font-medium text-sm">Váš účet čeká na schválení administrátorem</p>
-            <p className="text-xs mt-1">Nyní máte pouze oprávnění k prohlížení aktuálních zápisů. Nemůžete se zapisovat na žádné semináře.</p>
+            <p className="text-xs mt-1">Nyní máte pouze oprávnění k prohlížení aktuálních zápisů. Nemůžete se zapisovat na žádné předměty.</p>
           </div>
         </div>
       )}
@@ -371,7 +371,7 @@ export function EnrollmentHeader({
               <DropdownMenuSeparator />
               <DropdownMenuLabel>Správa a učitelé</DropdownMenuLabel>
               <DropdownMenuItem onClick={handleExportSubjectOccupancy}>
-                Obsazenost seminářů
+                Obsazenost předmětů
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportTeacherReports}>
                 Sestavy pro učitele

@@ -117,7 +117,7 @@ export function getEnrollmentColumns(opts: {
     
     { // Sloupec 5 (Bloky)
       accessorKey: "blocksWithCounts",
-      header: "Bloky (semináře)",
+      header: "Bloky (předměty)",
       cell: ({ row }) => {
         const { blocksWithCounts } = row.original;
         return (

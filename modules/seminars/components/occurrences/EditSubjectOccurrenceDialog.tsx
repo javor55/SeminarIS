@@ -1,6 +1,6 @@
 "use client";
 
-import { SubjectOccurrence, Subject, User, StudentEnrollment } from "@/lib/types";
+import { SubjectOccurrence, User, StudentEnrollment } from "@/lib/types";
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getAllUsers } from "@/modules/core/actions/users";
-import { getSubjects } from "@/modules/seminars/actions/subjects";
+import { getSubjectOptions } from "@/modules/core/actions/subjects";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,7 +46,7 @@ export function EditSubjectOccurrenceDialog({
   onDelete?: (_: string) => void;
   onShowStudents?: (_: string) => void;
 }) {
-  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [subjects, setSubjects] = useState<{ id: string; name: string; code: string | null }[]>([]);
   const [teachers, setTeachers] = useState<User[]>([]);
 
   const [subjectId, setSubjectId] = useState(occurrence.subjectId ?? "");
@@ -66,8 +66,8 @@ export function EditSubjectOccurrenceDialog({
 
   useEffect(() => {
      async function load() {
-       const [subjs, allU] = await Promise.all([getSubjects(), getAllUsers()]);
-       setSubjects(subjs.filter((s) => s.isActive !== false));
+       const [subjs, allU] = await Promise.all([getSubjectOptions(), getAllUsers()]);
+       setSubjects(subjs);
        setTeachers(allU.filter((u) => u.role === "TEACHER"));
      }
      load();
@@ -85,16 +85,16 @@ export function EditSubjectOccurrenceDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {isNew ? "Přidat výskyt semináře" : "Upravit výskyt semináře"}
+            {isNew ? "Přidat výskyt předmětu" : "Upravit výskyt předmětu"}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3 py-2">
           <div className="space-y-1">
-            <label className="text-sm font-medium">Seminář</label>
+            <label className="text-sm font-medium">Předmět</label>
             <Select value={subjectId} onValueChange={setSubjectId}>
               <SelectTrigger>
-                <SelectValue placeholder="Vyber seminář" />
+                <SelectValue placeholder="Vyber předmět" />
               </SelectTrigger>
               <SelectContent>
                 {subjects.map((s) => (
@@ -166,9 +166,9 @@ export function EditSubjectOccurrenceDialog({
           <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Zrušit tento výskyt semináře?</AlertDialogTitle>
+                <AlertDialogTitle>Zrušit tento výskyt předmětu?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Opravdu chcete odstranit tento výskyt semináře z bloku? Tato akce je nevratná.
+                  Opravdu chcete odstranit tento výskyt předmětu z bloku? Tato akce je nevratná.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -194,7 +194,7 @@ export function EditSubjectOccurrenceDialog({
             <Button 
                 onClick={async () => {
                   if (!subjectId) {
-                    alert("Vyberte vyučovaný seminář.");
+                    alert("Vyberte předmět.");
                     return;
                   }
                   

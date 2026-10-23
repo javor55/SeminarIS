@@ -1,10 +1,8 @@
 import type { ReactNode } from "react";
-import { ensureModulePage } from "@/lib/modules";
 
-// Zapnutí modulu se čte z DB při každém požadavku – stránky se nesmí předgenerovat při buildu
+// Předměty patří do jádra (nejdou vypnout), ale zápisy u předmětu čtou stav modulu z DB
 export const dynamic = "force-dynamic";
 
-export default async function SeminarsLayout({ children }: { children: ReactNode }) {
-  await ensureModulePage("seminars");
+export default function SubjectsLayout({ children }: { children: ReactNode }) {
   return children;
 }

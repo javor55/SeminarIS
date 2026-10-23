@@ -95,7 +95,7 @@ export function OccurrencesStudentsDialog({
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              Studenti – {occurrence.subject?.name || "Seminář"} (
+              Studenti – {occurrence.subject?.name || "Předmět"} (
               {occurrence.subCode ?? "bez kódu"})
             </DialogTitle>
             <DialogDescription>

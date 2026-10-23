@@ -47,11 +47,12 @@ export type Block = {
 export type Subject = {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   code?: string | null;
-  syllabus: string;
+  syllabus?: string | null;
+  grades?: number[];
   isActive: boolean;
-  createdById: string;
+  createdById?: string | null;
   updatedById?: string | null;
   createdAt: string | Date;
   updatedAt: string | Date | null;

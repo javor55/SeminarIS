@@ -1,6 +1,6 @@
 // Datové typy modulu Dopisování posílané do klienta (data jako ISO řetězce).
 
-export type MakeupSubjectRef = { id: string; name: string; code: string };
+export type MakeupSubjectRef = { id: string; name: string; code: string | null };
 
 export type MakeupSessionItem = {
   id: string;
