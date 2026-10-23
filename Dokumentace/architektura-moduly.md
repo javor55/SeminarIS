@@ -204,6 +204,25 @@ Po uložení je potřeba nové nasazení (Redeploy).
 - **Kdo se smí přihlásit heslem**: všichni / učitelé a admini / jen admini. Admin vždy.
   Omezení platí jen při zapnutém M365, takže se nikdo nemůže zamknout venku.
 
+## E-maily (Resend)
+
+E-maily se posílají přes [Resend](https://resend.com) z ověřené domény. Kód: `lib/email.ts`
+(`sendEmail`, jen pro server), akce `modules/core/actions/email.ts`.
+
+| Proměnná | Hodnota |
+|---|---|
+| `RESEND_API_KEY` | API klíč z Resendu (Resend → API Keys, stačí oprávnění „Sending access“) |
+| `EMAIL_FROM` | odesílatel z ověřené domény, např. `Školní IS <noreply@skola.cz>` |
+| `EMAIL_REPLY_TO` | volitelně adresa, kam chodí odpovědi |
+| `EMAIL_TRANSPORT` | `log` = nic neposílat, jen vypsat do logu (CI, vývoj) |
+
+Klíč patří jen do proměnných prostředí (je tajný, v databázi ani v administraci se nezobrazuje).
+Odesílatel je zatím také v env; nastavení, která se mění častěji (události, texty, limity),
+přibudou v administraci – viz `Dokumentace/zadani/2026-10-notifikace-audit-nahled.md`.
+
+Administrace → E-maily ukazuje stav konfigurace a umožňuje odeslat zkušební e-mail
+(adresát, předmět, text).
+
 ## Manifest modulu
 
 `modules/<id>/manifest.ts` obsahuje jen data, takže ho může načíst middleware (Edge),

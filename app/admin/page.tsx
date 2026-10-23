@@ -23,6 +23,7 @@ import { PerformanceBenchmarks } from "@/modules/core/components/admin/Performan
 import { can } from "@/modules/registry";
 import { PageHeader } from "@/components/page-header";
 import { SchoolYearCard } from "@/modules/core/components/admin/SchoolYearCard";
+import { EmailCard } from "@/modules/core/components/admin/EmailCard";
 import type { SchoolYearInfo } from "@/modules/core/school";
 import type { RegistrationClassMode } from "@/modules/core/settings";
 
@@ -245,6 +246,9 @@ export default function AdminPage() {
 
       {/* PŘIHLÁŠENÍ */}
       {auth && <AuthSettingsCard auth={auth} onChange={setAuth} />}
+
+      {/* E-MAILY */}
+      <EmailCard defaultTo={user.email} />
 
       {/* BENCHMARK A DIAGNOSTIKA */}
       <PerformanceBenchmarks />
