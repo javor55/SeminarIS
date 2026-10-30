@@ -21,9 +21,11 @@ import { KeyRound } from "lucide-react";
 interface ResetPasswordDialogProps {
   userId: string;
   userName: string;
+  // Textové tlačítko místo ikony (detail uživatele)
+  label?: string;
 }
 
-export function ResetPasswordDialog({ userId, userName }: ResetPasswordDialogProps) {
+export function ResetPasswordDialog({ userId, userName, label }: ResetPasswordDialogProps) {
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -49,9 +51,15 @@ export function ResetPasswordDialog({ userId, userName }: ResetPasswordDialogPro
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Reset hesla">
-          <KeyRound className="w-4 h-4 text-orange-600" />
-        </Button>
+        {label ? (
+          <Button variant="outline" size="sm" className="gap-2" data-testid="user-reset-password">
+            <KeyRound className="w-4 h-4 text-orange-600" /> {label}
+          </Button>
+        ) : (
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Reset hesla">
+            <KeyRound className="w-4 h-4 text-orange-600" />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleReset}>

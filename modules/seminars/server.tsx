@@ -13,6 +13,7 @@ import {
 import { SubjectOccurrencesPanel } from "@/modules/seminars/components/subjects/SubjectOccurrencesPanel";
 import { getSubjectOccurrences } from "@/modules/seminars/actions/occurrences";
 import { getSubjectWindows } from "@/modules/seminars/subject-windows";
+import { UserEnrollmentsPanel } from "@/modules/seminars/user-enrollments";
 import { getSeminarsEmailEstimates, runSeminarsDailyJob } from "@/modules/seminars/notifications";
 
 function findDashboardEnrollment(
@@ -125,6 +126,15 @@ export const seminarsServer: ModuleServer = {
         content: <SubjectOccurrencesPanel occurrences={occurrences} currentUser={user} />,
       },
     ];
+  },
+
+  // Detail uživatele: zápisy studenta po zápisových oknech (učitel a admin)
+  async getUserTabs(userId, viewer) {
+    if (!can(viewer.role, "seminars.windows.view")) return [];
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!target) return [];
+    if (target.role !== "STUDENT" && (await prisma.studentEnrollment.count({ where: { studentId: userId, deletedAt: null } })) === 0) return [];
+    return [{ id: "enrollments", label: "Zápisy", order: 100, content: <UserEnrollmentsPanel userId={userId} canOpenWindows /> }];
   },
 
   async getSubjectUsage(subjectId) {

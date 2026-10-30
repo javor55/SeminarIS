@@ -5,6 +5,7 @@ import { can } from "@/modules/registry";
 import type { ModuleServer } from "@/modules/server-types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { UserMakeupPanel } from "@/modules/makeup/user-makeup";
 import { getMakeupEmailEstimates, runMakeupDailyJob } from "@/modules/makeup/notifications";
 
 export const makeupServer: ModuleServer = {
@@ -75,6 +76,22 @@ export const makeupServer: ModuleServer = {
       );
     }
     return null;
+  },
+
+  // Detail uživatele: zápisy studenta s docházkou, u učitele dozorované termíny. Admin vidí vše,
+  // učitel jen termíny, které dozoruje, a písemky svých předmětů.
+  async getUserTabs(userId, viewer) {
+    if (!can(viewer.role, "makeup.sessions.manage")) return [];
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!target) return [];
+    return [
+      {
+        id: "makeup",
+        label: "Dopisování",
+        order: 110,
+        content: <UserMakeupPanel userId={userId} role={target.role} scope={{ all: can(viewer.role, "makeup.sessions.manageAll"), viewerId: viewer.id }} />,
+      },
+    ];
   },
 
   async getSubjectUsage(subjectId) {

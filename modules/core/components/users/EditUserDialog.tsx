@@ -20,16 +20,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const NO_CLASS = "__none";
 import { toast } from "sonner";
-import { UserRow } from "./users-columns";
+import type { UserListRow as UserRow } from "@/modules/core/users-query";
 import { Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface EditUserDialogProps {
   user: UserRow;
   onSuccess?: () => void;
+  // Textové tlačítko místo ikony (detail uživatele)
+  label?: string;
 }
 
-export function EditUserDialog({ user, onSuccess }: EditUserDialogProps) {
+export function EditUserDialog({ user, onSuccess, label }: EditUserDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -83,15 +85,21 @@ export function EditUserDialog({ user, onSuccess }: EditUserDialogProps) {
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-        title="Upravit profil uživatele"
-        onClick={() => setOpen(true)}
-      >
-        <Pencil className="w-4 h-4" />
-      </Button>
+      {label ? (
+        <Button variant="outline" size="sm" className="gap-2" data-testid="user-edit" onClick={() => setOpen(true)}>
+          <Pencil className="w-4 h-4" /> {label}
+        </Button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+          title="Upravit profil uživatele"
+          onClick={() => setOpen(true)}
+        >
+          <Pencil className="w-4 h-4" />
+        </Button>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
