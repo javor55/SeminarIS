@@ -98,13 +98,33 @@ Jeden model `Subject` pro všechno (dřív zvlášť `Seminar` a `Subject`). Ž�
   zobrazuje odvozený štítek „v zápisu: <název okna>“ podle výskytů (`SubjectOccurrence`)
   v nesmazaných blocích. Štítek dodává modul Semináře přes `getSubjectBadges`
   (`modules/seminars/subject-windows.ts`), jádro o něm nic neví; s vypnutým modulem zmizí.
-- Učitel a admin vidí všechny předměty (filtry ročník / v zápisu / stav). Student vidí aktivní
-  předměty svého ročníku a předměty nabízené v jemu viditelném zápisu.
-- Detail: popis, sylabus, ročníky, vyučující (úvazky), u učitele a admina i zápisy, kde je
-  předmět nabízen (záložka z modulu Semináře přes `getSubjectTabs`, `SubjectOccurrencesPanel`).
-- Před trvalým smazáním detail ukazuje, kde se předmět používá (`getSubjectUsage` všech zapnutých
-  modulů); použití se zapíše i do historie.
-- Dopisování nabízí na termínu všechny aktivní předměty.
+- Učitel a admin vidí všechny předměty (fulltext včetně vyučujících, filtry ročník / štítky modulů /
+  stav). Student vidí aktivní předměty svého ročníku a předměty nabízené v jemu viditelném zápisu.
+- **Štítky z modulů** (`getSubjectBadges`): Semináře „v zápisu: <okno>“, Dopisování „3 termíny
+  dopisování“ (nadcházející neodvolané termíny, odkaz na záložku). Štítek s `filter` tvoří v seznamu
+  filtr „má / nemá“ (`<klíč>:yes|no`).
+- **Detail se záložkami** (`/subjects/[id]?tab=<id>`, sdílená komponenta `components/tab-links.tsx`,
+  stejná jako v detailu uživatele; neznámá nebo nepovolená záložka spadne na první): jádro dává
+  **Přehled** (popis, zkratka, ročníky, štítky, sylabus) a **Vyučující** (úvazky, mřížka tříd), moduly
+  přes `getSubjectTabs`: **Zápisy** (Semináře, jen učitel a admin: výskyty ve všech oknech a blocích,
+  obsazenost, studenti, úpravy) a **Dopisování** (nadcházející a nedávné termíny s předmětem, zapsáno
+  /kapacita, počet na tento předmět; jména a docházku vidí admin u všech termínů a učitel u termínů,
+  které dozoruje, a u studentů, kterým dopisuje jeho předmět; student vidí termíny a jen svůj zápis).
+  Záložka vypnutého modulu zmizí.
+- **Archivace a mazání** (`SubjectLifecycleDialogs`, jen `core.subjects.archive`): dialog vždy vypíše
+  použití (úvazky z jádra + `getSubjectUsage` modulů). **Použitý předmět nejde trvale smazat** –
+  tlačítko mizí a nabízí se archivace; stejně to hlídá server (`deleteSubjectPermanently`). Použití se
+  počítá i z **vypnutých** modulů (jejich data po vypnutí zůstávají; v dialogu s dovětkem „modul je
+  vypnutý“), takže smazání nic tiše nezničí. Smazat jde jen nepoužitý předmět, zápis v historii.
+- **Moje předměty** (`/subjects/mine`, oprávnění `core.subjects.mine` = student a učitel, v menu za
+  Předměty): jádro ukazuje učiteli úvazky (předmět × třídy) a studentovi předměty jeho ročníku s vyučujícím
+  jeho třídy; sekce modulů přes `getMySubjectsSections` (Semináře: učitel vede výskyty s obsazeností,
+  student je zapsán; Dopisování: učitel – kdo dopisuje jeho předměty podle `subjectTeacherId`,
+  student – jeho zápisy).
+- Formulář termínu dopisování: předměty seskupené podle ročníků (`SubjectPicker`), nahoře předměty
+  dozorujícího z úvazků aktuálního roku (admin po přepnutí dozorujícího), hledání bez ohledu na diakritiku.
+- Štítky/kategorie předmětů (např. „seminář“, „jazyk“) se neimplementovaly: vyžadují nový model
+  a správu číselníku, filtrování podle modulových štítků a ročníku zatím stačí.
 
 ### Třídy (Administrace → Školní rok a třídy, `/admin/school-year`)
 
@@ -453,9 +473,10 @@ vynechají, stránka jádra se neshodí. Id záložek, štítků a položek jád
 
 | Bod rozšíření | Sběr | Použití |
 | --- | --- | --- |
-| `getSubjectTabs(subjectId, user)` | `collectSubjectTabs` | záložky detailu předmětu (do F4 zobrazené pod sebou, `data-subject-tab`) |
+| `getSubjectTabs(subjectId, user)` | `collectSubjectTabs` | záložky detailu předmětu `/subjects/[id]` (`?tab=<modul>.<id>`, `data-subject-tab`), jádro má 0–99, moduly 100+ |
 | `getSubjectBadges(subjectIds, user)` | `collectSubjectBadges` | štítky v seznamu a detailu předmětů, filtr (`filter`), `grantsAccess` zpřístupní předmět studentovi mimo jeho ročník |
-| `getSubjectUsage(subjectId)` | `collectSubjectUsage` | použití předmětu před smazáním/archivací |
+| `getSubjectUsage(subjectId)` | `collectSubjectUsage` | použití předmětu v dialogu archivace/mazání; počítá i vypnuté moduly, použitý předmět nejde smazat |
+| `getMySubjectsSections(user)` | `collectMySubjectsSections` | sekce stránky „Moje předměty“ (`/subjects/mine`) |
 | `getUserTabs(userId, viewer)` | `collectUserTabs` | záložky detailu uživatele `/users/[id]` (`?tab=<modul>.<id>`), jádro má 0–99, moduly 100+ |
 | `getAdminTodos(user)` | `collectAdminTodos` | přehled „co udělat“ v administraci (F2) |
 | `bulkUserActions` | `collectBulkUserActions` | hromadné akce v seznamu uživatelů (parametry, náhled dopadu, jedna transakce, audit) |
@@ -463,8 +484,8 @@ vynechají, stránka jádra se neshodí. Id záložek, štítků a položek jád
 | `adminSections` (v manifestu) | `collectAdminSections` | boční menu administrace (jádro i moduly, podle oprávnění) |
 | `settings` (v manifestu) | registr nastavení | deklarace nastavení modulu |
 
-Zapojené jsou `getSubjectTabs`, `getSubjectBadges`, `getSubjectUsage` (Semináře; Dopisování dodává
-`getSubjectUsage`, záložky přijdou ve F4), `getAdminTodos` (jádro, Semináře, Dopisování), `getAdminStats`,
+Zapojené jsou `getSubjectTabs`, `getSubjectBadges`, `getSubjectUsage`, `getMySubjectsSections` (Semináře
+i Dopisování), `getAdminTodos` (jádro, Semináře, Dopisování), `getAdminStats`,
 `adminSections` a `settings`. `getUserTabs` dodávají Semináře (Zápisy) a Dopisování, `bulkUserActions` jádro
 (viz Seznam a detail uživatele); „přidat do publika zápisu“ přijde ve F5.
 
@@ -585,7 +606,7 @@ Dál ručně:
 4. Stránky do `app/<cesta>/` (každá složka cest modulu má `layout.tsx` s `ensureModulePage("<id>")`
    a `export const dynamic = "force-dynamic"`).
 5. V `server.tsx` implementovat potřebné body rozšíření (widget, statistiky, `onUserDelete` pro tabulky
-   odkazující na uživatele, `getSubjectTabs` / `getSubjectBadges` / `getSubjectUsage`, `getAdminTodos`, …).
+   odkazující na uživatele, `getSubjectTabs` / `getSubjectBadges` / `getSubjectUsage` / `getMySubjectsSections`, `getAdminTodos`, …).
 6. Časy zobrazovat přes `lib/datetime.ts` (pásmo Europe/Prague). Server na Vercelu běží v UTC.
 7. Modul nesmí importovat jiný modul ani ho jádro (ESLint to hlídá); sdílené věci do jádra.
 
@@ -710,6 +731,11 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
   13. uživatelé (`13-users.spec.ts`): detail se záložkami (včetně zmizení záložky vypnutého modulu), filtry v URL
       a stránkování na serveru, „vybrat vše odpovídající filtru“ + hromadný přesun s jedním záznamem v historii,
       hromadný e-mail s limitem, ostatní hromadné akce a export CSV, učitel jen čte, student nemá přístup.
+
+  14. předměty (`14-subjects.spec.ts`): záložky detailu podle modulů a oprávnění (admin, učitel, student),
+      štítek „N termínů dopisování“ a filtr, dialog použití a zákaz smazání použitého předmětu (i na
+      serveru a pro vypnutý modul), Moje předměty (učitel, student, admin bez stránky), seskupený výběr
+      předmětů ve formuláři termínu.
 
   Vypnutí modulu Semináře (test 1) ověřuje, že z detailu i seznamu předmětů zmizí jeho panel a štítek.
 - **Kontraktový test modulů** (`npm run test:contract`, `scripts/contract-test.ts`, bez DB a buildu, běží
