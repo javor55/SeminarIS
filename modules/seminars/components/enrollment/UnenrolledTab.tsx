@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ConfirmAction } from "@/modules/core/components/users/ConfirmAction";
 import { getUnenrolledView, remindUnenrolled, type UnenrolledView } from "@/modules/seminars/actions/unenrolled";
 
-/** Záložka „Nezapsaní“: studenti cílových ročníků, kteří nemají zápis ve všech blocích. */
+/** Záložka „Nezapsaní“: studenti z publika zápisu, kterým chybí zápis v povinných blocích. */
 export function UnenrolledTab({
   windowId,
   windowName,
@@ -84,7 +84,7 @@ export function UnenrolledTab({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm text-muted-foreground" data-testid="unenrolled-count">
           {total === 0
-            ? "Všichni studenti cílových ročníků jsou zapsaní ve všech blocích."
+            ? "Všichni studenti z publika zápisu mají zapsáno vše potřebné v povinných blocích."
             : `Nezapsaných studentů: ${total}${classId ? ` (ve vybrané třídě ${rows.length})` : ""}`}
         </div>
         <div className="flex flex-wrap items-center gap-2">

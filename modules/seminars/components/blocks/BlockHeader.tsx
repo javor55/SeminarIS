@@ -10,6 +10,7 @@ import { EditBlockDialog } from "@/modules/seminars/components/blocks/EditBlockD
 import { EditSubjectOccurrenceDialog } from "@/modules/seminars/components/occurrences/EditSubjectOccurrenceDialog";
 import { moveBlock, deleteBlock, updateBlock, createSubjectOccurrence, updateSubjectOccurrence, deleteSubjectOccurrence } from "@/modules/seminars/actions/windows";
 import { toast } from "sonner";
+import { blockRulesLabel } from "@/modules/seminars/window-rules";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +46,9 @@ export function BlockHeader({
       <div className="px-4 py-3 border-b flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
           <h2 className="font-medium truncate">{block.name}</h2>
+          <p className="text-xs text-muted-foreground" data-testid="block-rules">
+            {blockRulesLabel({ required: block.required ?? true, minEnrollments: block.minEnrollments ?? 1, maxEnrollments: block.maxEnrollments ?? 1 })}
+          </p>
           {block.description ? (
             <p className="text-sm text-muted-foreground truncate">
               {block.description}
@@ -172,8 +176,8 @@ export function BlockHeader({
                 unwrap(await updateBlock(data));
                 toast.success("Blok byl upraven");
                 router.refresh();
-              } catch {
-                toast.error("Blok se nepodařilo upravit");
+              } catch (e) {
+                toast.error((e as Error).message || "Blok se nepodařilo upravit");
               }
             }}
           />

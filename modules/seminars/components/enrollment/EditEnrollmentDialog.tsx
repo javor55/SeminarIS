@@ -3,6 +3,7 @@
 import { unwrap } from "@/lib/action-result";
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -36,13 +37,12 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { updateEnrollmentWindow, createEnrollmentWindow, deleteEnrollmentWindow } from "@/modules/seminars/actions/windows";
-import { DEFAULT_STUDY_YEARS } from "@/lib/school";
-
-const GRADES = Array.from({ length: DEFAULT_STUDY_YEARS }, (_, i) => i + 1);
+import { NativeSelect } from "@/components/ui/native-select";
+import { AudiencePicker, emptyAudienceState, type AudienceState } from "@/modules/seminars/components/audience/AudiencePicker";
 import { EnrollmentStatus, EnrollmentWindowWithBlocks } from "@/lib/types";
 
 type EditEnrollmentDialogProps = {
-  enrollment: Partial<EnrollmentWindowWithBlocks> & { id?: string; name?: string; description?: string | null; status?: EnrollmentStatus; startsAt?: string | Date; endsAt?: string | Date; visibleToStudents?: boolean; targetGrades?: number[]; reminderDaysBefore?: number | null };
+  enrollment: Partial<EnrollmentWindowWithBlocks> & { id?: string; name?: string; description?: string | null; status?: EnrollmentStatus; startsAt?: string | Date; endsAt?: string | Date; visibleToStudents?: boolean; reminderDaysBefore?: number | null };
   onOpenChange: (open: boolean) => void;
 };
 
@@ -71,10 +71,19 @@ export function EditEnrollmentDialog({
   const [visibleToStudents, setVisibleToStudents] = React.useState(
     enrollment.visibleToStudents ?? false
   );
-  // Prázdné = zápis pro všechny ročníky
-  const [targetGrades, setTargetGrades] = React.useState<number[]>(
-    enrollment.targetGrades ?? []
+  // Publikum; prázdné = všichni aktivní studenti
+  const [audience, setAudience] = React.useState<AudienceState>(() => {
+    const v = enrollment.audienceView;
+    if (!v) return emptyAudienceState();
+    return { draft: v.draft, users: v.users, excluded: v.excluded };
+  });
+  // Pravidla okna
+  const [allowSelfUnenroll, setAllowSelfUnenroll] = React.useState(enrollment.allowSelfUnenroll ?? true);
+  const [customDeadline, setCustomDeadline] = React.useState(!!enrollment.changesUntil);
+  const [changesUntil, setChangesUntil] = React.useState<Date>(
+    new Date(enrollment.changesUntil ?? enrollment.endsAt ?? Date.now() + 7 * 24 * 60 * 60 * 1000)
   );
+  const [resultsVisibility, setResultsVisibility] = React.useState<"COUNTS" | "NAMES">(enrollment.resultsVisibility ?? "COUNTS");
   // Prázdné = automatická připomínka nezapsaným se neposílá
   const [reminderDays, setReminderDays] = React.useState<string>(
     enrollment.reminderDaysBefore != null ? String(enrollment.reminderDaysBefore) : ""
@@ -97,7 +106,10 @@ export function EditEnrollmentDialog({
         description,
         status,
         visibleToStudents,
-        targetGrades,
+        audience: audience.draft,
+        allowSelfUnenroll,
+        changesUntil: customDeadline ? changesUntil.toISOString() : null,
+        resultsVisibility,
         reminderDaysBefore: reminderDays.trim() === "" ? null : Number(reminderDays),
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
@@ -117,7 +129,7 @@ export function EditEnrollmentDialog({
     } catch (e: unknown) {
       // eslint-disable-next-line no-console
       console.error(e);
-      alert("Došlo k chybě při ukládání okna.");
+      toast.error((e as Error).message || "Došlo k chybě při ukládání okna.");
     } finally {
       setSaving(false);
     }
@@ -207,33 +219,33 @@ export function EditEnrollmentDialog({
               Viditelné pro studenty
             </Label>
           </div>
-          <div className="space-y-1 pt-2">
-            <Label className="text-sm font-medium">Pro ročníky</Label>
-            <div className="flex flex-wrap gap-2" id="targetGrades">
-              {GRADES.map((g) => {
-                const active = targetGrades.includes(g);
-                return (
-                  <button
-                    key={g}
-                    type="button"
-                    data-grade={g}
-                    onClick={() =>
-                      setTargetGrades((prev) =>
-                        active ? prev.filter((x) => x !== g) : [...prev, g].sort((a, b) => a - b)
-                      )
-                    }
-                    className={`rounded-md border px-3 py-1 text-sm ${active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
-                  >
-                    {g}. ročník
-                  </button>
-                );
-              })}
+          <AudiencePicker value={audience} onChange={setAudience} />
+          <div className="space-y-3 rounded-md border p-3" data-testid="window-rules">
+            <Label className="text-sm font-medium">Pravidla zápisu</Label>
+            <div className="flex items-center space-x-2">
+              <Switch id="allowSelfUnenroll" checked={allowSelfUnenroll} onCheckedChange={setAllowSelfUnenroll} />
+              <Label htmlFor="allowSelfUnenroll" className="text-sm">Student se může sám odepsat nebo přepsat zápis</Label>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {targetGrades.length === 0
-                ? "Nevybráno nic = zápis vidí a mohou se zapsat studenti všech ročníků."
-                : "Zápis uvidí jen studenti zařazení do tříd vybraných ročníků (Uživatelé → Třída)."}
-            </p>
+            <div className="space-y-1">
+              <Label className="text-sm" htmlFor="changesMode">Změny zápisu studenty povoleny do</Label>
+              <NativeSelect id="changesMode" value={customDeadline ? "custom" : "end"} onChange={(e) => setCustomDeadline(e.target.value === "custom")} disabled={!allowSelfUnenroll}>
+                <option value="end">Konce zápisu</option>
+                <option value="custom">Vlastního termínu</option>
+              </NativeSelect>
+              {customDeadline && allowSelfUnenroll && (
+                <div data-testid="changes-until">
+                  <DateTimePicker className="w-full" value={changesUntil} onChange={(date) => date && setChangesUntil(date)} />
+                  <p className="text-xs text-muted-foreground mt-1">Po tomto termínu se studenti už nemohou odepsat ani přepsat; nový zápis do bloku bez zápisu je možný do konce zápisu.</p>
+                </div>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-sm" htmlFor="resultsVisibility">Co vidí studenti o zapsaných</Label>
+              <NativeSelect id="resultsVisibility" value={resultsVisibility} onChange={(e) => setResultsVisibility(e.target.value as "COUNTS" | "NAMES")}>
+                <option value="COUNTS">Jen počty zapsaných</option>
+                <option value="NAMES">Počty i jména zapsaných</option>
+              </NativeSelect>
+            </div>
           </div>
           <div className="space-y-1 pt-2">
             <Label className="text-sm font-medium" htmlFor="reminderDaysBefore">

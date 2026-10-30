@@ -20,6 +20,9 @@ import {
 } from "@/components/ui/select";
 import { getAllUsers } from "@/modules/core/actions/users";
 import { getSubjectOptions } from "@/modules/core/actions/subjects";
+import { getAudienceOptions } from "@/modules/seminars/actions/windows";
+import { DEFAULT_STUDY_YEARS } from "@/lib/school";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,9 +57,15 @@ export function EditSubjectOccurrenceDialog({
   const [subCode, setSubCode] = useState(occurrence.subCode ?? "");
   const [capacity, setCapacity] = useState<string | number>(occurrence.capacity ?? "");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Omezení výskytu na ročníky / třídy (obojí prázdné = pro všechny z publika zápisu)
+  const [restrictGrades, setRestrictGrades] = useState<number[]>(occurrence.restrictGrades ?? []);
+  const [restrictClassIds, setRestrictClassIds] = useState<string[]>((occurrence.restrictClasses ?? []).map((c) => c.id));
+  const [classOptions, setClassOptions] = useState<{ id: string; label: string }[]>([]);
 
   useEffect(() => {
     if (open) {
+      setRestrictGrades(occurrence.restrictGrades ?? []);
+      setRestrictClassIds((occurrence.restrictClasses ?? []).map((c) => c.id));
       setSubjectId(occurrence.subjectId ?? "");
       setTeacherId(occurrence.teacherId ?? "");
       setSubCode(occurrence.subCode ?? "");
@@ -69,6 +78,7 @@ export function EditSubjectOccurrenceDialog({
        const [subjs, allU] = await Promise.all([getSubjectOptions(), getAllUsers()]);
        setSubjects(subjs);
        setTeachers(allU.filter((u) => u.role === "TEACHER"));
+       getAudienceOptions().then(setClassOptions).catch(() => setClassOptions([]));
      }
      load();
   }, []);
@@ -142,6 +152,47 @@ export function EditSubjectOccurrenceDialog({
               />
             </div>
           </div>
+
+          <div className="space-y-2 rounded-md border p-3" data-testid="occurrence-restriction">
+            <label className="text-sm font-medium">Určeno pro (volitelné omezení)</label>
+            <p className="text-xs text-muted-foreground">
+              Bez výběru je předmět určen všem z publika zápisu. Jinak ho uvidí a zapsat se na něj mohou jen studenti vybraných ročníků nebo tříd.
+            </p>
+            <div className="flex flex-wrap gap-2" id="occurrence-grades">
+              {Array.from({ length: DEFAULT_STUDY_YEARS }, (_, i) => i + 1).map((g) => {
+                const active = restrictGrades.includes(g);
+                return (
+                  <button
+                    key={g}
+                    type="button"
+                    data-grade={g}
+                    aria-pressed={active}
+                    onClick={() => setRestrictGrades((prev) => (active ? prev.filter((x) => x !== g) : [...prev, g].sort((a, b) => a - b)))}
+                    className={`rounded-md border px-3 py-1 text-sm ${active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
+                  >
+                    {g}. ročník
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-1.5" id="occurrence-classes">
+              {classOptions.map((c) => {
+                const active = restrictClassIds.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    data-class={c.label}
+                    aria-pressed={active}
+                    onClick={() => setRestrictClassIds((prev) => (active ? prev.filter((x) => x !== c.id) : [...prev, c.id]))}
+                    className={`rounded-md border px-2.5 py-0.5 text-xs ${active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-between items-center mt-4 gap-2">
@@ -205,13 +256,20 @@ export function EditSubjectOccurrenceDialog({
                   }
 
                   if (onSubmit) {
-                    await onSubmit({
-                      ...occurrence,
-                      subjectId,
-                      teacherId: teacherId || null,
-                      subCode: subCode || null,
-                      capacity: capNum,
-                    } as unknown as SubjectOccurrence);
+                    try {
+                      await onSubmit({
+                        ...occurrence,
+                        subjectId,
+                        teacherId: teacherId || null,
+                        subCode: subCode || null,
+                        capacity: capNum,
+                        restrictGrades,
+                        restrictClassIds,
+                      } as unknown as SubjectOccurrence);
+                    } catch (e) {
+                      toast.error((e as Error).message || "Předmět se nepodařilo uložit.");
+                      return;
+                    }
                   }
                   onOpenChange(false);
                 }}

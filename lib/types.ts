@@ -27,8 +27,19 @@ export type EnrollmentWindow = {
   startsAt: string | Date;
   endsAt: string | Date;
   visibleToStudents: boolean;
-  // Cílové ročníky; prázdné = všichni
-  targetGrades?: number[];
+  // Pravidla okna (modul Semináře): smí se student sám odepsat, do kdy smí měnit zápis (null = konec okna),
+  // co o zapsaných vidí studenti
+  allowSelfUnenroll?: boolean;
+  changesUntil?: string | Date | null;
+  resultsVisibility?: "COUNTS" | "NAMES";
+  // Publikum okna (jen pro učitele a adminy): ročníky, třídy, studenti, vynechaní a čitelný popis
+  audienceView?: {
+    draft: { grades: number[]; classIds: string[]; userIds: string[]; excludeUserIds: string[] };
+    classes: { id: string; label: string }[];
+    users: { id: string; name: string; email: string }[];
+    excluded: { id: string; name: string; email: string }[];
+    summary: string;
+  };
   // Automatická připomínka nezapsaným N dní před koncem (null = ne)
   reminderDaysBefore?: number | null;
   createdById: string;
@@ -42,6 +53,10 @@ export type Block = {
   name: string;
   order: number;
   description?: string;
+  // Povinný blok a počet zápisů, které student v bloku má / smí mít
+  required?: boolean;
+  minEnrollments?: number;
+  maxEnrollments?: number;
   enrollmentWindowId: string;
   createdById: string;
   updatedById?: string;
@@ -71,6 +86,9 @@ export type SubjectOccurrence = {
   teacherId: string;
   subCode?: string;
   capacity: number | null;
+  // Omezení výskytu na ročníky a třídy (obojí prázdné = bez omezení)
+  restrictGrades?: number[];
+  restrictClasses?: { id: string; grade: number; letter: string }[];
   createdById: string;
   updatedById?: string;
   createdAt: string | Date;
@@ -93,7 +111,9 @@ export type StudentEnrollment = {
 export type SubjectOccurrenceWithRelations = SubjectOccurrence & {
   subject: Subject;
   teacher?: User | null;
+  // Student dostane jen své zápisy; počet všech zápisů je v `enrolledCount`
   enrollments: StudentEnrollment[];
+  enrolledCount?: number;
 };
 
 export type EnrollmentWindowWithBlocks = EnrollmentWindow & {
