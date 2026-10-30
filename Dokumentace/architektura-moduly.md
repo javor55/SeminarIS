@@ -9,13 +9,14 @@ dalším bude zápis na dopisovací písemky.
 
 ```
 modules/
-  types.ts              typ ModuleManifest (čistá data)
+  types.ts              typ ModuleManifest (čistá data) a datové typy bodů rozšíření
   server-types.ts       typ ModuleServer (serverové háčky)
   registry.ts           seznam modulů, can(), menu, oprávnění k cestám  ← i pro middleware a klienta
   server-registry.ts    serverové části modulů                           ← jen server
   core/                 jádro: uživatelé, třídy, předměty, profil, administrace
     manifest.ts
     server.tsx          dashboard (výzva k výběru třídy, čekající účty), statistiky do administrace
+    extensions.ts       sběr bodů rozšíření ze zapnutých modulů (collectSubjectTabs, …)
     settings.ts         globální nastavení (registrace, výchozí role, výběr třídy při registraci)
     school.ts           dotazy nad školou pro všechny moduly (aktuální rok, ročník studenta, setStudentClass, …)
     actions/            server actions: users.ts (vč. stavu studia), classes.ts, approvals.ts, subjects.ts,
@@ -28,7 +29,7 @@ modules/
     eligibility.ts      cílení zápisových oken na ročníky
     unenrolled.ts       nezapsaní studenti okna a ruční/automatická připomínka
     notifications.ts    e-maily modulu (zápis otevřen, připomínka nezapsaným) a jeho denní úloha
-    subject-windows.ts  „v zápisu“: ve kterých oknech je předmět nabízen (pro jádro)
+    subject-windows.ts  „v zápisu“: ve kterých oknech je předmět nabízen (podklad pro štítky předmětů)
   makeup/               dopisování písemek (termíny, zápisy, docházka)
     manifest.ts, server.tsx, data.ts (interní dotazy), types.ts, notifications.ts (e-maily a denní úloha)
     actions/            sessions.ts (dozor), registrations.ts (student)
@@ -88,11 +89,14 @@ Jeden model `Subject` pro všechno (dřív zvlášť `Seminar` a `Subject`). Ž�
   `core.subjects.edit` (učitel, admin), `core.subjects.archive` (admin; archivace a trvalé smazání).
 - **Do zápisu (blok zápisového okna) lze zařadit jakýkoli aktivní předmět.** U předmětu se
   zobrazuje odvozený štítek „v zápisu: <název okna>“ podle výskytů (`SubjectOccurrence`)
-  v nesmazaných blocích (`modules/seminars/subject-windows.ts`).
+  v nesmazaných blocích. Štítek dodává modul Semináře přes `getSubjectBadges`
+  (`modules/seminars/subject-windows.ts`), jádro o něm nic neví; s vypnutým modulem zmizí.
 - Učitel a admin vidí všechny předměty (filtry ročník / v zápisu / stav). Student vidí aktivní
   předměty svého ročníku a předměty nabízené v jemu viditelném zápisu.
 - Detail: popis, sylabus, ročníky, vyučující (úvazky), u učitele a admina i zápisy, kde je
-  předmět nabízen (panel z modulu Semináře, `SubjectOccurrencesPanel`).
+  předmět nabízen (záložka z modulu Semináře přes `getSubjectTabs`, `SubjectOccurrencesPanel`).
+- Před trvalým smazáním detail ukazuje, kde se předmět používá (`getSubjectUsage` všech zapnutých
+  modulů); použití se zapíše i do historie.
 - Dopisování nabízí na termínu všechny aktivní předměty.
 
 ### Třídy (Uživatelé → Třídy)
@@ -361,7 +365,10 @@ klient i server:
 - `permissions`: oprávnění modulu (`"<modul>.<akce>"`) a role, které je mají,
 - `nav`: položky menu včetně oprávnění a pořadí,
 - `routes`: prefixy cest, které hlídá middleware,
-- `enabledByDefault` / `core`: výchozí stav; jádro nejde vypnout.
+- `enabledByDefault` / `core`: výchozí stav; jádro nejde vypnout,
+- `adminSections` (volitelné): položky bočního menu administrace (F2),
+- `settings` (volitelné): deklarace nastavení modulu – klíč `<modul>.<název>`, typ, výchozí hodnota,
+  popisek, validace (F2, jednotný registr nastavení).
 
 ## Serverová část modulu
 
@@ -373,6 +380,39 @@ klient i server:
   trvalým smazáním uživatele. Běží i u vypnutého modulu.
 - `runDailyJob(now)` je krok denní úlohy (cron, viz Plánované úlohy); vrací seznam kroků s výsledkem,
 - `getEmailEstimates()` vrací odhad počtu příjemců hromadných upozornění pro Administraci → Upozornění.
+
+### Body rozšíření jádra
+
+Jádro o modulech nic neví, moduly do něj jen „přispívají“. Body rozšíření jsou volitelné metody
+`ModuleServer` (`modules/server-types.ts`); jádro je sbírá **jen ze zapnutých modulů** funkcemi
+v `modules/core/extensions.ts` (`collect*`). Chyba jednoho modulu se zaloguje a jeho příspěvky se
+vynechají, stránka jádra se neshodí. Id záložek, štítků a položek jádro prefixuje id modulu
+(`seminars.occurrences`). Oprávnění uživatele si bod hlídá sám (jádro kontroluje jen zapnutí modulu).
+
+| Bod rozšíření | Sběr | Použití |
+| --- | --- | --- |
+| `getSubjectTabs(subjectId, user)` | `collectSubjectTabs` | záložky detailu předmětu (do F4 zobrazené pod sebou, `data-subject-tab`) |
+| `getSubjectBadges(subjectIds, user)` | `collectSubjectBadges` | štítky v seznamu a detailu předmětů, filtr (`filter`), `grantsAccess` zpřístupní předmět studentovi mimo jeho ročník |
+| `getSubjectUsage(subjectId)` | `collectSubjectUsage` | použití předmětu před smazáním/archivací |
+| `getUserTabs(userId, viewer)` | `collectUserTabs` | záložky detailu uživatele (F3) |
+| `getAdminTodos(user)` | `collectAdminTodos` | přehled „co udělat“ v administraci (F2) |
+| `bulkUserActions` | `collectBulkUserActions` | hromadné akce nad uživateli (F3) |
+| `adminSections`, `settings` (v manifestu) | – | menu administrace a deklarace nastavení (F2) |
+
+Zapojené jsou zatím `getSubjectTabs`, `getSubjectBadges` a `getSubjectUsage` (Semináře; Dopisování
+dodává `getSubjectUsage`, záložky přijdou ve F4). Ostatní body jsou definované a mají sběrné funkce,
+UI na nich vznikne v dalších fázích.
+
+### Hranice mezi jádrem a moduly
+
+ESLint (`no-restricted-imports` v `.eslintrc.json`, chyba při `npm run lint`):
+
+- `modules/core/**`, `lib/**`, `components/**` a stránky jádra (`app/**` kromě složek modulů)
+  nesmějí importovat `@/modules/seminars/**` ani `@/modules/makeup/**`,
+- `modules/seminars/**` (a `app/enrollments/**`) nesmí importovat `modules/makeup` a naopak,
+- jediná výjimka: `modules/registry.ts` a `modules/server-registry.ts`.
+
+Co moduly sdílejí, patří do jádra; co jádro potřebuje od modulů, jde přes body rozšíření.
 
 ## Oprávnění
 
@@ -407,16 +447,31 @@ Data zůstávají v databázi.
 
 Vzorem je modul Dopisování (`modules/makeup/`).
 
-1. `modules/<id>/manifest.ts`: id, název, oprávnění, menu, chráněné cesty.
-2. Přidat manifest do `MODULES` v `modules/registry.ts`.
-3. Modely do `prisma/schema.prisma` (do vlastní sekce) a vytvořit migraci
+```bash
+npm run new-module <id> "<Název>"   # např. npm run new-module attendance "Docházka"
+```
+
+Příkaz (`scripts/new-module.mjs`, jen Node) vytvoří kostru a zaregistruje ji v obou registrech:
+`modules/<id>/manifest.ts`, `modules/<id>/server.tsx`, `app/<id>/layout.tsx` (`force-dynamic` +
+`ensureModulePage`), `app/<id>/page.tsx` a prázdný `e2e/NN-<id>.spec.ts`. `id` jsou malá písmena a číslice.
+Dál ručně:
+
+1. V `manifest.ts` doplnit oprávnění (prefix `<id>.`), menu a chráněné cesty (`routes`).
+2. Modely do `prisma/schema.prisma` (do vlastní sekce) a migrace
    (`npx prisma migrate dev --name <id>`, viz níže).
-4. Server actions do `modules/<id>/actions/*.ts` (`"use server"`). Každá začíná
+3. Server actions do `modules/<id>/actions/*.ts` (`"use server"`). Každá začíná
    `requirePermission(...)`.
-5. Stránky do `app/<cesta>/` a `layout.tsx` s `ensureModulePage("<id>")`.
-6. Podle potřeby `modules/<id>/server.tsx` (widget, statistiky, `onUserDelete`
-   pro tabulky odkazující na uživatele) a jeho registrace v `modules/server-registry.ts`.
-7. Časy zobrazovat přes `lib/datetime.ts` (pásmo Europe/Prague). Server na Vercelu běží v UTC.
+4. Stránky do `app/<cesta>/` (každá složka cest modulu má `layout.tsx` s `ensureModulePage("<id>")`
+   a `export const dynamic = "force-dynamic"`).
+5. V `server.tsx` implementovat potřebné body rozšíření (widget, statistiky, `onUserDelete` pro tabulky
+   odkazující na uživatele, `getSubjectTabs` / `getSubjectBadges` / `getSubjectUsage`, …).
+6. Časy zobrazovat přes `lib/datetime.ts` (pásmo Europe/Prague). Server na Vercelu běží v UTC.
+7. Modul nesmí importovat jiný modul ani ho jádro (ESLint to hlídá); sdílené věci do jádra.
+
+Kontrolní seznam před PR: `npm run typecheck`, `npm run lint` (0 chyb), `npm run test:contract`,
+`npm run build`, `npm run test:e2e`; E2E test modulu; aktualizovaná tato dokumentace.
+Ručně (bez příkazu) se modul přidá do `MODULES` v `modules/registry.ts` a do `MODULE_SERVERS`
+v `modules/server-registry.ts`.
 
 ### Chyby v server actions (důležité)
 
@@ -530,18 +585,25 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
   9. denní cron (autorizace, připomínky, souhrny, idempotence, úklid),
   10. historie změn,
   11. náhled „zobrazit jako“ (data studenta, odmítnutí změn, podvržené cookie).
+
+  Vypnutí modulu Semináře (test 1) ověřuje, že z detailu i seznamu předmětů zmizí jeho panel a štítek.
+- **Kontraktový test modulů** (`npm run test:contract`, `scripts/contract-test.ts`, bez DB a buildu, běží
+  v CI v jobu „checks“): unikátní id, shoda `registry.ts` a `server-registry.ts`, oprávnění s prefixem modulu,
+  cesty a menu chráněné oprávněním vlastního modulu, každý nejádrový modul má layout s `ensureModulePage`
+  a `force-dynamic` (vypnutý modul = 404), platné deklarace `adminSections` a `settings`.
 - E-maily se v testech neposílají: `EMAIL_TRANSPORT=log` jen zapisuje `EmailLog`. Test cronu potřebuje
   `CRON_SECRET` (v CI je nastavený, lokálně např. `CRON_SECRET=test-cron`).
 - **Před každou sadou se databáze vyprázdní a naplní seedem.** Proto
   **nikdy neukazujte `DATABASE_URL` na produkci**.
 
 ```bash
+# po přidání modulu smazat starou cache zapnutých modulů: rm -rf .next/cache/fetch-cache
 # lokálně (testovací DB v DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL=http://localhost:3000)
 npm run db:migrate && npm run build && npm run test:e2e
 ```
 
 - **GitHub Actions** (`.github/workflows/ci.yml`) běží u každého pull requestu a pushe do `main`:
-  - typecheck, lint, build,
+  - typecheck, lint, kontraktový test modulů, build,
   - E2E testy s PostgreSQL v kontejneru.
 
   Při selhání se uloží report s trasami a screenshoty.

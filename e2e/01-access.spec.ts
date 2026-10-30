@@ -54,6 +54,14 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   await pa.waitForTimeout(1000);
   const text = await pa.locator('main').innerText();
   check('admin stats', text.includes('Uživatelé celkem') && text.includes('Aktivní předměty') && text.includes('Otevřené zápisy'));
+  // detail předmětu: panel zápisů a štítek „v zápisu“ dodává modul Semináře (body rozšíření)
+  const panel = pa.locator('[data-subject-tab="seminars.occurrences"]');
+  await pa.goto('/subjects/' + subjId); await pa.waitForLoadState('networkidle');
+  check('subject detail has seminars panel', (await panel.count()) === 1 && (await pa.getByTestId('subject-occurrences').count()) === 1);
+  check('subject detail has "v zápisu" badge', (await pa.getByTestId('subject-badges').innerText()).includes('v zápisu: Zápis LS 2025'));
+  await pa.goto('/subjects'); await pa.waitForLoadState('networkidle');
+  check('subject list has "v zápisu" badge', (await pa.getByTestId('subject-badges').first().innerText()).includes('v zápisu'));
+  await pa.goto('/admin'); await pa.waitForSelector('#module-seminars');
   // vypnout semináře
   await pa.click('#module-seminars'); await pa.waitForTimeout(2500);
   check('setting stored', sql(`select value from "SystemSetting" where key='module.seminars.enabled'`) === 'false');
@@ -61,6 +69,11 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   const text2 = await pa.locator('main').innerText();
   check('stats without seminars', !text2.includes('Aktivní předměty'));
   // předměty jsou v jádru, jdou vypnout jen zápisy
+  await pa.goto('/subjects/' + subjId); await pa.waitForLoadState('networkidle');
+  check('subject detail without seminars panel', (await pa.locator('[data-subject-tab]').count()) === 0 && (await pa.getByTestId('subject-occurrences').count()) === 0);
+  check('subject detail without "v zápisu" badge', (await pa.getByTestId('subject-badges').count()) === 0 && !(await pa.content()).includes('v zápisu:'));
+  await pa.goto('/subjects'); await pa.waitForLoadState('networkidle');
+  check('subject list without "v zápisu" badge', !(await pa.locator('main').innerText()).includes('v zápisu'));
   const r = await pa.goto('/subjects'); check('/subjects stays when seminars disabled', r.status() === 200, String(r.status()));
   const r2 = await pa.goto('/enrollments'); check('/enrollments 404 when disabled', r2.status() === 404, String(r2.status()));
   await pa.goto('/dashboard'); check('dashboard empty when disabled', (await pa.content()).includes('Vítejte'));
@@ -71,6 +84,8 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   await pa.goto('/admin'); await pa.waitForSelector('#module-seminars'); await pa.waitForTimeout(800);
   await pa.click('#module-seminars'); await pa.waitForTimeout(2500);
   check('seminars re-enabled', JSON.stringify(await navLabels(pa)).includes('Zápisy'));
+  await pa.goto('/subjects/' + subjId); await pa.waitForLoadState('networkidle');
+  check('subject detail panel back', (await pa.locator('[data-subject-tab="seminars.occurrences"]').count()) === 1);
   await pa.goto('/dashboard'); check('dashboard back', (await pa.content()).includes('Zápis LS 2025'));
 
 

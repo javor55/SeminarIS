@@ -12,7 +12,7 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 4. V tomto souboru fázi označit `[x]` s číslem PR (commit spolu s fází nebo hned po mergi).
 
 ## Stav
-- [ ] F1 Body rozšíření a hranice modulů
+- [x] F1 Body rozšíření a hranice modulů
 - [ ] F2 Administrace se sekcemi a přehled „co udělat“, jednotné nastavení
 - [ ] F3 Detail uživatele a hromadné akce
 - [ ] F4 Předměty napříč moduly
