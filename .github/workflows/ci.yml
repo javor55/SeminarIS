@@ -34,6 +34,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      - name: Kontraktový test modulů
+        run: npm run test:contract
       - run: npm run build
 
   e2e:
