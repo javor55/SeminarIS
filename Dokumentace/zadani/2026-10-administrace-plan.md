@@ -14,7 +14,7 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 ## Stav
 - [x] F1 Body rozšíření a hranice modulů
 - [x] F2 Administrace se sekcemi a přehled „co udělat“, jednotné nastavení
-- [ ] F3 Detail uživatele a hromadné akce
+- [x] F3 Detail uživatele a hromadné akce
 - [ ] F4 Předměty napříč moduly
 - [ ] F5 Konfigurovatelné zápisy (publikum, pravidla bloků)
 - [ ] F6 Importy s náhledem (uživatelé, úvazky)
@@ -122,6 +122,11 @@ Zápisy se dnes cílí jen na ročníky (`EnrollmentWindow.targetGrades`). Nově
   `isInAudience` / `audienceWhere` (`modules/seminars/eligibility.ts`).
 - UI okna: výběr publika (ročníky, třídy, hledání uživatelů), přehled „kolik studentů to je“
   se seznamem; hromadná akce z Uživatelů „přidat do publika zápisu“ (F3).
+  **Hák z F3:** jádro už má celý běh hromadných akcí (výběr, náhled, transakce, audit; viz
+  `Dokumentace/architektura-moduly.md`, „Hromadné akce nad uživateli“). Akci F5 přidá modul Semináře jako
+  `bulkUserActions` v `modules/seminars/server.tsx` (`permission: "seminars.windows.manage"`, parametr
+  `windowId` přes `params`, `preview` s počtem nových členů publika a přeskočenými, `run` zapíše
+  `EnrollmentWindowAudience` typu USER); v jádře se nemění nic.
 - **Pravidla bloků:** povinný / nepovinný blok (nezapsaní počítají jen povinné), počet
   povolených zápisů v bloku (min/max, výchozí 1/1), volitelně omezení výskytu na ročníky/třídy.
 - **Pravidla okna:** může se student sám odepsat (ano/ne), změny povoleny do (konec okna /
