@@ -4,11 +4,8 @@ import { redirect } from "next/navigation";
 import { getSubjectDetail } from "@/modules/core/actions/subjects";
 import { getSubjectTeaching } from "@/modules/core/actions/assignments";
 import { SubjectDetailView } from "@/modules/core/components/subjects/SubjectDetailView";
-import { SubjectOccurrencesPanel } from "@/modules/seminars/components/subjects/SubjectOccurrencesPanel";
-import { getSubjectOccurrences } from "@/modules/seminars/actions/occurrences";
-import { isModuleEnabled } from "@/lib/modules";
+import { collectSubjectTabs } from "@/modules/core/extensions";
 import { User } from "@/lib/types";
-import { can } from "@/modules/registry";
 
 export default async function SubjectDetailPage({
   params,
@@ -41,13 +38,16 @@ export default async function SubjectDetailPage({
 
   const teaching = await getSubjectTeaching(id);
 
-  // Zápisy, kde je předmět nabízen (modul Semináře) – jen pro učitele a admina
-  const showOccurrences = can(currentUser.role, "seminars.windows.view") && (await isModuleEnabled("seminars"));
-  const occurrences = showOccurrences ? await getSubjectOccurrences(id) : null;
+  // Záložky modulů (např. zápisy z modulu Semináře); do F4 se zobrazují pod sebou
+  const tabs = await collectSubjectTabs(id, currentUser);
 
   return (
     <SubjectDetailView subject={subject} teaching={teaching} currentUser={currentUser}>
-      {occurrences && <SubjectOccurrencesPanel occurrences={occurrences} currentUser={currentUser} />}
+      {tabs.map((tab) => (
+        <section key={tab.id} data-subject-tab={tab.id}>
+          {tab.content}
+        </section>
+      ))}
     </SubjectDetailView>
   );
 }

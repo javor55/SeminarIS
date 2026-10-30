@@ -28,15 +28,23 @@ const quote = (v: string) => `"${v.replace(/"/g, '""')}"`;
 export function SubjectsClientView({ subjects, currentUser }: { subjects: SubjectRow[]; currentUser: User }) {
   const canEdit = can(currentUser.role, "core.subjects.edit");
 
+  // Filtry „má / nemá štítek“ podle toho, co moduly u předmětů dodaly
+  const badgeFilters = new Map<string, NonNullable<SubjectRow["badges"][number]["filter"]>>();
+  for (const s of subjects) for (const b of s.badges) if (b.filter) badgeFilters.set(b.filter.key, b.filter);
+  const badgeFilterOptions = [...badgeFilters.values()].flatMap((f) => [
+    { label: f.yesLabel, value: `${f.key}:yes` },
+    { label: f.noLabel, value: `${f.key}:no` },
+  ]);
+
   const handleExport = () => {
     downloadCsv(
       "export_predmetu",
-      ["Předmět", "Zkratka", "Ročníky", "V zápisu", "Vyučující", "Stav"],
+      ["Předmět", "Zkratka", "Ročníky", "Štítky", "Vyučující", "Stav"],
       subjects.map((s) => [
         quote(s.name),
         s.code || "",
         quote(subjectGradesLabel(s.grades)),
-        quote(s.windows.map((w) => w.name).join(", ")),
+        quote(s.badges.map((b) => b.label).join(", ")),
         quote(s.teachers.join(", ")),
         s.isActive ? "Aktivní" : "Archivováno",
       ])
@@ -138,14 +146,15 @@ export function SubjectsClientView({ subjects, currentUser }: { subjects: Subjec
                 label: "Ročník",
                 options: GRADES.map((g) => ({ label: `${g}. ročník`, value: String(g) })),
               },
-              {
-                columnId: "inWindow",
-                label: "V zápisu",
-                options: [
-                  { label: "Nabízené v zápisu", value: "yes" },
-                  { label: "Mimo zápis", value: "no" },
-                ],
-              },
+              ...(badgeFilterOptions.length > 0
+                ? [
+                    {
+                      columnId: "badges",
+                      label: badgeFilters.size === 1 ? [...badgeFilters.values()][0].label : "Štítky",
+                      options: badgeFilterOptions,
+                    },
+                  ]
+                : []),
               ...(canEdit
                 ? [
                     {

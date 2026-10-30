@@ -3,6 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
 import { subjectGradesLabel } from "@/lib/school";
+import { SubjectBadgeChip } from "@/modules/core/components/subjects/SubjectBadgeChip";
 import type { SubjectListItem } from "@/modules/core/actions/subjects";
 
 export type SubjectRow = SubjectListItem;
@@ -48,23 +49,27 @@ export const subjectsColumns: ColumnDef<SubjectRow>[] = [
     },
   },
   {
-    id: "inWindow",
-    header: "V zápisu",
-    accessorFn: (s) => (s.windows.length > 0 ? "yes" : "no"),
+    // štítky z modulů (např. „v zápisu“); filtr má tvar `<klíč>:yes|no`, viz SubjectsClientView
+    id: "badges",
+    header: "Štítky",
+    accessorFn: (s) => s.badges.map((b) => b.label).join(", "),
     cell: ({ row }) => {
-      const windows = row.original.windows;
-      if (windows.length === 0) return <span className="text-muted-foreground">—</span>;
+      const badges = row.original.badges;
+      if (badges.length === 0) return <span className="text-muted-foreground">—</span>;
       return (
-        <div className="flex flex-wrap gap-1" data-testid="subject-windows">
-          {windows.map((w) => (
-            <span key={w.id} className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs px-2 py-0.5 rounded-full border border-emerald-500/30">
-              v zápisu: {w.name}
-            </span>
+        <div className="flex flex-wrap gap-1" data-testid="subject-badges">
+          {badges.map((b) => (
+            <SubjectBadgeChip key={b.id} badge={b} />
           ))}
         </div>
       );
     },
-    filterFn: includesFilter,
+    filterFn: (row, _id, value: string[]) => {
+      if (!value || value.length === 0) return true;
+      const [key, state] = value[0].split(":");
+      const has = row.original.badges.some((b) => b.filter?.key === key);
+      return state === "yes" ? has : !has;
+    },
   },
   {
     id: "teachers",

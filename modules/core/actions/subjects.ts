@@ -5,11 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { audit, describeChanges } from "@/lib/audit";
-import { isModuleEnabled } from "@/lib/modules";
 import { can } from "@/modules/registry";
 import { sanitizeGrades, subjectGradesLabel, subjectInGrade } from "@/lib/school";
 import { getCurrentSchoolYear, getStudentGrade } from "@/modules/core/school";
-import { getSubjectWindows, type SubjectWindowRef } from "@/modules/seminars/subject-windows";
+import { collectSubjectBadges, collectSubjectUsage } from "@/modules/core/extensions";
+import type { SubjectBadge, SubjectUsageItem } from "@/modules/types";
 
 export type SubjectListItem = {
   id: string;
@@ -20,8 +20,8 @@ export type SubjectListItem = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  // „v zápisu“: zápisová okna, ve kterých je předmět nabízen
-  windows: SubjectWindowRef[];
+  // štítky z modulů (např. „v zápisu“), viz getSubjectBadges
+  badges: SubjectBadge[];
   // vyučující podle úvazků v aktuálním školním roce
   teachers: string[];
   // jen v seznamu pro učitele a admina (export katalogu sylabů) a v detailu
@@ -31,6 +31,8 @@ export type SubjectListItem = {
 export type SubjectDetail = SubjectListItem & {
   createdByName: string | null;
   updatedByName: string | null;
+  // kde se předmět používá v modulech; jen pro toho, kdo ho smí archivovat/mazat
+  usage: SubjectUsageItem[];
 };
 
 export type SubjectInput = {
@@ -47,9 +49,8 @@ function revalidateSubjects() {
   revalidatePath("/", "layout");
 }
 
-async function seminarsOn() {
-  return isModuleEnabled("seminars");
-}
+/** Předmět nabízený modulem v jemu viditelném místě je viditelný i studentovi mimo jeho ročník. */
+const grantsAccess = (badges: SubjectBadge[] | undefined) => !!badges?.some((b) => b.grantsAccess);
 
 type SubjectRow = {
   id: string;
@@ -66,7 +67,7 @@ type SubjectRow = {
   updatedBy?: { firstName: string; lastName: string } | null;
 };
 
-function toItem(s: SubjectRow, windows: SubjectWindowRef[]): SubjectListItem {
+function toItem(s: SubjectRow, badges: SubjectBadge[]): SubjectListItem {
   return {
     id: s.id,
     name: s.name,
@@ -76,7 +77,7 @@ function toItem(s: SubjectRow, windows: SubjectWindowRef[]): SubjectListItem {
     isActive: s.isActive,
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
-    windows,
+    badges,
     teachers: [...new Set(s.teachingAssignments.map((a) => fullName(a.teacher)))].sort((a, b) => a.localeCompare(b, "cs")),
   };
 }
@@ -100,21 +101,20 @@ async function teachingInclude() {
 export async function getSubjects(): Promise<SubjectListItem[]> {
   const user = await requirePermission("core.subjects.view");
   const privileged = can(user.role, "core.subjects.edit");
-  const withWindows = await seminarsOn();
 
   const subjects = await prisma.subject.findMany({
     where: privileged ? {} : { isActive: true },
     orderBy: { name: "asc" },
     include: await teachingInclude(),
   });
-  const windows = withWindows ? await getSubjectWindows(user) : new Map<string, SubjectWindowRef[]>();
+  const badges = await collectSubjectBadges(subjects.map((s) => s.id), user);
 
-  if (privileged) return subjects.map((s) => ({ ...toItem(s, windows.get(s.id) ?? []), syllabus: s.syllabus }));
+  if (privileged) return subjects.map((s) => ({ ...toItem(s, badges.get(s.id) ?? []), syllabus: s.syllabus }));
 
   const grade = await getStudentGrade(user.id);
   return subjects
-    .filter((s) => (grade != null && subjectInGrade(s.grades, grade)) || windows.has(s.id))
-    .map((s) => toItem(s, windows.get(s.id) ?? []));
+    .filter((s) => (grade != null && subjectInGrade(s.grades, grade)) || grantsAccess(badges.get(s.id)))
+    .map((s) => toItem(s, badges.get(s.id) ?? []));
 }
 
 /** Předměty pro výběr (aktivní): zápisové okno, dopisování, … */
@@ -141,15 +141,16 @@ export async function getSubjectDetail(id: string): Promise<SubjectDetail | null
     },
   });
   if (!s) return null;
-  const windows = (await seminarsOn()) ? ((await getSubjectWindows(user, [id])).get(id) ?? []) : [];
+  const badges = (await collectSubjectBadges([id], user)).get(id) ?? [];
   if (!privileged) {
     const grade = await getStudentGrade(user.id);
-    const visible = s.isActive && ((grade != null && subjectInGrade(s.grades, grade)) || windows.length > 0);
+    const visible = s.isActive && ((grade != null && subjectInGrade(s.grades, grade)) || grantsAccess(badges));
     if (!visible) return null;
   }
   return {
-    ...toItem(s, windows),
+    ...toItem(s, badges),
     syllabus: s.syllabus,
+    usage: can(user.role, "core.subjects.archive") ? await collectSubjectUsage(id) : [],
     createdByName: s.createdBy ? fullName(s.createdBy) : null,
     updatedByName: s.updatedBy ? fullName(s.updatedBy) : null,
   };
@@ -254,14 +255,16 @@ export async function deleteSubjectPermanently(id: string) {
     const admin = await requirePermission("core.subjects.archive");
     const subject = await prisma.subject.findUnique({ where: { id } });
     if (!subject) throw new Error("Předmět nenalezen.");
+    const usage = await collectSubjectUsage(id);
+    const usageText = usage.map((u) => `${u.label}: ${u.count}`).join("; ");
     await prisma.$transaction(async (tx) => {
       await tx.subject.delete({ where: { id } });
       await audit(tx, admin, {
         action: "subjects.subject.delete",
         entityType: "subject",
         entityId: id,
-        summary: `Trvale smazán předmět „${subject.name}“ (včetně výskytů v zápisech, úvazků a vazeb dopisování)`,
-        data: { name: subject.name, code: subject.code },
+        summary: `Trvale smazán předmět „${subject.name}“ (včetně výskytů v zápisech, úvazků a vazeb dopisování)${usageText ? `. Použití: ${usageText}` : ""}`,
+        data: { name: subject.name, code: subject.code, usage },
       });
     });
     revalidateSubjects();

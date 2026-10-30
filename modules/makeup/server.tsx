@@ -77,6 +77,17 @@ export const makeupServer: ModuleServer = {
     return null;
   },
 
+  async getSubjectUsage(subjectId) {
+    const [sessions, registrations] = await Promise.all([
+      prisma.makeupSession.count({ where: { subjects: { some: { subjectId } } } }),
+      prisma.makeupRegistration.count({ where: { subjects: { some: { subjectId } } } }),
+    ]);
+    return [
+      { id: "sessions", label: "Termíny dopisování s tímto předmětem", count: sessions },
+      { id: "registrations", label: "Zápisy studentů na dopisování tohoto předmětu", count: registrations },
+    ];
+  },
+
   async getAdminStats() {
     const upcoming = await prisma.makeupSession.count({ where: { endsAt: { gte: new Date() }, cancelledAt: null } });
     return [{ label: "Termíny dopisování", value: upcoming, hint: "Nadcházející vypsané termíny", icon: "calendar" }];
