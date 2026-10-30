@@ -19,7 +19,7 @@ import { ConfirmAction } from "@/modules/core/components/users/ConfirmAction";
 import { approveAsTeacher, approveUser, approveUsers, rejectUser } from "@/modules/core/actions/approvals";
 import type { ClassOption } from "@/modules/core/actions/classes";
 import { formatDateTime } from "@/lib/datetime";
-import type { UserRow } from "./users-columns";
+import type { UserListRow as UserRow } from "@/modules/core/users-query";
 
 /** Hosté čekající na schválení (aktivní účty s rolí GUEST). */
 export function pendingApprovals(users: UserRow[]) {
