@@ -91,8 +91,7 @@ test("historie: úprava uživatele, role a zápisového okna se zapíše česky 
   await pa.goto("/users");
   await pa.waitForLoadState("networkidle");
   const row = pa.locator("tr", { hasText: "eva.studentova@skola.cz" });
-  await row.getByRole("combobox").click();
-  await pa.getByRole("option", { name: "TEACHER" }).click();
+  await row.getByTestId("role-select").selectOption("TEACHER");
   await pa.getByRole("button", { name: "Potvrdit" }).click();
   await pa.waitForTimeout(1500);
   check("role changed", sql(`select role from "User" where email='eva.studentova@skola.cz'`) === "TEACHER");

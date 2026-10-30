@@ -77,3 +77,16 @@ export function describeChanges<T extends Record<string, unknown>>(
   }
   return parts.join("; ");
 }
+
+/** Záznamy týkající se uživatele: co dělal on a co se dělo s ním (i v hromadných akcích a u studentů v modulech). */
+export function auditUserWhere(userId: string): Prisma.AuditLogWhereInput {
+  return {
+    OR: [
+      { actorId: userId },
+      { entityType: "user", entityId: userId },
+      { data: { path: ["studentId"], equals: userId } },
+      // hromadné akce: souhrnný záznam nese id dotčených uživatelů
+      { data: { path: ["userIds"], array_contains: userId } },
+    ],
+  };
+}

@@ -118,13 +118,14 @@ test("třídy, předměty, import se třídou, přesun mezi třídami, cílení 
   check('moved back to 3.A', sql(`select c.grade||c.letter from "User" u join "ClassGroup" c on c.id=u."classGroupId" where u.email='jan.student@skola.cz'`) === '3A');
 
   // hromadná akce „Přesunout do třídy“ v seznamu uživatelů
-  await pa.goto('/users'); await pa.waitForLoadState('networkidle');
-  await pa.getByPlaceholder('Hledat podle jména nebo e-mailu…').fill('novy.zak');
-  await pa.getByRole('button', { name: 'Hromadné akce' }).click();
-  check('bulk panel offers "Přesunout do třídy"', (await pa.getByText('Přesunout do třídy').count()) > 0);
-  await pa.getByText('Přesunout do třídy').locator('xpath=following-sibling::div').getByRole('combobox').click();
-  await pa.getByRole('option', { name: '3.B', exact: true }).click();
-  await pa.getByText('Přesunout do třídy').locator('xpath=following-sibling::div').getByRole('button', { name: 'OK' }).click(); await pa.waitForTimeout(1500);
+  await pa.goto('/users?q=novy.zak'); await pa.waitForSelector('[data-testid=users-table]'); await pa.waitForLoadState('networkidle');
+  await pa.locator('tr[data-user="novy.zak@skola.cz"] input[type=checkbox]').check();
+  const bulkSelect = pa.getByTestId('bulk-action-select');
+  check('bulk menu offers "Přesunout do třídy"', (await bulkSelect.locator('option', { hasText: 'Přesunout do třídy' }).count()) === 1);
+  await bulkSelect.selectOption({ label: 'Přesunout do třídy' });
+  await pa.locator('#bulk-classGroupId').selectOption({ label: '3.B' });
+  await expect(pa.getByTestId('bulk-count')).toContainText('akce se týká 1');
+  await pa.getByTestId('bulk-confirm').click(); await pa.waitForSelector('[data-testid=bulk-dialog]', { state: 'detached' });
   check('bulk move to class', sql(`select c.grade||c.letter from "User" u join "ClassGroup" c on c.id=u."classGroupId" where u.email='novy.zak@skola.cz'`) === '3B');
 
   // admin: přihlášení karta bez konfigurace
@@ -164,10 +165,11 @@ test("úvazky z detailu předmětu a z uživatelů", async ({ browser }) => {
   sql(`update "Subject" set grades='{3,4}' where id='sfy'`);
 
   // Uživatelé → učitel → Úvazky
-  await pa.goto('/users'); await pa.waitForLoadState('networkidle');
-  const row = pa.locator('tr', { hasText: 't2@skola.cz' });
-  check('teacher row shows assignment count', (await row.locator('[data-testid=assignments-open]').innerText()).trim() === '2');
-  await pa.locator('tr', { hasText: 'teacher@skola.cz' }).locator('[data-testid=assignments-open]').click();
+  await pa.goto('/users/usr_t2?tab=assignments'); await pa.waitForSelector('[data-testid=user-assignments]');
+  check('teacher detail lists assignments', (await pa.getByTestId('user-assignment').innerText()).includes('Fyzika') && (await pa.getByTestId('user-assignment').innerText()).includes('4.A, 4.B'), await pa.getByTestId('user-assignments').innerText());
+  check('assignment count on the edit button', (await pa.getByTestId('assignments-open').innerText()).trim() === '2');
+  await pa.goto('/users/usr_teacher?tab=assignments'); await pa.waitForSelector('[data-testid=assignments-open]');
+  await pa.getByTestId('assignments-open').click();
   await pa.waitForSelector('#assign-subject');
   await pa.selectOption('#assign-subject', { label: 'Fyzika (F)' });
   check('class grid limited to subject grades', (await pa.locator('#assign-classes button').allInnerTexts()).join(',') === '3.A,3.B,4.A,4.B', (await pa.locator('#assign-classes button').allInnerTexts()).join(','));

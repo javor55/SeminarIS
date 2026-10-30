@@ -36,11 +36,8 @@ test("uzavření školního roku: změna třídy, opakování, absolvování, od
   await pa.keyboard.press('Escape');
 
   // detail uživatele – historie
-  await pa.reload(); await pa.waitForLoadState('networkidle');
-  const row = pa.locator('tr', { hasText: 'jan.student@skola.cz' });
-  await row.locator('button:has(svg.lucide-eye)').click(); await pa.waitForTimeout(800);
-  check('details show class history', (await pa.locator('[data-testid=class-history]').innerText()).includes(`${yearLabel(Y)}: 3.A`));
-  await pa.keyboard.press('Escape');
+  await pa.goto('/users/usr_stud1?tab=classes'); await pa.waitForSelector('[data-testid=user-classes]');
+  check('detail shows class history', (await pa.getByTestId('user-classes').innerText()).includes(yearLabel(Y)) && (await pa.getByTestId('user-classes').innerText()).includes('3.A'));
 
   // úvazky pro test převzetí: Učitel – Matematika ve 3.A a 4.A; Fyzika jen pro 4. ročník (do nižšího se nepřevezme)
   sql(`insert into "Subject"(id,name,code,"updatedAt") values ('sm','Matematika','M',now())`);
@@ -96,14 +93,16 @@ test("uzavření školního roku: změna třídy, opakování, absolvování, od
   check('graduate cannot log in', !pg.url().endsWith('/dashboard'), pg.url());
 
   // ukončení studia během roku přes dialog + obnovení
-  await pa.reload(); await pa.waitForLoadState('networkidle');
-  await pa.locator('tr', { hasText: 'eva.studentova@skola.cz' }).locator('button[title="Ukončit studium"]').click();
+  // (dialogy jsou v detailu uživatele, ne v seznamu)
+  await pa.goto('/users/usr_stud2'); await pa.waitForSelector('[data-testid=study-open]');
+  await pa.click('[data-testid=study-open]');
   await pa.click('#study-reason'); await pa.getByRole('option', { name: 'zanechání studia' }).click();
   await pa.fill('#study-note', 'na vlastní žádost');
   await pa.click('[data-testid=study-submit]'); await pa.waitForTimeout(2000);
   check('mid-year end study', userRow('eva.studentova@skola.cz').startsWith('4A|LEFT|false|WITHDRAWAL'), userRow('eva.studentova@skola.cz'));
-  await pa.reload(); await pa.waitForLoadState('networkidle');
-  await pa.locator('tr', { hasText: 'eva.studentova@skola.cz' }).locator('button[title="Obnovit studium"]').click();
+  await pa.reload(); await pa.waitForSelector('[data-testid=study-open]');
+  check('detail shows the ended study', (await pa.getByTestId('user-study').innerText()).includes('ukončil'), await pa.getByTestId('user-study').innerText());
+  await pa.click('[data-testid=study-open]');
   await pa.click('[data-testid=study-submit]'); await pa.waitForTimeout(2000);
   check('restore study', userRow('eva.studentova@skola.cz').startsWith('4A|ACTIVE|true|'), userRow('eva.studentova@skola.cz'));
 });

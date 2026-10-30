@@ -1,21 +1,15 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getAllUsers } from "@/modules/core/actions/users";
-import { getClassesOverview } from "@/modules/core/actions/classes";
-import { UsersClientView, type UsersTab } from "@/modules/core/components/users/UsersClientView";
-import { User } from "@/lib/types";
-import { UserRow } from "@/modules/core/components/users/users-columns";
+import { getCurrentUser } from "@/lib/session";
 import { can } from "@/modules/registry";
+import { getClassesOverview } from "@/modules/core/actions/classes";
+import { describeBulkActions } from "@/modules/core/bulk-runner";
+import { getPendingApprovals, getUserCounts, queryUsers } from "@/modules/core/users-query";
+import { parseUserListQuery } from "@/modules/core/users-filter";
+import { UsersView } from "@/modules/core/components/users/UsersView";
 
-export default async function UsersPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const session = await getServerSession(authOptions);
-  
-  if (!session?.user) {
-    redirect("/");
-  }
-
-  const currentUser = session.user as User;
+export default async function UsersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect("/");
 
   if (!can(currentUser.role, "core.users.view")) {
     return (
@@ -26,17 +20,30 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
     );
   }
 
-  const { tab } = await searchParams;
+  const params = await searchParams;
   // Správa tříd se přesunula do administrace (staré odkazy zůstávají funkční)
-  if (tab === "classes" && can(currentUser.role, "core.admin")) redirect("/admin/school-year");
-  const [dbUsers, classes] = await Promise.all([getAllUsers(), getClassesOverview()]);
+  if (params.tab === "classes" && can(currentUser.role, "core.admin")) redirect("/admin/school-year");
+  const canManage = can(currentUser.role, "core.users.manage");
+  const tab = params.tab === "approvals" && canManage ? "approvals" : "users";
+
+  const query = parseUserListQuery(params);
+  const [classes, counts] = await Promise.all([getClassesOverview(), getUserCounts()]);
+  const [list, approvals, actions] = await Promise.all([
+    tab === "users" ? queryUsers(query) : null,
+    tab === "approvals" ? getPendingApprovals() : null,
+    tab === "users" ? describeBulkActions(currentUser) : [],
+  ]);
 
   return (
-    <UsersClientView 
-      users={dbUsers as unknown as UserRow[]} 
-      currentUser={currentUser} 
+    <UsersView
+      tab={tab}
+      query={query}
+      list={list}
+      approvals={approvals}
       classes={classes}
-      initialTab={tab === "approvals" ? (tab as UsersTab) : "users"}
+      counts={counts}
+      actions={actions}
+      currentUser={{ id: currentUser.id, role: currentUser.role }}
     />
   );
 }

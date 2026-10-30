@@ -48,7 +48,7 @@ test("registrace se třídou a schválení hosta jedním klikem", async ({ brows
   check('admin widget shows pending count', (await pa.locator('[data-testid=approvals-widget]').innerText()).includes('5 účtů čeká na schválení'), await pa.locator('[data-testid=approvals-widget]').innerText());
   await pa.locator('[data-testid=approvals-widget] a').click(); await pa.waitForURL('**/users?tab=approvals');
   await pa.waitForSelector('[data-testid=approvals-table]');
-  check('tab shows count', (await pa.locator('button[data-tab=approvals]').innerText()).includes('(5)'));
+  check('tab shows count', (await pa.locator('a[data-tab=approvals]').innerText()).includes('(5)'));
   check('class preselected from request', (await pa.locator('select[aria-label="Třída – Nová Žákyně"] option:checked').innerText()) === '3.A');
 
   // schválení jedním klikem

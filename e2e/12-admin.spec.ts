@@ -95,7 +95,7 @@ test("přehled „co udělat“: položky jádra i modulů s odkazy, po vyřeše
   // položka vede na řešení
   await todo("core.pending-accounts").getByRole("link").click();
   await pa.waitForURL("**/users?tab=approvals");
-  await expect(pa.locator("button[data-tab=approvals]")).toContainText("(2)");
+  await expect(pa.locator("a[data-tab=approvals]")).toContainText("(2)");
 
   // vyřešeno -> položka zmizí
   sql(`update "User" set role='STUDENT' where id in ('g1','g2')`);

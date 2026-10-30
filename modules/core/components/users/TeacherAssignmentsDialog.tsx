@@ -23,7 +23,7 @@ import {
   type TeacherAssignments,
 } from "@/modules/core/actions/assignments";
 import { subjectInGrade } from "@/lib/school";
-import type { UserRow } from "./users-columns";
+import type { UserListRow as UserRow } from "@/modules/core/users-query";
 
 /**
  * Uživatelé → učitel → Úvazky: předměty a třídy, které učitel učí v aktuálním školním roce.

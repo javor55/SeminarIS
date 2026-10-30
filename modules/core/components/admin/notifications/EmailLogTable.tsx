@@ -50,6 +50,7 @@ export function EmailLogTable({ events }: { events: NotificationEventView[] }) {
         <NativeSelect className="w-[260px]" aria-label="Událost" value={event} onChange={(e) => { setPage(0); setEvent(e.target.value); }}>
           <option value="">Všechna upozornění</option>
           {events.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}
+          <option value="manual.bulk">Hromadný e-mail správce</option>
           <option value="test">Zkušební e-mail</option>
         </NativeSelect>
         <Input className="w-[240px]" placeholder="Hledat příjemce, předmět…" aria-label="Hledat" value={search} onChange={(e) => { setPage(0); setSearch(e.target.value); }} />

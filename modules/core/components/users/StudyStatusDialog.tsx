@@ -19,13 +19,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { endStudy, restoreStudy } from "@/modules/core/actions/users";
 import { STUDY_END_REASON_LABELS, type StudyEndReasonValue } from "@/lib/school";
-import type { UserRow } from "./users-columns";
+import type { UserListRow as UserRow } from "@/modules/core/users-query";
 
 // Důvody ukončení během roku (absolvování řeší uzavření školního roku)
 const MID_YEAR_REASONS: StudyEndReasonValue[] = ["TRANSFER", "WITHDRAWAL", "EXPULSION", "GRADUATED", "OTHER"];
 
 /** Ukončení studia studenta během roku, případně jeho obnovení. */
-export function StudyStatusDialog({ user }: { user: UserRow }) {
+export function StudyStatusDialog({ user, label }: { user: UserRow; label?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -55,15 +55,21 @@ export function StudyStatusDialog({ user }: { user: UserRow }) {
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-        title={isStudying ? "Ukončit studium" : "Obnovit studium"}
-        onClick={() => setOpen(true)}
-      >
-        <GraduationCap className="w-4 h-4" />
-      </Button>
+      {label ? (
+        <Button variant="outline" size="sm" className="gap-2" data-testid="study-open" onClick={() => setOpen(true)}>
+          <GraduationCap className="w-4 h-4" /> {isStudying ? "Ukončit studium" : "Obnovit studium"}
+        </Button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+          title={isStudying ? "Ukončit studium" : "Obnovit studium"}
+          onClick={() => setOpen(true)}
+        >
+          <GraduationCap className="w-4 h-4" />
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[440px]">
           <DialogHeader>

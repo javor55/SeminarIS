@@ -22,7 +22,11 @@ modules/
     school.ts           dotazy nad školou pro všechny moduly (aktuální rok, ročník studenta, setStudentClass, …)
     actions/            server actions: users.ts (vč. stavu studia), classes.ts, approvals.ts, subjects.ts,
                         assignments.ts (úvazky), school.ts (školní rok, uzavření roku), admin.ts, profile.ts
-    components/         users/ (vč. záložky Ke schválení), subjects/, admin/ (AdminShell, AdminNav, SettingsForm,
+    users-filter.ts     filtr seznamu uživatelů (čistá data, parametry URL); users-query.ts dotazy (stránka, počty)
+    user-detail.ts      data detailu uživatele (profil, třídy, úvazky, historie, e-maily)
+    bulk-actions.ts     hromadné akce jádra (přesun, role, aktivita, schválení, studium, e-mail, smazání);
+                        bulk-runner.ts společný běh (výběr, náhled, transakce, audit)
+    components/         users/ (seznam, detail/, hromadné akce, záložka Ke schválení), subjects/, admin/ (AdminShell, AdminNav, SettingsForm,
                         ModulesForm, školní rok a třídy, uzavření roku, upozornění, historie)
   seminars/             zápisová okna a zápis studentů do předmětů (semináře)
     manifest.ts
@@ -136,7 +140,7 @@ aktuální školní rok ze dvou míst (oprávnění `core.school.manage`, tedy a
 - **detail předmětu → Vyučující 2026/27**: mřížka tříd (řádky = ročníky předmětu, sloupce =
   písmena), čipy učitelů (× odebere), výběr „+ učitel“, tlačítko **Stejný učitel pro celý
   ročník**; ukládá se hned,
-- **Uživatelé → u učitele Úvazky**: seznam „předmět – třídy“ a přidání (předmět + třídy jen
+- **detail učitele → záložka Úvazky (tlačítko s počtem otevře úpravy)**: seznam „předmět – třídy“ a přidání (předmět + třídy jen
   z ročníků předmětu).
 
 Číst úvazky v detailu předmětu může každý, kdo předmět vidí. Podle úvazků dopisování dohledá
@@ -169,10 +173,62 @@ nastavení systému, dokud nikdo není zařazen do třídy. Potom se rok mění 
 
 ### Během roku (Uživatelé)
 
-- **Přesun do třídy:** úprava uživatele, Administrace → Školní rok a třídy, nebo hromadně. V historii se zapíše
-  jako „přeřazen“.
-- **Ukončit studium** (ikona čepice u studenta): důvod, datum, poznámka. Účet se deaktivuje.
-  Stejnou ikonou se studium obnoví.
+- **Přesun do třídy:** úprava uživatele (detail), Administrace → Školní rok a třídy, nebo hromadně. V historii se
+  zapíše jako „přeřazen“.
+- **Ukončit studium** (detail uživatele → Profil → Ukončit studium): důvod, datum, poznámka. Účet se deaktivuje.
+  Stejným tlačítkem se studium obnoví.
+
+### Seznam a detail uživatele (`/users`, `/users/[id]`)
+
+**Seznam** (`app/users/page.tsx`, server): filtrování, řazení a stránkování (50 na stránku) probíhá na serveru
+(`modules/core/users-query.ts`). Celý filtr je v URL, takže jde sdílet odkazem:
+`/users?q=novák&role=STUDENT&class=3.A&grade=3&study=ACTIVE&active=1&pending=1&noclass=1&sort=email&dir=desc&page=2`.
+Parametry čte `parseUserListQuery` (`users-filter.ts`, neplatné hodnoty se ignorují); fulltext hledá každé
+slovo ve jménu, příjmení nebo e-mailu. Dlaždice nad seznamem jsou odkazy na hotové filtry.
+Řádek má jen rychlé akce (role, aktivita, detail, historie, „zobrazit jako“); ostatní jsou v detailu.
+
+**Výběr řádků:** zaškrtnutá id (i napříč stránkami) nebo **„vybrat všech N odpovídajících filtru“**. V druhém případě
+klient neposílá žádná id, jen filtr a odškrtnuté výjimky; id vyhodnotí server (`resolveSelection`). Výběr je omezen na
+`BULK_MAX` = 2000 uživatelů (víc se musí zúžit filtrem). **Export CSV** exportuje výběr, bez výběru vše odpovídající
+filtru (`exportUsersCsv`, buňky začínající `= + - @` jsou ošetřené proti vzorcům v Excelu).
+
+**Detail** (`app/users/[id]/page.tsx`): učitel čte, správce (`core.users.manage`) upravuje, student a host cizí detail
+neotevřou (přesměrování na dashboard, oprávnění `core.users.view`). Záložka je v URL (`?tab=`), neplatná nebo
+nedostupná záložka spadne na Profil. Záložky jádra: **Profil** (údaje a akce: upravit, reset hesla, role, aktivita,
+ukončení/obnova studia, smazat; „Zobrazit jako“ je v hlavičce), **Třídy** (`ClassMembership`), **Úvazky** (učitel,
+admin; úpravy jen s `core.school.manage`), **Historie** a **E-maily** (jen admin, jako Administrace → Historie
+a Upozornění). Záložky modulů dodává `getUserTabs`: Semináře **Zápisy** (po zápisových oknech), Dopisování
+**Dopisování** (zápisy s docházkou; u učitele dozorované termíny; učitel vidí jen své termíny a písemky svých
+předmětů). Vypnutý modul = jeho záložka zmizí.
+
+### Hromadné akce nad uživateli
+
+Akce jsou `BulkUserAction` (`modules/server-types.ts`) v poli `bulkUserActions` modulu. Jádro svoje akce registruje
+stejným bodem (`coreServer.bulkUserActions`, `modules/core/bulk-actions.ts`), takže modul přidává akce stejně
+(id se prefixuje id modulu, `core.class` → audit `users.bulk.class`). Akce deklaruje `permission`, `params` (parametry
+dialogu: výběr, text), `preview` (kdo je dotčen, kdo se přeskočí a proč, co se stane) a `run`. Společný běh
+(`modules/core/bulk-runner.ts`, server actions `actions/user-bulk.ts`) zajišťuje:
+
+1. výběr (id, nebo filtr + výjimky vyhodnocené na serveru, strop `BULK_MAX`),
+2. **náhled** v potvrzovacím dialogu (`BulkActionDialog`): počet vybraných, počet dotčených, popis dopadu, přeskočení,
+   několik jmen; nebezpečné akce (smazání) vyžadují opsání slova `SMAZAT` (kontroluje i server),
+3. spuštění: oprávnění akce (nedostupná akce se vůbec nenabídne ani nespustí), **režim „zobrazit jako“ jen pro čtení**
+   (`safeAction`), kontrola, že se výběr od náhledu nezměnil (počty), **jedna transakce** (timeout 120 s),
+   **jeden souhrnný záznam v historii** `users.bulk.<akce>` s id dotčených v `data.userIds` (historie uživatele
+   i Administrace → Historie podle uživatele hromadné akce najdou). Akce vrací `afterCommit` (např. e-mail o schválení).
+
+Akce jádra: přesun do třídy (jen studenti), změna role (sebe přeskočí), aktivovat / deaktivovat (sebe přeskočí),
+schválit hosty (třída podle žádosti nebo zvolená), ukončit / obnovit studium, poslat e-mail, trvale smazat (admin,
+sebe přeskočí, úklid modulů přes `onUserDelete`).
+
+**Hromadný e-mail** jde přes e-mailovou vrstvu (`sendEventEmail("manual.bulk", …, { content })`): událost `manual.bulk`
+se posílá vždy (jako zkušební e-mail ignoruje vypínače upozornění), ale **počítá se do denního i měsíčního limitu**,
+co se nevejde, se zapíše jako `SKIPPED_LIMIT`. Odhad (kolik se odešle a kolik zablokuje limit) je v náhledu před
+odesláním, vyčerpaný limit akci zablokuje. Příjemci jsou aktivní uživatelé s platným e-mailem, text může obsahovat
+`{{jmeno}}`. Neběží v DB transakci (e-mail se nedá vrátit); souhrn do historie se zapíše po odeslání (bez textu zprávy).
+
+**TODO F5:** akce „přidat do publika zápisu“ patří do modulu Semináře (`bulkUserActions` v `modules/seminars/server.tsx`
+s parametrem `windowId` přes `params`, až bude existovat model publika okna); F3 ji záměrně neobsahuje.
 
 Pro moduly jsou připravené funkce v `modules/core/school.ts`: `getCurrentSchoolYear()`,
 `getStudentGrade(userId)`, `activeStudentsWhere`, `studentsInGradesWhere(grades)`,
@@ -400,17 +456,17 @@ vynechají, stránka jádra se neshodí. Id záložek, štítků a položek jád
 | `getSubjectTabs(subjectId, user)` | `collectSubjectTabs` | záložky detailu předmětu (do F4 zobrazené pod sebou, `data-subject-tab`) |
 | `getSubjectBadges(subjectIds, user)` | `collectSubjectBadges` | štítky v seznamu a detailu předmětů, filtr (`filter`), `grantsAccess` zpřístupní předmět studentovi mimo jeho ročník |
 | `getSubjectUsage(subjectId)` | `collectSubjectUsage` | použití předmětu před smazáním/archivací |
-| `getUserTabs(userId, viewer)` | `collectUserTabs` | záložky detailu uživatele (F3) |
+| `getUserTabs(userId, viewer)` | `collectUserTabs` | záložky detailu uživatele `/users/[id]` (`?tab=<modul>.<id>`), jádro má 0–99, moduly 100+ |
 | `getAdminTodos(user)` | `collectAdminTodos` | přehled „co udělat“ v administraci (F2) |
-| `bulkUserActions` | `collectBulkUserActions` | hromadné akce nad uživateli (F3) |
+| `bulkUserActions` | `collectBulkUserActions` | hromadné akce v seznamu uživatelů (parametry, náhled dopadu, jedna transakce, audit) |
 | `getAdminStats()` | `collectAdminStats` | krátké statistiky pod přehledem v administraci |
 | `adminSections` (v manifestu) | `collectAdminSections` | boční menu administrace (jádro i moduly, podle oprávnění) |
 | `settings` (v manifestu) | registr nastavení | deklarace nastavení modulu |
 
 Zapojené jsou `getSubjectTabs`, `getSubjectBadges`, `getSubjectUsage` (Semináře; Dopisování dodává
 `getSubjectUsage`, záložky přijdou ve F4), `getAdminTodos` (jádro, Semináře, Dopisování), `getAdminStats`,
-`adminSections` a `settings`. `getUserTabs` a `bulkUserActions` jsou definované a mají sběrné funkce,
-UI na nich vznikne ve F3.
+`adminSections` a `settings`. `getUserTabs` dodávají Semináře (Zápisy) a Dopisování, `bulkUserActions` jádro
+(viz Seznam a detail uživatele); „přidat do publika zápisu“ přijde ve F5.
 
 ### Hranice mezi jádrem a moduly
 
@@ -649,7 +705,11 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
   8. upozornění: limity, vypnuté události, odhlášení z nepovinných, nezapsaní studenti a ruční připomínka,
   9. denní cron (autorizace, připomínky, souhrny, idempotence, úklid),
   10. historie změn,
-  11. náhled „zobrazit jako“ (data studenta, odmítnutí změn, podvržené cookie).
+  11. náhled „zobrazit jako“ (data studenta, odmítnutí změn, podvržené cookie),
+  12. administrace (sekce, přehled „co udělat“, nastavení),
+  13. uživatelé (`13-users.spec.ts`): detail se záložkami (včetně zmizení záložky vypnutého modulu), filtry v URL
+      a stránkování na serveru, „vybrat vše odpovídající filtru“ + hromadný přesun s jedním záznamem v historii,
+      hromadný e-mail s limitem, ostatní hromadné akce a export CSV, učitel jen čte, student nemá přístup.
 
   Vypnutí modulu Semináře (test 1) ověřuje, že z detailu i seznamu předmětů zmizí jeho panel a štítek.
 - **Kontraktový test modulů** (`npm run test:contract`, `scripts/contract-test.ts`, bez DB a buildu, běží
