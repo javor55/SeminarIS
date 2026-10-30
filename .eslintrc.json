@@ -3,9 +3,44 @@
     "next/core-web-vitals",
     "next/typescript"
   ],
-    "rules": {
+  "rules": {
     "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
     "no-console": "warn",
     "react/prop-types": "off"
-  }
+  },
+  "overrides": [
+    {
+      // Jádro (modules/core, lib, components, stránky jádra) o modulech nic neví – moduly do něj jen přispívají přes body rozšíření (modules/core/extensions.ts). Výjimka: modules/registry.ts a modules/server-registry.ts.
+      "files": ["modules/core/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}", "middleware.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["@/modules/seminars", "@/modules/seminars/**", "**/modules/seminars/**"], "message": "Jádro nesmí importovat modul Semináře. Použijte bod rozšíření (modules/server-types.ts, modules/core/extensions.ts)." },
+            { "group": ["@/modules/makeup", "@/modules/makeup/**", "**/modules/makeup/**"], "message": "Jádro nesmí importovat modul Dopisování. Použijte bod rozšíření (modules/server-types.ts, modules/core/extensions.ts)." }
+          ]
+        }]
+      }
+    },
+    {
+      // Moduly se navzájem neimportují (jen přes jádro a body rozšíření).
+      "files": ["modules/seminars/**/*.{ts,tsx}", "app/enrollments/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["@/modules/makeup", "@/modules/makeup/**", "**/modules/makeup/**"], "message": "Modul Semináře nesmí importovat modul Dopisování. Sdílené věci patří do jádra." }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["modules/makeup/**/*.{ts,tsx}", "app/makeup/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["@/modules/seminars", "@/modules/seminars/**", "**/modules/seminars/**"], "message": "Modul Dopisování nesmí importovat modul Semináře. Sdílené věci patří do jádra." }
+          ]
+        }]
+      }
+    }
+  ]
 }

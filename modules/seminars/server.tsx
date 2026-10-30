@@ -4,11 +4,15 @@ import { can } from "@/modules/registry";
 import { computeUnenrolled } from "@/modules/seminars/unenrolled";
 import type { EnrollmentWindow, User } from "@/lib/types";
 import type { ModuleServer } from "@/modules/server-types";
+import type { SubjectBadge } from "@/modules/types";
 import { EnrollmentView } from "@/modules/seminars/components/enrollment/EnrollmentView";
 import {
   getEnrollmentWindowsVisible,
   getEnrollmentWindowByIdWithBlocks,
 } from "@/modules/seminars/actions/windows";
+import { SubjectOccurrencesPanel } from "@/modules/seminars/components/subjects/SubjectOccurrencesPanel";
+import { getSubjectOccurrences } from "@/modules/seminars/actions/occurrences";
+import { getSubjectWindows } from "@/modules/seminars/subject-windows";
 import { getSeminarsEmailEstimates, runSeminarsDailyJob } from "@/modules/seminars/notifications";
 
 function findDashboardEnrollment(
@@ -87,6 +91,53 @@ export const seminarsServer: ModuleServer = {
         <EnrollmentView enrollmentWindow={ew} currentUser={user} />
       </div>
     );
+  },
+
+  // „v zápisu“: štítky předmětů nabízených v zápisových oknech (podle viditelnosti pro uživatele)
+  async getSubjectBadges(subjectIds, user) {
+    const windows = await getSubjectWindows(user, subjectIds);
+    const canOpen = can(user.role, "seminars.windows.view");
+    const result = new Map<string, SubjectBadge[]>();
+    for (const [subjectId, list] of windows) {
+      result.set(
+        subjectId,
+        list.map((w) => ({
+          id: `window.${w.id}`,
+          label: `v zápisu: ${w.name}`,
+          href: canOpen ? `/enrollments/${w.id}` : undefined,
+          filter: { key: "inWindow", label: "V zápisu", yesLabel: "Nabízené v zápisu", noLabel: "Mimo zápis" },
+          grantsAccess: true,
+        }))
+      );
+    }
+    return result;
+  },
+
+  // Panel výskytů předmětu v zápisech – jen pro učitele a admina
+  async getSubjectTabs(subjectId, user) {
+    if (!can(user.role, "seminars.windows.view")) return [];
+    const occurrences = await getSubjectOccurrences(subjectId);
+    return [
+      {
+        id: "occurrences",
+        label: "Zápisy",
+        order: 100,
+        content: <SubjectOccurrencesPanel occurrences={occurrences} currentUser={user} />,
+      },
+    ];
+  },
+
+  async getSubjectUsage(subjectId) {
+    const [occurrences, enrollments, windows] = await Promise.all([
+      prisma.subjectOccurrence.count({ where: { subjectId } }),
+      prisma.studentEnrollment.count({ where: { subjectOccurrence: { subjectId } } }),
+      prisma.enrollmentWindow.count({ where: { blocks: { some: { subjectOccurrences: { some: { subjectId } } } } } }),
+    ]);
+    return [
+      { id: "windows", label: "Zápisová okna s tímto předmětem", count: windows },
+      { id: "occurrences", label: "Výskyty v zápisech", count: occurrences },
+      { id: "enrollments", label: "Zápisy studentů na tento předmět", count: enrollments },
+    ];
   },
 
   async getAdminStats() {

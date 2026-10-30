@@ -14,6 +14,7 @@ import type { SubjectTeaching } from "@/modules/core/actions/assignments";
 import { subjectGradesLabel } from "@/lib/school";
 import { formatDateTime } from "@/lib/datetime";
 import { can } from "@/modules/registry";
+import { SubjectBadgeChip } from "@/modules/core/components/subjects/SubjectBadgeChip";
 import type { User } from "@/lib/types";
 
 export function SubjectDetailView({
@@ -25,7 +26,7 @@ export function SubjectDetailView({
   subject: SubjectDetail;
   teaching: SubjectTeaching;
   currentUser: User;
-  // Zápisy, kde je předmět nabízen (modul Semináře) – jen pro učitele a admina
+  // Obsah z modulů (záložky předmětu, viz getSubjectTabs)
   children?: ReactNode;
 }) {
   const router = useRouter();
@@ -101,7 +102,11 @@ export function SubjectDetailView({
                   {!subject.isActive && (
                     <ConfirmAction
                       title="Trvale smazat předmět?"
-                      description={`Opravdu chcete trvale a nevratně smazat předmět "${subject.name}"? Smažou se i jeho výskyty v zápisových oknech, zápisy studentů a úvazky.`}
+                      description={`Opravdu chcete trvale a nevratně smazat předmět "${subject.name}"? Smažou se i jeho výskyty v zápisových oknech, zápisy studentů a úvazky.${
+                        subject.usage.length > 0
+                          ? ` Použití: ${subject.usage.map((u) => `${u.label}: ${u.count}`).join("; ")}.`
+                          : ""
+                      }`}
                       actionLabel="Trvale smazat"
                       onConfirm={deletePermanently}
                       trigger={
@@ -124,20 +129,16 @@ export function SubjectDetailView({
             <div className="text-xs uppercase font-semibold text-muted-foreground">Ročníky</div>
             <div data-testid="subject-grades">{subjectGradesLabel(subject.grades)}</div>
           </div>
-          <div>
-            <div className="text-xs uppercase font-semibold text-muted-foreground">V zápisu</div>
-            {subject.windows.length === 0 ? (
-              <div className="text-muted-foreground">Momentálně není nabízen v žádném zápisu.</div>
-            ) : (
-              <div className="flex flex-wrap gap-1" data-testid="subject-windows">
-                {subject.windows.map((w) => (
-                  <span key={w.id} className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs px-2 py-0.5 rounded-full border border-emerald-500/30">
-                    v zápisu: {w.name}
-                  </span>
+          {subject.badges.length > 0 && (
+            <div>
+              <div className="text-xs uppercase font-semibold text-muted-foreground">Štítky</div>
+              <div className="flex flex-wrap gap-1" data-testid="subject-badges">
+                {subject.badges.map((b) => (
+                  <SubjectBadgeChip key={b.id} badge={b} />
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
           {canEdit && (
             <div className="sm:col-span-2 text-xs text-muted-foreground">
               Vytvořil: <strong>{subject.createdByName ?? "—"}</strong> dne <strong>{formatDateTime(subject.createdAt)}</strong>

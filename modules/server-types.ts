@@ -3,6 +3,30 @@ import type { ReactNode } from "react";
 import type { TxClient } from "@/lib/prisma";
 import type { User } from "@/lib/types";
 import type { EmailEventId } from "@/lib/email/events";
+import type { AdminTodo, SubjectBadge, SubjectUsageItem } from "@/modules/types";
+
+/** Záložka (detail předmětu, detail uživatele). Obsah je serverová komponenta modulu. */
+export type ModuleTab = {
+  // Jedinečné v rámci modulu; jádro ho před použitím prefixuje id modulu
+  id: string;
+  label: string;
+  // Pořadí záložek (nižší = dříve); záložky jádra mají 0–99, moduly 100+
+  order: number;
+  content: ReactNode;
+};
+
+/** Hromadná akce nad vybranými uživateli (F3). Spouští ji jádro v jedné transakci. */
+export type BulkUserAction = {
+  // Jedinečné v rámci modulu
+  id: string;
+  label: string;
+  // Oprávnění potřebné ke spuštění (jádro kontroluje i zapnutí modulu)
+  permission: string;
+  // Text potvrzovacího dialogu; `{count}` se nahradí počtem vybraných
+  confirm?: string;
+  // Provede akci a vrátí souhrn pro audit a toast. Neověřuje oprávnění (udělá jádro).
+  run: (tx: TxClient, userIds: string[], actor: User) => Promise<{ affected: number; summary: string }>;
+};
 
 export type AdminStat = {
   label: string;
@@ -32,4 +56,22 @@ export type ModuleServer = {
   runDailyJob?: (now: Date) => Promise<DailyJobStep[]>;
   // Odhad počtu příjemců hromadných upozornění pro administraci (Upozornění)
   getEmailEstimates?: () => Promise<Partial<Record<EmailEventId, number>>>;
+
+  // === Body rozšíření jádra ===
+  // Jádro je volá jen u zapnutých modulů přes pomocné funkce v `modules/core/extensions.ts`
+  // (collect*). Chyba jednoho modulu stránku jádra neshodí – položky modulu se jen vynechají.
+  // Každý bod si hlídá oprávnění uživatele sám (jádro kontroluje jen zapnutí modulu).
+
+  // Záložky v detailu předmětu (v F1 se zobrazí pod sebou, od F4 jako záložky)
+  getSubjectTabs?: (subjectId: string, user: User) => Promise<ModuleTab[]>;
+  // Štítky předmětů pro seznam a detail. Vrací jen předměty, které štítek mají.
+  getSubjectBadges?: (subjectIds: string[], user: User) => Promise<Map<string, SubjectBadge[]>>;
+  // Kde se předmět používá (varování před archivací/smazáním). Bez kontroly oprávnění uživatele.
+  getSubjectUsage?: (subjectId: string) => Promise<SubjectUsageItem[]>;
+  // Záložky v detailu uživatele (F3); `viewer` je ten, kdo se dívá
+  getUserTabs?: (userId: string, viewer: User) => Promise<ModuleTab[]>;
+  // Položky přehledu „co udělat“ v administraci (F2)
+  getAdminTodos?: (user: User) => Promise<AdminTodo[]>;
+  // Vlastní hromadné akce v seznamu uživatelů (F3)
+  bulkUserActions?: readonly BulkUserAction[];
 };
