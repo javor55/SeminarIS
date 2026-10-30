@@ -1,10 +1,10 @@
 import { unstable_cache, revalidateTag } from "next/cache";
 import { notFound } from "next/navigation";
-import { prisma, type TxClient } from "@/lib/prisma";
-import { setSetting } from "@/lib/settings";
+import { prisma } from "@/lib/prisma";
 import { MODULES } from "@/modules/registry";
 
-// Stav zapnutí modulů je v SystemSetting pod klíčem `module.<id>.enabled`.
+// Stav zapnutí modulů je v SystemSetting pod klíčem `module.<id>.enabled` (deklarace a zápis
+// v registru nastavení, lib/settings-registry.ts – ten po změně zavolá invalidateModulesCache).
 const settingKey = (id: string) => `module.${id}.enabled`;
 const MODULES_TAG = "modules";
 
@@ -27,18 +27,6 @@ export const getEnabledModuleIds = unstable_cache(loadEnabledModuleIds, ["enable
 
 export async function isModuleEnabled(id: string): Promise<boolean> {
   return (await getEnabledModuleIds()).includes(id);
-}
-
-/**
- * Zapne/vypne modul. S `db` (transakce) se jen zapíše nastavení a cache zapnutých modulů
- * musí volající zneplatnit po commitu přes `invalidateModulesCache()`.
- */
-export async function setModuleEnabled(id: string, enabled: boolean, db?: TxClient) {
-  const mod = MODULES.find((m) => m.id === id);
-  if (!mod) throw new Error("Neznámý modul.");
-  if ("core" in mod && mod.core) throw new Error("Jádro systému nelze vypnout.");
-  await setSetting(settingKey(id), enabled ? "true" : "false", db ?? prisma);
-  if (!db) invalidateModulesCache();
 }
 
 export function invalidateModulesCache() {

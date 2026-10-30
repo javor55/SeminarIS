@@ -1,12 +1,11 @@
-import { getSetting } from "@/lib/settings";
+import { getSetting } from "@/lib/settings-registry";
 
-// Globální nastavení jádra. Interní funkce bez autorizace (používá je i veřejná registrace).
+// Globální nastavení jádra: tenké obálky nad registrem nastavení (lib/settings-registry.ts,
+// deklarace v modules/core/manifest.ts). Interní funkce bez autorizace (používá je i veřejná registrace).
 
 export async function isRegistrationEnabled(): Promise<boolean> {
   try {
-    const value = await getSetting("registration_enabled");
-    // Pokud klíč neexistuje, registrace je povolena (výchozí stav)
-    return value == null ? true : value === "true";
+    return await getSetting<boolean>("registration_enabled");
   } catch {
     return false;
   }
@@ -14,8 +13,7 @@ export async function isRegistrationEnabled(): Promise<boolean> {
 
 export async function getDefaultRole(): Promise<"GUEST" | "STUDENT"> {
   try {
-    const value = await getSetting("default_user_role");
-    return value === "STUDENT" ? "STUDENT" : "GUEST";
+    return (await getSetting<string>("default_user_role")) === "STUDENT" ? "STUDENT" : "GUEST";
   } catch {
     return "GUEST";
   }
@@ -24,14 +22,9 @@ export async function getDefaultRole(): Promise<"GUEST" | "STUDENT"> {
 /** Výběr třídy při registraci: vypnuto / volitelný / povinný. */
 export type RegistrationClassMode = "off" | "optional" | "required";
 
-export const REGISTRATION_CLASS_MODES: readonly RegistrationClassMode[] = ["off", "optional", "required"];
-
-export const REGISTRATION_CLASS_MODE_KEY = "registration_class_mode";
-
 export async function getRegistrationClassMode(): Promise<RegistrationClassMode> {
   try {
-    const value = await getSetting(REGISTRATION_CLASS_MODE_KEY);
-    return REGISTRATION_CLASS_MODES.includes(value as RegistrationClassMode) ? (value as RegistrationClassMode) : "off";
+    return await getSetting<RegistrationClassMode>("registration_class_mode");
   } catch {
     return "off";
   }

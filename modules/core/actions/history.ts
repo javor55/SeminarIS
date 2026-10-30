@@ -4,8 +4,9 @@ import type { Prisma } from "@prisma/client";
 import { safeAction } from "@/lib/safe-action";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
-import { audit, auditAreaLabel, AUDIT_AREAS } from "@/lib/audit";
-import { getAuditRetentionYears, setAuditRetentionYears } from "@/lib/audit-settings";
+import { auditAreaLabel, AUDIT_AREAS } from "@/lib/audit";
+import { AUDIT_RETENTION_KEY, getAuditRetentionYears } from "@/lib/audit-settings";
+import { saveSettings } from "@/lib/settings-registry";
 import { startOfSchoolDay } from "@/lib/datetime";
 
 // Administrace → Historie: kdo, co a kdy změnil (AuditLog).
@@ -115,16 +116,6 @@ export async function getHistorySettings(): Promise<{ retentionYears: number }> 
 export async function saveHistoryRetention(years: number) {
   return safeAction(async () => {
     const admin = await requirePermission("core.admin");
-    const before = await getAuditRetentionYears();
-    await prisma.$transaction(async (tx) => {
-      await setAuditRetentionYears(years, tx);
-      await audit(tx, admin, {
-        action: "settings.history",
-        entityType: "setting",
-        entityId: "audit.retentionYears",
-        summary: `Uchovávání historie změn: ${before} → ${years} let`,
-        data: { before, after: years },
-      });
-    });
+    await saveSettings(admin, { [AUDIT_RETENTION_KEY]: years });
   });
 }
