@@ -22,7 +22,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
             ? "Co uživatel udělal a co se s ním dělo."
             : "Kdo, co a kdy v systému změnil. Záznamy vznikají ve stejné chvíli jako změna samotná."
         }
-        back={name ? { href: "/admin/history", label: "Celá historie" } : { href: "/admin", label: "Administrace" }}
+        back={name ? { href: "/admin/history", label: "Celá historie" } : undefined}
       />
       <HistoryView userId={userId} />
     </div>

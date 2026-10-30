@@ -12,10 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { NativeSelect } from "@/components/ui/native-select";
 import { ConfirmAction } from "@/modules/core/components/users/ConfirmAction";
-import { createClasses, deleteClass, type ClassOverview } from "@/modules/core/actions/classes";
+import { createClasses, deleteClass, type ClassOverview, type ClassStudent } from "@/modules/core/actions/classes";
 import { setUsersClass } from "@/modules/core/actions/users";
 import { GRADES } from "@/lib/school";
-import type { UserRow } from "./users-columns";
 
 /** Záložka Třídy: seznam tříd, studenti třídy, přesun do jiné třídy, generátor a smazání prázdné třídy. */
 export function ClassesTab({
@@ -24,7 +23,7 @@ export function ClassesTab({
   canManage,
 }: {
   classes: ClassOverview[];
-  users: UserRow[];
+  users: ClassStudent[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -47,7 +46,7 @@ export function ClassesTab({
   }
 
   const toggleGrade = (g: number) => setGrades((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
-  const studentsOf = (classId: string) => users.filter((u) => u.role === "STUDENT" && u.classGroupId === classId);
+  const studentsOf = (classId: string) => users.filter((u) => u.classGroupId === classId);
 
   return (
     <div className="space-y-6">

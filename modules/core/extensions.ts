@@ -3,9 +3,9 @@ import type { User } from "@/lib/types";
 import { getEnabledModuleIds } from "@/lib/modules";
 import { MODULE_SERVERS } from "@/modules/server-registry";
 import type { ModuleId } from "@/modules/registry";
-import type { AdminTodo, SubjectBadge, SubjectUsageItem } from "@/modules/types";
-import type { BulkUserAction, ModuleServer, ModuleTab } from "@/modules/server-types";
-import { can, type Permission } from "@/modules/registry";
+import type { AdminSection, AdminTodo, SubjectBadge, SubjectUsageItem } from "@/modules/types";
+import type { AdminStat, BulkUserAction, ModuleServer, ModuleTab } from "@/modules/server-types";
+import { MODULES, can, type Permission } from "@/modules/registry";
 
 // Sběr bodů rozšíření (viz ModuleServer) ze zapnutých modulů. Jádro nesmí importovat moduly
 // přímo – vše, co moduly do jádra přispívají, jde přes tyto funkce.
@@ -92,4 +92,19 @@ export async function collectBulkUserActions(user: User): Promise<(BulkUserActio
       .filter((a) => can(user.role, a.permission as Permission))
       .map((a) => ({ ...a, id: `${id}.${a.id}`, moduleId: id }))
   );
+}
+
+/** Sekce bočního menu administrace ze zapnutých modulů (jádro i moduly), které smí uživatel otevřít. */
+export async function collectAdminSections(user: User): Promise<AdminSection[]> {
+  const enabled = await getEnabledModuleIds();
+  return MODULES.filter((m) => enabled.includes(m.id))
+    .flatMap((m) => ((m as { adminSections?: readonly AdminSection[] }).adminSections ?? []) as readonly AdminSection[])
+    .filter((s) => can(user.role, s.permission as Permission))
+    .sort(byOrder);
+}
+
+/** Krátké statistiky pro přehled administrace ze zapnutých modulů. */
+export async function collectAdminStats(): Promise<AdminStat[]> {
+  const parts = await collect((s) => s.getAdminStats?.());
+  return parts.flatMap((p) => p.value);
 }

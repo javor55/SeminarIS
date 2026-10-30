@@ -131,7 +131,7 @@ export function YearClosureWizard({ preview }: { preview: YearClosurePreview }) 
       toast.success(
         `Školní rok ${res.nextYearLabel} zahájen: postoupilo ${res.promoted}, opakuje ${res.repeated}, absolvovalo ${res.graduated}, odešlo ${res.left}.`
       );
-      router.push("/admin");
+      router.push("/admin/school-year");
       router.refresh();
     } catch (err) {
       toast.error((err as Error).message || "Uzavření roku se nezdařilo.");
@@ -142,7 +142,7 @@ export function YearClosureWizard({ preview }: { preview: YearClosurePreview }) 
 
   const header = (
     <PageHeader
-      back={{ href: "/admin", label: "Zpět na Administraci" }}
+      back={{ href: "/admin/school-year", label: "Zpět na Školní rok a třídy" }}
       title={`Uzavření školního roku ${preview.currentYear.label} → ${preview.nextYear.label}`}
       description={
         step === 1

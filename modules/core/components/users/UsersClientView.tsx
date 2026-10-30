@@ -8,10 +8,10 @@ import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
 import { usersColumns, UserRow } from "@/modules/core/components/users/users-columns";
 import { ImportUsersDialog } from "@/modules/core/components/users/ImportUsersDialog";
-import { ClassesTab } from "@/modules/core/components/users/ClassesTab";
 import { ApprovalsTab, pendingApprovals } from "@/modules/core/components/users/ApprovalsTab";
 import { Download, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,7 +41,7 @@ import { can } from "@/modules/registry";
 
 const NO_CLASS = "__none";
 
-export type UsersTab = "users" | "classes" | "approvals";
+export type UsersTab = "users" | "approvals";
 
 export function UsersClientView({
   users,
@@ -303,7 +303,20 @@ export function UsersClientView({
     <div className="space-y-6">
       <PageHeader
         title="Správa uživatelů"
-        description="Správa rolí, tříd, stavu studia a zápisů."
+        description={
+          <>
+            Správa rolí, tříd, stavu studia a zápisů.
+            {can(currentUser.role, "core.admin") && (
+              <>
+                {" "}Třídy se zakládají a spravují v{" "}
+                <Link href="/admin/school-year" className="font-medium underline underline-offset-4" data-testid="classes-link">
+                  Administraci → Školní rok a třídy
+                </Link>
+                .
+              </>
+            )}
+          </>
+        }
         actions={
           <>
               {currentUser.role === "ADMIN" && (
@@ -323,7 +336,6 @@ export function UsersClientView({
       <div className="flex gap-1 border-b" role="tablist">
         {([
           ["users", "Uživatelé"],
-          ["classes", "Třídy"],
           ...(canManage ? [["approvals", `Ke schválení (${pendingCount})`]] : []),
         ] as [UsersTab, string][]).map(([id, label]) => (
           <button
@@ -340,7 +352,6 @@ export function UsersClientView({
         ))}
       </div>
 
-      {tab === "classes" && <ClassesTab classes={classes} users={users} canManage={canManage} />}
       {tab === "approvals" && canManage && <ApprovalsTab users={users} classes={classes} />}
 
       {tab === "users" && (

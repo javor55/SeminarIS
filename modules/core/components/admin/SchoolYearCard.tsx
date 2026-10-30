@@ -3,6 +3,7 @@
 import { unwrap } from "@/lib/action-result";
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,8 +13,9 @@ import { setCurrentSchoolYear } from "@/modules/core/actions/school";
 import { DEFAULT_STUDY_YEARS } from "@/lib/school";
 import type { SchoolYearInfo } from "@/modules/core/school";
 
-/** Administrace → Školní rok: aktuální rok, počáteční nastavení a odkaz na uzavření roku. */
-export function SchoolYearCard({ info, onChange }: { info: SchoolYearInfo; onChange: () => void }) {
+/** Administrace → Školní rok a třídy: aktuální rok, počáteční nastavení a odkaz na uzavření roku. */
+export function SchoolYearCard({ info }: { info: SchoolYearInfo }) {
+  const router = useRouter();
   const [selected, setSelected] = useState(String(info.currentYear.startYear));
   const [busy, setBusy] = useState(false);
   const changed = selected !== String(info.currentYear.startYear);
@@ -23,7 +25,7 @@ export function SchoolYearCard({ info, onChange }: { info: SchoolYearInfo; onCha
     try {
       unwrap(await setCurrentSchoolYear(Number(selected)));
       toast.success("Školní rok nastaven.");
-      onChange();
+      router.refresh();
     } catch (err) {
       toast.error((err as Error).message || "Nepodařilo se změnit školní rok.");
     } finally {
