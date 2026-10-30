@@ -32,9 +32,9 @@ test("historie: odepsání v seminářích a z dopisování, nastavení, filtr a
   check("removal audited with readable summary", auditCount(`action='makeup.registration.remove' and "actorId"='usr_teacher' and summary like 'Učitel Petr odepsal(a) studenta Student Jan z termínu%Matematika%'`) === 1);
 
   // 3) admin změní nastavení: vypne registraci
-  await pa.goto("/admin");
-  await pa.waitForSelector("#registration");
-  await pa.locator("#registration").click();
+  await pa.goto("/admin/registration");
+  await pa.waitForSelector("#setting-registration_enabled");
+  await pa.locator("#setting-registration_enabled").click();
   await toastText(pa);
   check("settings change audited", auditCount(`action='settings.registration' and summary='Registrace nových uživatelů: zapnuto → vypnuto'`) === 1);
 

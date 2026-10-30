@@ -13,7 +13,7 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 
 ## Stav
 - [x] F1 Body rozšíření a hranice modulů
-- [ ] F2 Administrace se sekcemi a přehled „co udělat“, jednotné nastavení
+- [x] F2 Administrace se sekcemi a přehled „co udělat“, jednotné nastavení
 - [ ] F3 Detail uživatele a hromadné akce
 - [ ] F4 Předměty napříč moduly
 - [ ] F5 Konfigurovatelné zápisy (publikum, pravidla bloků)

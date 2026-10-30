@@ -16,12 +16,14 @@ modules/
   core/                 jádro: uživatelé, třídy, předměty, profil, administrace
     manifest.ts
     server.tsx          dashboard (výzva k výběru třídy, čekající účty), statistiky do administrace
-    extensions.ts       sběr bodů rozšíření ze zapnutých modulů (collectSubjectTabs, …)
-    settings.ts         globální nastavení (registrace, výchozí role, výběr třídy při registraci)
+    extensions.ts       sběr bodů rozšíření ze zapnutých modulů (collectSubjectTabs, collectAdminTodos, collectAdminSections, …)
+    settings.ts         tenké obálky nad registrem nastavení (registrace, výchozí role, výběr třídy)
+    admin-todos.ts      položky přehledu „co udělat“ patřící jádru; system-status.ts stav DB, migrací, cronu, e-mailu
     school.ts           dotazy nad školou pro všechny moduly (aktuální rok, ročník studenta, setStudentClass, …)
     actions/            server actions: users.ts (vč. stavu studia), classes.ts, approvals.ts, subjects.ts,
                         assignments.ts (úvazky), school.ts (školní rok, uzavření roku), admin.ts, profile.ts
-    components/         users/ (vč. záložek Třídy a Ke schválení), subjects/, admin/ (školní rok, uzavření roku)
+    components/         users/ (vč. záložky Ke schválení), subjects/, admin/ (AdminShell, AdminNav, SettingsForm,
+                        ModulesForm, školní rok a třídy, uzavření roku, upozornění, historie)
   seminars/             zápisová okna a zápis studentů do předmětů (semináře)
     manifest.ts
     server.tsx          widget na dashboard, statistiky, úklid při mazání uživatele
@@ -43,7 +45,8 @@ lib/
   audit.ts              audit(tx, uživatel, záznam) – historie změn; audit-settings.ts (doba uchování)
   impersonation*.ts     „zobrazit jako uživatel“ (podepsaná cookie)
   modules.ts            zapnuté moduly (SystemSetting `module.<id>.enabled`), ensureModulePage
-  settings.ts           getSetting / setSetting
+  settings.ts           surové čtení/zápis klíčů SystemSetting, které nejsou nastavením (např. `cron.daily.lastRun`)
+  settings-registry.ts  jednotný registr nastavení (viz Jednotné nastavení): čtení, validace, zápis s auditem
   prisma.ts             Prisma klient (passwordHash se nikdy nevrací bez výslovného omit: false)
   auth.ts               NextAuth (heslo + Microsoft 365); role a aktivita se při každém ověření načtou z DB
   auth-settings.ts      nastavení přihlašování (M365 zapnuto, kdo smí heslem, zakládání účtů)
@@ -61,8 +64,8 @@ Všechny moduly sdílí tato data:
 
 | Model | Význam | Kde se spravuje |
 |---|---|---|
-| `SchoolYear` | školní rok (`startYear` 2026 = 2026/27), právě jeden je aktuální | Administrace → Školní rok |
-| `ClassGroup` | **pevná třída** = ročník (`grade` 1–4) + písmeno; třídy se zakládají jednou | Uživatelé → Třídy |
+| `SchoolYear` | školní rok (`startYear` 2026 = 2026/27), právě jeden je aktuální | Administrace → Školní rok a třídy |
+| `ClassGroup` | **pevná třída** = ročník (`grade` 1–4) + písmeno; třídy se zakládají jednou | Administrace → Školní rok a třídy |
 | `Subject` | **předmět** (název, zkratka, popis, sylabus, ročníky, aktivní/archivovaný) | menu Předměty |
 | `TeachingAssignment` | úvazek: učitel × předmět × třída × školní rok | detail předmětu, Uživatelé → Úvazky |
 | `User.classGroupId` | aktuální třída studenta (u absolventů a ukončených poslední) | Uživatelé |
@@ -77,7 +80,7 @@ Ročník studenta je `classGroup.grade`. Student se do vyššího ročníku **p�
 Do modulů se počítají jen **studující** studenti (`activeStudentsWhere`). Absolventi a
 ukončení mají deaktivovaný účet, jejich data (zápisy, historie) zůstávají.
 
-Stránka **Škola** už neexistuje: školní rok je v Administraci, třídy v Uživatelích, předměty
+Stránka **Škola** už neexistuje: školní rok a třídy jsou v Administraci, předměty
 v menu Předměty a úvazky v detailu předmětu a u učitele.
 
 ### Předměty (`/subjects`, jádro)
@@ -99,9 +102,11 @@ Jeden model `Subject` pro všechno (dřív zvlášť `Seminar` a `Subject`). Ž�
   modulů); použití se zapíše i do historie.
 - Dopisování nabízí na termínu všechny aktivní předměty.
 
-### Třídy (Uživatelé → Třídy)
+### Třídy (Administrace → Školní rok a třídy, `/admin/school-year`)
 
-- Záložka **Třídy**: seznam tříd s počty studujících, rozkliknutím studenti třídy a jejich
+- V Uživatelích je jen odkaz (`/users?tab=classes` přesměruje admina do administrace). Učitel správu
+  tříd nevidí (sekce je jen pro admina); třídu studenta vidí v seznamu uživatelů.
+- Sekce **Třídy**: seznam tříd s počty studujících, rozkliknutím studenti třídy a jejich
   přesun do jiné třídy (`setStudentClass`, v historii „přeřazen“). Admin tu generátorem založí
   třídy (ročníky × písmena, např. 1–4 × A, B, C; existující se přeskočí) a smaže prázdnou třídu
   (bez studentů a bez historie zařazení).
@@ -137,7 +142,7 @@ aktuální školní rok ze dvou míst (oprávnění `core.school.manage`, tedy a
 Číst úvazky v detailu předmětu může každý, kdo předmět vidí. Podle úvazků dopisování dohledá
 vyučujícího studenta.
 
-### Uzavření školního roku (Administrace → Školní rok → Uzavřít školní rok…, `/admin/close-year`)
+### Uzavření školního roku (Administrace → Školní rok a třídy → Uzavřít školní rok…, `/admin/close-year`)
 
 Jednou ročně, typicky na konci srpna. Průvodce má dva kroky.
 
@@ -159,12 +164,12 @@ cílové třídy, absolventům a odcházejícím se nastaví stav a deaktivují 
 a aktuálním rokem se stane následující školní rok. Hosté a učitelé se nemění. Akce se nedá
 vrátit; jednotlivé studenty jde opravit ručně (přesun do třídy, obnovení studia).
 
-Ruční nastavení aktuálního roku (Administrace → Školní rok) je k dispozici jen při prvním
+Ruční nastavení aktuálního roku (Administrace → Školní rok a třídy) je k dispozici jen při prvním
 nastavení systému, dokud nikdo není zařazen do třídy. Potom se rok mění jen uzavřením.
 
 ### Během roku (Uživatelé)
 
-- **Přesun do třídy:** úprava uživatele, záložka Třídy, nebo hromadně. V historii se zapíše
+- **Přesun do třídy:** úprava uživatele, Administrace → Školní rok a třídy, nebo hromadně. V historii se zapíše
   jako „přeřazen“.
 - **Ukončit studium** (ikona čepice u studenta): důvod, datum, poznámka. Účet se deaktivuje.
   Stejnou ikonou se studium obnoví.
@@ -206,7 +211,7 @@ Project → Settings → Environment Variables (Production, případně Preview)
 
 Po uložení je potřeba nové nasazení (Redeploy).
 
-### Nastavení v aplikaci (Administrace → Přihlášení)
+### Nastavení v aplikaci (Administrace → Registrace a přihlášení)
 
 - **Přihlášení přes Microsoft 365**: zobrazí nebo skryje tlačítko na přihlašovací stránce.
 - **Zakládat účty při prvním přihlášení**: vypnuto (výchozí) = projde jen ten, kdo už je
@@ -366,9 +371,10 @@ klient i server:
 - `nav`: položky menu včetně oprávnění a pořadí,
 - `routes`: prefixy cest, které hlídá middleware,
 - `enabledByDefault` / `core`: výchozí stav; jádro nejde vypnout,
-- `adminSections` (volitelné): položky bočního menu administrace (F2),
-- `settings` (volitelné): deklarace nastavení modulu – klíč `<modul>.<název>`, typ, výchozí hodnota,
-  popisek, validace (F2, jednotný registr nastavení).
+- `adminSections` (volitelné): položky bočního menu administrace (`label`, `href`, `permission`, `order`;
+  jádro 0–99, moduly 100+). Stránka sekce modulu leží ve složce cest modulu (např. `/makeup/settings`,
+  chráněná pravidlem v `routes`) a obalí se `<AdminShell>` z jádra, aby měla boční menu,
+- `settings` (volitelné): deklarace nastavení (viz Jednotné nastavení).
 
 ## Serverová část modulu
 
@@ -397,11 +403,14 @@ vynechají, stránka jádra se neshodí. Id záložek, štítků a položek jád
 | `getUserTabs(userId, viewer)` | `collectUserTabs` | záložky detailu uživatele (F3) |
 | `getAdminTodos(user)` | `collectAdminTodos` | přehled „co udělat“ v administraci (F2) |
 | `bulkUserActions` | `collectBulkUserActions` | hromadné akce nad uživateli (F3) |
-| `adminSections`, `settings` (v manifestu) | – | menu administrace a deklarace nastavení (F2) |
+| `getAdminStats()` | `collectAdminStats` | krátké statistiky pod přehledem v administraci |
+| `adminSections` (v manifestu) | `collectAdminSections` | boční menu administrace (jádro i moduly, podle oprávnění) |
+| `settings` (v manifestu) | registr nastavení | deklarace nastavení modulu |
 
-Zapojené jsou zatím `getSubjectTabs`, `getSubjectBadges` a `getSubjectUsage` (Semináře; Dopisování
-dodává `getSubjectUsage`, záložky přijdou ve F4). Ostatní body jsou definované a mají sběrné funkce,
-UI na nich vznikne v dalších fázích.
+Zapojené jsou `getSubjectTabs`, `getSubjectBadges`, `getSubjectUsage` (Semináře; Dopisování dodává
+`getSubjectUsage`, záložky přijdou ve F4), `getAdminTodos` (jádro, Semináře, Dopisování), `getAdminStats`,
+`adminSections` a `settings`. `getUserTabs` a `bulkUserActions` jsou definované a mají sběrné funkce,
+UI na nich vznikne ve F3.
 
 ### Hranice mezi jádrem a moduly
 
@@ -432,11 +441,65 @@ stačí upravit tam.
 > Zbývá doladit: klientské komponenty seminářů a uživatelů ještě místy porovnávají
 > role přímo (jen schovávají tlačítka). Server oprávnění vynucuje vždy.
 
+## Administrace (`/admin`)
+
+`app/admin/layout.tsx` obaluje stránky `AdminShell` s **bočním menu** (na mobilu je z něj výběr nad obsahem).
+Menu skládá `collectAdminSections(user)` z `adminSections` zapnutých modulů a nabízí jen sekce, na které má
+uživatel oprávnění. Stránky jsou serverové komponenty, klientské jsou jen formuláře.
+
+| Sekce | URL | Obsah |
+| --- | --- | --- |
+| Přehled | `/admin` | **Co udělat** + statistiky |
+| Registrace a přihlášení | `/admin/registration` | registrace, výchozí role, výběr třídy, Microsoft 365, kdo smí heslem |
+| Školní rok a třídy | `/admin/school-year` (+ `/admin/close-year`) | školní rok, uzavření roku, třídy |
+| Moduly | `/admin/modules` | zapnutí a vypnutí modulů |
+| Upozornění | `/admin/notifications` | e-maily: vypínač, limity, šablony, přehled odeslaných |
+| Historie | `/admin/history` | historie změn a doba uchování |
+| Diagnostika | `/admin/diagnostics` | databáze a migrace, denní úloha, e-mail, commit nasazení, benchmark |
+| Semináře | `/enrollments/settings` | výchozí hodnoty nového zápisového okna |
+| Dopisování | `/makeup/settings` | výchozí kapacita a uzávěrka nových termínů |
+
+### Přehled „co udělat“
+
+Položky dodává jádro (`modules/core/admin-todos.ts`) a zapnuté moduly přes `getAdminTodos(user)`
+(`AdminTodo`: `id`, `label`, `count`, `severity` = `critical` / `warning` / `info`, `href`). Položky s počtem 0
+se nezobrazí, řadí se podle závažnosti. Jádro hlídá: čekající registrace, studenty bez třídy, denní úlohu
+(chybí `CRON_SECRET`, neběžela, selhala), e-maily (nenastavené, čerpání denního/měsíčního limitu, neúspěšné
+za 24 h), Microsoft 365 nenastaveno (jen informativně), předměty bez ročníků a bez úvazku, třídy bez úvazků.
+Semináře přidávají nezapsané v každém otevřeném okně, Dopisování nadcházející termíny bez předmětů nebo
+s neaktivním dozorem. Nový modul přidá položku jedním voláním `getAdminTodos` (oprávnění si hlídá sám).
+
+### Jednotné nastavení (`lib/settings-registry.ts`)
+
+Každé nastavení je **deklarace** (`SettingDeclaration` v `modules/types.ts`): `key`, `type`
+(`boolean` / `number` / `string` / `enum`), `default`, `label`, `description`, `options` (enum), `min`/`max`
+(celá čísla), `maxLength`, `validate`, `permission` (oprávnění k zápisu, výchozí `core.admin`), `hidden`
+(spravuje ho vlastní obrazovka, generický formulář ho vynechá) a `audit` (`action` pro historii, `group`
+= více nastavení jedním záznamem). Deklarace jsou v `settings` manifestů (jádro má i historické klíče bez
+prefixu, např. `registration_enabled`; nové klíče modulů mají prefix `<modul>.`, hlídá to
+`npm run test:contract`). Registr k nim sám přidá zapnutí modulů (`module.<id>.enabled`) a e-mailové události
+(`email.event.<id>.enabled|subject|body`).
+
+- **Uložení** zůstává v `SystemSetting` pod původními klíči a ve stejném tvaru (boolean `"true"`/`"false"`,
+  číslo jako text, enum a text jako text), takže přechod na registr nezměnil žádná uložená data.
+  Neplatná uložená hodnota se čte jako výchozí.
+- **Čtení**: `getSetting(key)` / `getSettingValues(filter)` – jeden dotaz na požadavek (React `cache`),
+  doplní výchozí hodnoty. Starší funkce (`isRegistrationEnabled`, `getAuthSettings`, `loadEmailConfig`,
+  `getAuditRetentionYears`, …) jsou tenké obálky nad ním.
+- **Zápis**: `saveSettings(user, { klíč: hodnota }, { audit? })` – ověří oprávnění (a zapnutý modul),
+  zvaliduje podle deklarace, uloží jen změněné hodnoty a zapíše **historii změn ve stejné transakci**
+  („Výchozí kapacita termínu: 10 → 25“); beze změny se nezapíše nic. Je to jediná cesta zápisu; akce
+  `saveSettingsAction` ji nabízí formulářům. Složitější obrazovky (šablony upozornění, zapnutí modulů)
+  validují po svém a volají `saveSettings` s vlastním záznamem do historie (`opts.audit`).
+- **Formuláře**: `describeSettings(user, filter)` vrátí pole pro komponentu `SettingsForm`
+  (přepínač a výběr se ukládají hned, číslo a text tlačítkem Uložit). Stránka sekce modulu tak stojí jen na
+  deklaracích: viz `app/makeup/settings/page.tsx`.
+
 ## Zapnutí a vypnutí modulu
 
-Administrace → karta **Moduly**. Vypnutý modul:
+Administrace → **Moduly**. Vypnutý modul:
 
-- zmizí z menu (seznam zapnutých modulů je v session, `useAuth().enabledModules`),
+- zmizí z menu (seznam zapnutých modulů je v session, `useAuth().enabledModules`) i z menu administrace,
 - má stránky vracející 404 (layout volá `ensureModulePage("<id>")`),
 - má server actions, které vyhodí chybu (`requirePermission` / `requireModule`),
 - nepřispívá na dashboard ani do statistik.
@@ -456,7 +519,9 @@ Příkaz (`scripts/new-module.mjs`, jen Node) vytvoří kostru a zaregistruje ji
 `ensureModulePage`), `app/<id>/page.tsx` a prázdný `e2e/NN-<id>.spec.ts`. `id` jsou malá písmena a číslice.
 Dál ručně:
 
-1. V `manifest.ts` doplnit oprávnění (prefix `<id>.`), menu a chráněné cesty (`routes`).
+1. V `manifest.ts` doplnit oprávnění (prefix `<id>.`), menu a chráněné cesty (`routes`); případně
+   sekci administrace (`adminSections` + stránka obalená `<AdminShell>`, cesta musí být v `routes`)
+   a deklarace nastavení (`settings`, klíče `<id>.…`, `permission` modulu).
 2. Modely do `prisma/schema.prisma` (do vlastní sekce) a migrace
    (`npx prisma migrate dev --name <id>`, viz níže).
 3. Server actions do `modules/<id>/actions/*.ts` (`"use server"`). Každá začíná
@@ -464,7 +529,7 @@ Dál ručně:
 4. Stránky do `app/<cesta>/` (každá složka cest modulu má `layout.tsx` s `ensureModulePage("<id>")`
    a `export const dynamic = "force-dynamic"`).
 5. V `server.tsx` implementovat potřebné body rozšíření (widget, statistiky, `onUserDelete` pro tabulky
-   odkazující na uživatele, `getSubjectTabs` / `getSubjectBadges` / `getSubjectUsage`, …).
+   odkazující na uživatele, `getSubjectTabs` / `getSubjectBadges` / `getSubjectUsage`, `getAdminTodos`, …).
 6. Časy zobrazovat přes `lib/datetime.ts` (pásmo Europe/Prague). Server na Vercelu běží v UTC.
 7. Modul nesmí importovat jiný modul ani ho jádro (ESLint to hlídá); sdílené věci do jádra.
 
@@ -643,8 +708,8 @@ migrací `20261024000000_init` a produkční databáze se založí znovu:
 4. Návrat zpět: Instant Rollback na předchozí nasazení a znovu připojit starou databázi.
 5. Naplnění:
    - první registrovaný uživatel se stane adminem,
-   - Administrace → Školní rok: zkontrolovat školní rok,
-   - Uživatelé → Třídy: založit třídy (generátor 1–4 × A, B, C),
+   - Administrace → Školní rok a třídy: zkontrolovat školní rok,
+   - Administrace → Školní rok a třídy: založit třídy (generátor 1–4 × A, B, C),
    - Uživatelé: import studentů se sloupcem `class` a učitelů,
    - Předměty: založit předměty (ročníky) a nastavit vyučující,
    - Zápisy: zápisová okna.
