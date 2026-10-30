@@ -21,6 +21,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { APP_NAME } from "@/lib/app-config";
 
+/** Odkaz je aktivní, když cesta začíná jeho adresou a žádný jiný odkaz menu nesedí přesněji („Moje předměty“ vs. „Předměty“). */
+function isActiveLink(href: string, pathname: string, links: { href: string }[]) {
+  if (href === "/") return pathname === "/";
+  if (pathname !== href && !pathname.startsWith(href + "/")) return false;
+  return !links.some((l) => l.href.length > href.length && l.href !== "/" && (pathname === l.href || pathname.startsWith(l.href + "/")));
+}
+
 export function AppTopbar({ user }: { user?: User }) {
   const pathname = usePathname();
   const { logout, enabledModules } = useAuth();
@@ -39,10 +46,7 @@ export function AppTopbar({ user }: { user?: User }) {
           {/* 🔥 DESKTOP Navigace: Skrytá na mobilu (hidden), viditelná od 'md' (md:flex) */}
           <nav className="hidden md:flex gap-2">
             {links.map((link) => {
-              const isActive =
-                link.href === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(link.href);
+              const isActive = isActiveLink(link.href, pathname, links);
 
               return (
                 <Link
@@ -100,10 +104,7 @@ export function AppTopbar({ user }: { user?: User }) {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {links.map((link) => {
-                  const isActive =
-                    link.href === "/"
-                      ? pathname === "/"
-                      : pathname.startsWith(link.href);
+                  const isActive = isActiveLink(link.href, pathname, links);
 
                   return (
                     <DropdownMenuItem key={link.href} asChild>

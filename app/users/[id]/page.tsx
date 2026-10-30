@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
+import { TabLinks } from "@/components/tab-links";
 import { Badge } from "@/components/ui/badge";
 import { getCurrentUser } from "@/lib/session";
 import { ROLE_LABELS } from "@/lib/school";
@@ -114,20 +114,7 @@ export default async function UserDetailPage({
         actions={canImpersonate ? <ImpersonateButton userId={user.id} name={name} label="Zobrazit jako" /> : undefined}
       />
 
-      <div className="flex gap-1 overflow-x-auto border-b" role="tablist" data-testid="user-tabs">
-        {tabs.map((t) => (
-          <Link
-            key={t.id}
-            href={t.id === tabs[0].id ? `/users/${user.id}` : `/users/${user.id}?tab=${encodeURIComponent(t.id)}`}
-            role="tab"
-            aria-selected={t.id === active.id}
-            data-tab={t.id}
-            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium ${t.id === active.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </div>
+      <TabLinks tabs={tabs} activeId={active.id} baseHref={`/users/${user.id}`} testId="user-tabs" />
 
       <section key={active.id} data-user-tab={active.id}>
         {active.content}

@@ -23,10 +23,13 @@ export const coreModule = {
     "core.subjects.view": ["STUDENT", "TEACHER", "ADMIN"],
     "core.subjects.edit": ["TEACHER", "ADMIN"],
     "core.subjects.archive": ["ADMIN"],
+    // „Moje předměty“: co učím (učitel) / co mě čeká (student)
+    "core.subjects.mine": ["STUDENT", "TEACHER"],
   },
   nav: [
     { label: "Dashboard", href: "/", permission: "core.dashboard", order: 0 },
     { label: "Předměty", href: "/subjects", permission: "core.subjects.view", order: 20 },
+    { label: "Moje předměty", href: "/subjects/mine", permission: "core.subjects.mine", order: 25 },
     { label: "Uživatelé", href: "/users", permission: "core.users.view", order: 80 },
     { label: "Administrace", href: "/admin", permission: "core.admin", order: 90 },
     { label: "Můj profil", href: "/profile", permission: "core.profile", order: 100 },
@@ -34,6 +37,7 @@ export const coreModule = {
   routes: [
     { prefix: "/users", permission: "core.users.view" },
     { prefix: "/admin", permission: "core.admin" },
+    { prefix: "/subjects/mine", permission: "core.subjects.mine" },
     { prefix: "/subjects", permission: "core.subjects.view" },
   ],
   // Boční menu administrace (moduly přidávají vlastní přes `adminSections`)
