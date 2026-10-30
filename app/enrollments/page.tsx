@@ -6,6 +6,7 @@ import { getEnrollmentWindowsWithDetails } from "@/modules/seminars/actions/wind
 import { EnrollmentsClientView } from "@/modules/seminars/components/enrollment/EnrollmentsClientView";
 import { User } from "@/lib/types";
 import { can } from "@/modules/registry";
+import { getSettingValues } from "@/lib/settings-registry";
 
 export default async function EnrollmentsPage() {
   const [session, enrollments] = await Promise.all([
@@ -30,10 +31,18 @@ export default async function EnrollmentsPage() {
     );
   }
 
+  // Výchozí hodnoty nového okna (Administrace → Semináře)
+  const defaults = await getSettingValues((d) => d.owner === "seminars");
+  const reminder = Number(defaults["seminars.defaultReminderDaysBefore"]);
+
   return (
     <EnrollmentsClientView
       enrollments={enrollments}
       currentUser={currentUser}
+      newWindowDefaults={{
+        visibleToStudents: defaults["seminars.defaultVisibleToStudents"] === true,
+        reminderDaysBefore: reminder > 0 ? reminder : null,
+      }}
     />
   );
 }

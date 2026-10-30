@@ -24,12 +24,16 @@ export type AdminSection = {
   permission: string;
   // Pořadí v menu administrace (jádro používá 0–99, moduly 100+)
   order: number;
+  // Další cesty, pod kterými je sekce v menu zvýrazněná (např. podstránka průvodce)
+  match?: readonly string[];
 };
 
 /**
- * Deklarace nastavení modulu (F2: jednotný registr nastavení). Čistá data, aby šla načíst
- * i mimo server. Hodnota se ukládá do `SystemSetting` pod klíčem `key`
- * (konvence: `<idModulu>.<název>`, např. `seminars.defaultCapacity`).
+ * Deklarace nastavení (F2: jednotný registr nastavení, `lib/settings-registry.ts`). Čistá data,
+ * aby šla načíst i mimo server. Hodnota se ukládá do `SystemSetting` pod klíčem `key`
+ * (konvence nových nastavení: `<idModulu>.<název>`, např. `makeup.defaultCapacity`; jádro má
+ * z historických důvodů i klíče bez prefixu – ty se nesmí přejmenovat, ztratila by se data).
+ * Uložení: boolean "true"/"false", number jako text celého čísla, string a enum jako text.
  */
 export type SettingDeclaration = {
   key: string;
@@ -38,11 +42,21 @@ export type SettingDeclaration = {
   default: string | number | boolean;
   label: string;
   description?: string;
+  // Oprávnění potřebné k zápisu (výchozí `core.admin`); u modulů oprávnění modulu
+  permission?: string;
+  // Spravuje ho vlastní obrazovka (šablony e-mailů, zapnutí modulů…); generický formulář ho vynechá
+  hidden?: boolean;
   // Jen pro `enum`
   options?: readonly { value: string; label: string }[];
-  // Jen pro `number`
+  // Jen pro `number` (celá čísla)
   min?: number;
   max?: number;
+  // Jen pro `string`
+  maxLength?: number;
+  placeholder?: string;
+  // Název akce v historii změn (výchozí `settings.value`) a společný popis pro více nastavení,
+  // která se mají zapsat jedním záznamem (např. všechna e-mailová nastavení)
+  audit?: { action: string; group?: string };
   // Volitelná dodatečná validace; vrací text chyby, nebo null, když je hodnota v pořádku
   validate?: (value: string | number | boolean) => string | null;
 };

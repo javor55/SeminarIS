@@ -1,7 +1,7 @@
-import { getSetting } from "@/lib/settings";
+import { getSettingValues } from "@/lib/settings-registry";
 import type { Role } from "@/lib/types";
 
-// Nastavení přihlašování (Microsoft 365 a heslo). Hodnoty jsou v SystemSetting,
+// Nastavení přihlašování (Microsoft 365 a heslo). Hodnoty jsou v registru nastavení (SystemSetting),
 // přístupové údaje k Microsoftu v proměnných prostředí (nikdy ne v DB ani v repu).
 
 /** Kdo se smí přihlásit heslem, když je zapnuté Microsoft 365. Admin vždy. */
@@ -30,16 +30,12 @@ export function isMicrosoftConfigured(): boolean {
 }
 
 export async function getAuthSettings(): Promise<AuthSettings> {
-  const [enabled, autoCreate, scope] = await Promise.all([
-    getSetting(AUTH_SETTING_KEYS.microsoftEnabled),
-    getSetting(AUTH_SETTING_KEYS.microsoftAutoCreate),
-    getSetting(AUTH_SETTING_KEYS.passwordScope),
-  ]);
+  const v = await getSettingValues((d) => Object.values(AUTH_SETTING_KEYS).includes(d.key as never));
   return {
     microsoftConfigured: isMicrosoftConfigured(),
-    microsoftEnabled: enabled !== "false",
-    microsoftAutoCreate: autoCreate === "true",
-    passwordScope: PASSWORD_SCOPES.includes(scope as PasswordLoginScope) ? (scope as PasswordLoginScope) : "ALL",
+    microsoftEnabled: v[AUTH_SETTING_KEYS.microsoftEnabled] === true,
+    microsoftAutoCreate: v[AUTH_SETTING_KEYS.microsoftAutoCreate] === true,
+    passwordScope: v[AUTH_SETTING_KEYS.passwordScope] as PasswordLoginScope,
   };
 }
 

@@ -11,9 +11,9 @@ test.beforeAll(() => {
 test("upozornění: zkušební e-mail sobě se zapíše do přehledu", async ({ browser }) => {
   const p = await login(browser, "admin@skola.cz");
   await p.goto("/admin");
-  // z administrace se jde na Upozornění a Historii
-  await expect(p.getByTestId("notifications-link")).toBeVisible();
-  await p.getByTestId("notifications-link").getByRole("link").click();
+  // z bočního menu administrace se jde na Upozornění
+  await expect(p.getByTestId("admin-nav")).toBeVisible();
+  await p.getByTestId("admin-nav").getByRole("link", { name: "Upozornění" }).click();
   await p.waitForURL("**/admin/notifications");
   const card = p.getByTestId("email-card");
   await expect(card).toBeVisible();

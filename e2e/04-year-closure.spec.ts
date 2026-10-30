@@ -48,7 +48,7 @@ test("uzavření školního roku: změna třídy, opakování, absolvování, od
   sql(`insert into "TeachingAssignment"(id,"teacherId","subjectId","classGroupId","schoolYearId") select 'ta_'||s.id||c.grade||c.letter, 'usr_teacher', s.id, c.id, (select id from "SchoolYear" where "isCurrent") from "ClassGroup" c, "Subject" s where (s.id='sm' and c.letter='A' and c.grade in (3,4)) or (s.id='sf4' and c.letter='A' and c.grade=4)`);
 
   // ruční změna roku je skrytá, protože už jsou zařazení studenti
-  await pa.goto('/admin'); await pa.waitForSelector('[data-testid=school-year-card]');
+  await pa.goto('/admin/school-year'); await pa.waitForSelector('[data-testid=school-year-card]');
   check('manual year switch hidden', (await pa.locator('#school-year').count()) === 0);
 
   // průvodce: Jan 3.A (výchozí postup do 4.A), 3.B hromadně do 4.A + výjimka Cyril odchází
@@ -71,7 +71,7 @@ test("uzavření školního roku: změna třídy, opakování, absolvování, od
   await pa.selectOption('#assignment-mode', 'WITH_CLASS');
   await pa.click('[data-testid=close-year]');
   await pa.getByRole('button', { name: 'Uzavřít rok', exact: true }).click();
-  await pa.waitForURL('**/admin', { timeout: 30000 }); await pa.waitForLoadState('networkidle');
+  await pa.waitForURL('**/admin/school-year', { timeout: 30000 }); await pa.waitForLoadState('networkidle');
 
   check(`current year is ${Y + 1}`, sql(`select "startYear" from "SchoolYear" where "isCurrent"`) === `${Y + 1}`);
   check('Jan promoted to 4.A', userRow('jan.student@skola.cz') === `4A|ACTIVE|true||` && hist('jan.student@skola.cz') === `${Y}:3A:ASSIGNED,${Y + 1}:4A:PROMOTED`, hist('jan.student@skola.cz'));
@@ -123,7 +123,7 @@ test("uzavření roku: úvazky ponechat u stejných tříd / nepřebírat, upozo
   await pa.selectOption('#assignment-mode', 'SAME');
   await pa.click('[data-testid=close-year]');
   await pa.getByRole('button', { name: 'Uzavřít rok', exact: true }).click();
-  await pa.waitForURL('**/admin', { timeout: 30000 });
+  await pa.waitForURL('**/admin/school-year', { timeout: 30000 });
   check('new class created on closure', sql(`select count(*) from "ClassGroup" where grade=4 and letter='A'`) === '1');
   check('assignment kept at same class', sql(`select string_agg(c.grade||c.letter, ',') from "TeachingAssignment" t join "ClassGroup" c on c.id=t."classGroupId" join "SchoolYear" y on y.id=t."schoolYearId" where y."startYear"=${Y + 1}`) === '3A');
 });

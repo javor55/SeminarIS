@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
-import { DEFAULT_STUDY_YEARS, classLabel, compareClasses, parseLetters, sanitizeGrades } from "@/lib/school";
+import { DEFAULT_STUDY_YEARS, classLabel, compareClasses, parseLetters, sanitizeGrades, studyStatusLabel } from "@/lib/school";
 
 export type ClassOption = {
   id: string;
@@ -19,8 +19,20 @@ export type ClassOverview = ClassOption & {
   studentCount: number;
 };
 
+/** Student zařazený do třídy (rozkliknutí třídy v administraci). */
+export type ClassStudent = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  classGroupId: string;
+  // „absolvent“, „ukončil studium“…; null = studuje
+  studyLabel: string | null;
+};
+
 function revalidateClasses() {
   revalidatePath("/users");
+  revalidatePath("/admin/school-year");
   revalidatePath("/", "layout");
 }
 
@@ -40,6 +52,24 @@ export async function getClassesOverview(): Promise<ClassOverview[]> {
   return classes
     .sort(compareClasses)
     .map((c) => ({ id: c.id, label: classLabel(c), grade: c.grade, letter: c.letter, studentCount: c._count.students }));
+}
+
+/** Studenti zařazení do tříd (včetně absolventů, kteří si třídu ponechali), seřazení podle jména. */
+export async function getClassStudents(): Promise<ClassStudent[]> {
+  await requirePermission("core.users.view");
+  const users = await prisma.user.findMany({
+    where: { role: "STUDENT", classGroupId: { not: null } },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    select: { id: true, firstName: true, lastName: true, email: true, classGroupId: true, studyStatus: true, studyEndReason: true },
+  });
+  return users.map((u) => ({
+    id: u.id,
+    firstName: u.firstName,
+    lastName: u.lastName,
+    email: u.email,
+    classGroupId: u.classGroupId as string,
+    studyLabel: studyStatusLabel(u.studyStatus, u.studyEndReason),
+  }));
 }
 
 /** Generátor tříd: všechny kombinace vybraných ročníků a písmen (např. 1–4 × A, B, C). Existující se přeskočí. */

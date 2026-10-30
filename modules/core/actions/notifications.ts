@@ -2,16 +2,16 @@
 
 import { safeAction } from "@/lib/safe-action";
 import { prisma } from "@/lib/prisma";
+import { saveSettings } from "@/lib/settings-registry";
 import { requirePermission } from "@/lib/session";
-import { audit, describeChanges } from "@/lib/audit";
 import { getEnabledModuleIds } from "@/lib/modules";
 import { CONFIGURABLE_EMAIL_EVENTS, getEmailEvent, type EmailEventId } from "@/lib/email/events";
 import { unknownVariables } from "@/lib/email/template";
 import {
   loadEmailConfig,
   getEmailUsage,
-  saveEmailEvent,
-  saveEmailSettings,
+  emailEventKeys,
+  EMAIL_SETTING_KEYS,
   MIN_LOG_RETENTION_DAYS,
   type EmailSettings,
   type EmailUsage,
@@ -109,32 +109,14 @@ export async function saveNotificationSettings(data: {
 }) {
   return safeAction(async () => {
     const admin = await requirePermission("core.admin");
-    const before = (await loadEmailConfig()).settings;
-    await prisma.$transaction(async (tx) => {
-      await saveEmailSettings(data, tx);
-      const after = {
-        enabled: data.enabled,
-        from: data.from.trim() || null,
-        replyTo: data.replyTo.trim() || null,
-        dailyLimit: data.dailyLimit,
-        monthlyLimit: data.monthlyLimit,
-        logRetentionDays: data.logRetentionDays,
-      };
-      const changes = describeChanges(before, after, {
-        enabled: "e-mailová upozornění",
-        from: "odesílatel",
-        replyTo: "reply-to",
-        dailyLimit: "denní limit",
-        monthlyLimit: "měsíční limit",
-        logRetentionDays: "uchovávání záznamů o e-mailech (dny)",
-      });
-      await audit(tx, admin, {
-        action: "settings.notifications",
-        entityType: "setting",
-        entityId: "email",
-        summary: `Nastavení e-mailových upozornění${changes ? `: ${changes}` : " uloženo beze změny"}`,
-        data: { before, after },
-      });
+    // Validace, uložení a záznam do historie řeší registr nastavení (deklarace v manifestu jádra)
+    await saveSettings(admin, {
+      [EMAIL_SETTING_KEYS.enabled]: data.enabled,
+      [EMAIL_SETTING_KEYS.from]: data.from,
+      [EMAIL_SETTING_KEYS.replyTo]: data.replyTo,
+      [EMAIL_SETTING_KEYS.dailyLimit]: data.dailyLimit,
+      [EMAIL_SETTING_KEYS.monthlyLimit]: data.monthlyLimit,
+      [EMAIL_SETTING_KEYS.logRetentionDays]: data.logRetentionDays,
     });
     revalidatePath("/admin/notifications");
   });
@@ -167,18 +149,22 @@ export async function saveNotificationEvent(
       body: data.body === undefined ? undefined : data.body.trim() === def.defaultBody ? "" : data.body,
     };
     const before = (await loadEmailConfig()).events.get(def.id)!;
-    await prisma.$transaction(async (tx) => {
-      await saveEmailEvent(def, clean, tx);
-      const parts: string[] = [];
-      if (data.enabled !== undefined && data.enabled !== before.enabled) parts.push(data.enabled ? "zapnuto" : "vypnuto");
-      if (data.subject !== undefined || data.body !== undefined) parts.push("upravena šablona");
-      await audit(tx, admin, {
+    const keys = emailEventKeys(def.id);
+    const changes: Record<string, unknown> = {};
+    if (data.enabled !== undefined) changes[keys.enabled] = data.enabled;
+    if (clean.subject !== undefined) changes[keys.subject] = clean.subject;
+    if (clean.body !== undefined) changes[keys.body] = clean.body;
+    const parts: string[] = [];
+    if (data.enabled !== undefined && data.enabled !== before.enabled) parts.push(data.enabled ? "zapnuto" : "vypnuto");
+    if (data.subject !== undefined || data.body !== undefined) parts.push("upravena šablona");
+    await saveSettings(admin, changes, {
+      audit: {
         action: "settings.notifications.event",
         entityType: "setting",
         entityId: `email.event.${def.id}`,
         summary: `Upozornění „${def.label}“: ${parts.join(", ") || "uloženo beze změny"}`,
         data: { event: def.id, enabled: data.enabled ?? null, subjectChanged: data.subject !== undefined, bodyChanged: data.body !== undefined },
-      });
+      },
     });
     revalidatePath("/admin/notifications");
   });

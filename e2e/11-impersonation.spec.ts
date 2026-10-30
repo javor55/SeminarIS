@@ -93,10 +93,10 @@ test("náhled jako student: jeho data, pruh, žádná změna a žádný e-mail, 
   check("start and stop audited", sql(`select string_agg(action||':'||"actorId", ',' order by "createdAt") from "AuditLog"`) === "impersonation.start:usr_admin,impersonation.stop:usr_admin");
   check("start summary", sql(`select summary from "AuditLog" where action='impersonation.start'`) === "Spuštěn náhled jako Jan Student (student 3.A)");
   // po ukončení admin změny může dělat
-  await pa.goto("/admin");
-  await pa.waitForSelector("#registration");
-  await pa.locator("#registration").click();
-  expect(await toastText(pa)).toContain("Registrace zakázána");
+  await pa.goto("/admin/registration");
+  await pa.waitForSelector("#setting-registration_enabled");
+  await pa.locator("#setting-registration_enabled").click();
+  expect(await toastText(pa)).toContain("Nastavení uloženo");
 });
 
 test("náhled: jako učitel a host; ukončení odhlášením", async ({ browser }) => {

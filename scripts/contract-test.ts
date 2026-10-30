@@ -18,7 +18,16 @@ type Manifest = {
   nav: { label: string; href: string; permission: string; order: number }[];
   routes: { prefix: string; permission: string }[];
   adminSections?: { label: string; href: string; permission: string; order: number }[];
-  settings?: { key: string; type: string; default: unknown; label: string; options?: { value: string }[] }[];
+  settings?: {
+    key: string;
+    type: string;
+    default: unknown;
+    label: string;
+    permission?: string;
+    min?: number;
+    max?: number;
+    options?: { value: string }[];
+  }[];
 };
 
 // Moduly podle registrů (pořadí = pořadí v registru)
@@ -54,6 +63,8 @@ const cores = manifests.filter((m) => m.core);
 if (cores.length !== 1 || cores[0].id !== "core") fail("Právě jeden modul (id „core“) musí být označen jako jádro.");
 
 const allPermissions = new Map<string, string>();
+const settingKeys = new Set<string>();
+const adminHrefs = new Set<string>();
 const covered = (m: Manifest, href: string) => m.routes.some((r) => href === r.prefix || href.startsWith(r.prefix + "/"));
 // stránky jádra, které chrání jen přihlášení, ne oprávnění cesty
 const CORE_OPEN_HREFS = ["/", "/dashboard", "/profile"];
@@ -88,14 +99,26 @@ for (const m of manifests) {
   for (const s of m.adminSections ?? []) {
     if (!(s.permission in m.permissions)) fail(`${where}: sekce administrace „${s.label}“ používá cizí/neexistující oprávnění „${s.permission}“.`);
     if (!s.href.startsWith("/")) fail(`${where}: sekce administrace „${s.label}“ má neplatný odkaz.`);
+    // stránka sekce musí být chráněná pravidlem cesty modulu (jinak by se menu dalo obejít odkazem)
+    else if (!covered(m, s.href)) fail(`${where}: sekce administrace „${s.label}“ vede na „${s.href}“, které nechrání žádné pravidlo cesty.`);
+    if (adminHrefs.has(s.href)) fail(`${where}: sekce administrace „${s.label}“ má odkaz „${s.href}“ už použitý jinou sekcí.`);
+    adminHrefs.add(s.href);
   }
 
-  const keys = new Set<string>();
+  // nastavení: nové klíče mají prefix modulu (jádro má kvůli uloženým datům historické klíče),
+  // klíče jsou unikátní napříč moduly, výchozí hodnota odpovídá typu a mezím
   for (const s of m.settings ?? []) {
-    if (!s.key.startsWith(`${m.id}.`)) fail(`${where}: nastavení „${s.key}“ nemá prefix „${m.id}.“.`);
-    if (keys.has(s.key)) fail(`${where}: nastavení „${s.key}“ je deklarované dvakrát.`);
-    keys.add(s.key);
+    if (!m.core && !s.key.startsWith(`${m.id}.`)) fail(`${where}: nastavení „${s.key}“ nemá prefix „${m.id}.“.`);
+    if (settingKeys.has(s.key)) fail(`${where}: nastavení „${s.key}“ je deklarované dvakrát.`);
+    settingKeys.add(s.key);
+    if (s.permission && !(s.permission in m.permissions)) fail(`${where}: nastavení „${s.key}“ používá cizí/neexistující oprávnění „${s.permission}“.`);
+    if (!m.core && !s.permission) fail(`${where}: nastavení „${s.key}“ nemá oprávnění (permission) pro zápis.`);
     if (s.type === "enum" && !s.options?.some((o) => o.value === s.default)) fail(`${where}: výchozí hodnota nastavení „${s.key}“ není mezi možnostmi.`);
+    const typeOk = s.type === "number" ? Number.isInteger(s.default) : s.type === "boolean" ? typeof s.default === "boolean" : typeof s.default === "string";
+    if (!typeOk) fail(`${where}: výchozí hodnota nastavení „${s.key}“ neodpovídá typu „${s.type}“.`);
+    if (s.type === "number" && typeof s.default === "number" && ((s.min !== undefined && s.default < s.min) || (s.max !== undefined && s.default > s.max))) {
+      fail(`${where}: výchozí hodnota nastavení „${s.key}“ je mimo meze.`);
+    }
   }
 
   // nejádrový modul: každá cesta má layout s ensureModulePage + force-dynamic (vypnutý modul = 404)

@@ -50,8 +50,7 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   // --- Admin ---
   const pa = await login(browser, 'admin@skola.cz');
   check('admin nav', JSON.stringify(await navLabels(pa)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Dopisování', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(pa)));
-  await pa.goto('/admin'); await pa.waitForSelector('#module-seminars');
-  await pa.waitForTimeout(1000);
+  await pa.goto('/admin'); await pa.waitForSelector('[data-testid=admin-stats]');
   const text = await pa.locator('main').innerText();
   check('admin stats', text.includes('Uživatelé celkem') && text.includes('Aktivní předměty') && text.includes('Otevřené zápisy'));
   // detail předmětu: panel zápisů a štítek „v zápisu“ dodává modul Semináře (body rozšíření)
@@ -61,11 +60,12 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   check('subject detail has "v zápisu" badge', (await pa.getByTestId('subject-badges').innerText()).includes('v zápisu: Zápis LS 2025'));
   await pa.goto('/subjects'); await pa.waitForLoadState('networkidle');
   check('subject list has "v zápisu" badge', (await pa.getByTestId('subject-badges').first().innerText()).includes('v zápisu'));
-  await pa.goto('/admin'); await pa.waitForSelector('#module-seminars');
+  await pa.goto('/admin/modules'); await pa.waitForSelector('#module-seminars');
   // vypnout semináře
   await pa.click('#module-seminars'); await pa.waitForTimeout(2500);
   check('setting stored', sql(`select value from "SystemSetting" where key='module.seminars.enabled'`) === 'false');
   check('admin nav without seminars', JSON.stringify(await navLabels(pa)) === JSON.stringify(['Dashboard', 'Předměty', 'Dopisování', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(pa)));
+  await pa.goto('/admin'); await pa.waitForSelector('[data-testid=admin-stats]');
   const text2 = await pa.locator('main').innerText();
   check('stats without seminars', !text2.includes('Aktivní předměty'));
   // předměty jsou v jádru, jdou vypnout jen zápisy
@@ -81,7 +81,7 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   const ps = await login(browser, 'eva.studentova@skola.cz');
   check('student nav without seminars', JSON.stringify(await navLabels(ps)) === JSON.stringify(['Dashboard', 'Předměty', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(ps)));
   // zapnout zpět
-  await pa.goto('/admin'); await pa.waitForSelector('#module-seminars'); await pa.waitForTimeout(800);
+  await pa.goto('/admin/modules'); await pa.waitForSelector('#module-seminars'); await pa.waitForTimeout(800);
   await pa.click('#module-seminars'); await pa.waitForTimeout(2500);
   check('seminars re-enabled', JSON.stringify(await navLabels(pa)).includes('Zápisy'));
   await pa.goto('/subjects/' + subjId); await pa.waitForLoadState('networkidle');

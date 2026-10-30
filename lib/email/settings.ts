@@ -1,15 +1,13 @@
-import { prisma, type TxClient } from "@/lib/prisma";
-import { setSetting } from "@/lib/settings";
+import { prisma } from "@/lib/prisma";
+import { getSettingValues } from "@/lib/settings-registry";
 import { startOfSchoolDay, startOfSchoolMonth } from "@/lib/datetime";
-import { EMAIL_EVENTS, type EmailEventDef } from "@/lib/email/events";
+import { EMAIL_EVENTS } from "@/lib/email/events";
 import { getEmailStatus, type EmailStatus } from "@/lib/email/transport";
 
 // Nastavení e-mailových upozornění v administraci (tabulka SystemSetting, klíče `email.*`).
 // Tajný klíč RESEND_API_KEY tu NENÍ – ten je jen v env.
 
-export const DEFAULT_DAILY_LIMIT = 90;
-export const DEFAULT_MONTHLY_LIMIT = 2900;
-export const DEFAULT_LOG_RETENTION_DAYS = 90;
+// Výchozí hodnoty a meze limitů jsou v deklaracích nastavení (modules/core/manifest.ts)
 // Měsíční limit se počítá z EmailLogu, proto se log nesmí mazat dřív než za měsíc
 export const MIN_LOG_RETENTION_DAYS = 35;
 
@@ -48,33 +46,26 @@ export type EmailConfig = {
   status: EmailStatus;
 };
 
-function intOr(value: string | undefined, fallback: number, min = 0): number {
-  const n = Number(value);
-  return value != null && value.trim() !== "" && Number.isInteger(n) && n >= min ? n : fallback;
-}
-
-/** Celé nastavení e-mailů jedním dotazem. */
+/** Celé nastavení e-mailů (z registru nastavení). */
 export async function loadEmailConfig(): Promise<EmailConfig> {
-  const rows = await prisma.systemSetting.findMany({ where: { key: { startsWith: "email." } } });
-  const map = new Map(rows.map((r) => [r.key, r.value]));
-  const get = (k: string) => map.get(k);
+  const v = await getSettingValues((d) => d.key.startsWith("email."));
+  const get = (k: string) => v[k];
 
   const settings: EmailSettings = {
-    enabled: get(EMAIL_SETTING_KEYS.enabled) !== "false",
-    from: get(EMAIL_SETTING_KEYS.from)?.trim() || null,
-    replyTo: get(EMAIL_SETTING_KEYS.replyTo)?.trim() || null,
-    dailyLimit: intOr(get(EMAIL_SETTING_KEYS.dailyLimit), DEFAULT_DAILY_LIMIT),
-    monthlyLimit: intOr(get(EMAIL_SETTING_KEYS.monthlyLimit), DEFAULT_MONTHLY_LIMIT),
-    logRetentionDays: intOr(get(EMAIL_SETTING_KEYS.logRetentionDays), DEFAULT_LOG_RETENTION_DAYS, MIN_LOG_RETENTION_DAYS),
+    enabled: get(EMAIL_SETTING_KEYS.enabled) === true,
+    from: String(get(EMAIL_SETTING_KEYS.from)) || null,
+    replyTo: String(get(EMAIL_SETTING_KEYS.replyTo)) || null,
+    dailyLimit: get(EMAIL_SETTING_KEYS.dailyLimit) as number,
+    monthlyLimit: get(EMAIL_SETTING_KEYS.monthlyLimit) as number,
+    logRetentionDays: get(EMAIL_SETTING_KEYS.logRetentionDays) as number,
   };
 
   const events = new Map<string, EmailEventConfig>();
   for (const def of EMAIL_EVENTS) {
-    const enabled = get(eventKey(def.id, "enabled"));
     events.set(def.id, {
-      enabled: enabled == null ? def.defaultEnabled : enabled === "true",
-      subject: get(eventKey(def.id, "subject"))?.trim() || null,
-      body: get(eventKey(def.id, "body"))?.trim() || null,
+      enabled: get(eventKey(def.id, "enabled")) === true,
+      subject: String(get(eventKey(def.id, "subject"))) || null,
+      body: String(get(eventKey(def.id, "body"))) || null,
     });
   }
   return { settings, events, status: getEmailStatus(settings) };
@@ -86,50 +77,12 @@ export async function isEmailEventActive(eventId: string): Promise<boolean> {
   return cfg.settings.enabled && (cfg.events.get(eventId)?.enabled ?? false);
 }
 
-export async function saveEmailSettings(
-  data: {
-    enabled: boolean;
-    from: string;
-    replyTo: string;
-    dailyLimit: number;
-    monthlyLimit: number;
-    logRetentionDays: number;
-  },
-  db: TxClient = prisma
-) {
-  const check = (n: number, label: string, min: number, max: number) => {
-    if (!Number.isInteger(n) || n < min || n > max) throw new Error(`${label}: zadejte celé číslo ${min}–${max}.`);
-  };
-  check(data.dailyLimit, "Denní limit", 0, 100_000);
-  check(data.monthlyLimit, "Měsíční limit", 0, 1_000_000);
-  check(data.logRetentionDays, "Uchovávání záznamů o e-mailech (dny)", MIN_LOG_RETENTION_DAYS, 3650);
-  const from = data.from.trim();
-  const replyTo = data.replyTo.trim();
-  // „Jméno <adresa>“ nebo holá adresa
-  const addr = (v: string) => (v.match(/<([^<>]+)>\s*$/)?.[1] ?? v).trim();
-  const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
-  if (from && !EMAIL_RE.test(addr(from))) throw new Error('Odesílatel musí být e-mail, nebo "Jméno <e-mail>".');
-  if (replyTo && !EMAIL_RE.test(addr(replyTo))) throw new Error("Reply-to musí být platný e-mail.");
-
-  await setSetting(EMAIL_SETTING_KEYS.enabled, data.enabled ? "true" : "false", db);
-  await setSetting(EMAIL_SETTING_KEYS.from, from, db);
-  await setSetting(EMAIL_SETTING_KEYS.replyTo, replyTo, db);
-  await setSetting(EMAIL_SETTING_KEYS.dailyLimit, String(data.dailyLimit), db);
-  await setSetting(EMAIL_SETTING_KEYS.monthlyLimit, String(data.monthlyLimit), db);
-  await setSetting(EMAIL_SETTING_KEYS.logRetentionDays, String(data.logRetentionDays), db);
-}
-
-/** Uloží nastavení jedné události; prázdný předmět/text = výchozí šablona. */
-export async function saveEmailEvent(
-  def: EmailEventDef,
-  data: { enabled?: boolean; subject?: string; body?: string },
-  db: TxClient = prisma
-) {
-  if (data.enabled !== undefined) await setSetting(eventKey(def.id, "enabled"), data.enabled ? "true" : "false", db);
-  if (data.subject !== undefined) await setSetting(eventKey(def.id, "subject"), data.subject.trim(), db);
-  if (data.body !== undefined) await setSetting(eventKey(def.id, "body"), data.body.trim(), db);
-}
-
+/** Klíče nastavení jedné události v registru (zapnutí, předmět, text šablony). */
+export const emailEventKeys = (id: string) => ({
+  enabled: eventKey(id, "enabled"),
+  subject: eventKey(id, "subject"),
+  body: eventKey(id, "body"),
+});
 
 // === Využití limitů ===
 

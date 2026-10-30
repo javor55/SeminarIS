@@ -88,6 +88,20 @@ export const makeupServer: ModuleServer = {
     ];
   },
 
+  // Přehled „co udělat“: nadcházející termíny, které nejdou použít
+  async getAdminTodos(user) {
+    if (!can(user.role, "makeup.sessions.manageAll")) return [];
+    const upcoming = { endsAt: { gte: new Date() }, cancelledAt: null };
+    const [withoutSubjects, withoutSupervisor] = await Promise.all([
+      prisma.makeupSession.count({ where: { ...upcoming, subjects: { none: {} } } }),
+      prisma.makeupSession.count({ where: { ...upcoming, teacher: { isActive: false } } }),
+    ]);
+    return [
+      { id: "without-subjects", label: "Nadcházející termíny dopisování bez předmětů", count: withoutSubjects, severity: "warning" as const, href: "/makeup" },
+      { id: "without-supervisor", label: "Nadcházející termíny dopisování s neaktivním dozorem", count: withoutSupervisor, severity: "warning" as const, href: "/makeup" },
+    ];
+  },
+
   async getAdminStats() {
     const upcoming = await prisma.makeupSession.count({ where: { endsAt: { gte: new Date() }, cancelledAt: null } });
     return [{ label: "Termíny dopisování", value: upcoming, hint: "Nadcházející vypsané termíny", icon: "calendar" }];

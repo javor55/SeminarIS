@@ -78,6 +78,10 @@ export function SessionFormDialog({ session, trigger }: { session?: MakeupSessio
         const opts = await getSessionFormOptions();
         setOptions(opts);
         if (!teacherId) setTeacherId(opts.currentUserId);
+        if (!isEdit) {
+          setCapacity(String(opts.defaults.capacity));
+          setDeadline(String(opts.defaults.changeDeadlineMinutes));
+        }
       } catch (err) {
         toast.error((err as Error).message);
       }

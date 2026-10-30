@@ -1,31 +1,11 @@
-"use client";
-
-import { unwrap } from "@/lib/action-result";
-import { useState, useEffect } from "react";
-import { useAuth } from "@/components/auth/auth-provider";
-import { getAdminOverview, setRegistrationEnabled, setDefaultRole, setRegistrationClassMode, setModuleEnabledAction, setAuthSettings, type AdminModuleInfo } from "@/modules/core/actions/admin";
-import type { AuthSettings, PasswordLoginScope } from "@/lib/auth-settings";
-import type { AdminStat } from "@/modules/server-types";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
-import { Switch } from "@/components/ui/switch";
-import { Users, BookOpen, Calendar, Bell, History } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
-import { PerformanceBenchmarks } from "@/modules/core/components/admin/PerformanceBenchmarks";
-import { can } from "@/modules/registry";
+import { AlertTriangle, BookOpen, Calendar, CheckCircle2, Info, OctagonAlert, Users } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { SchoolYearCard } from "@/modules/core/components/admin/SchoolYearCard";
-import type { SchoolYearInfo } from "@/modules/core/school";
-import type { RegistrationClassMode } from "@/modules/core/settings";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCurrentUser } from "@/lib/session";
+import { collectAdminStats, collectAdminTodos } from "@/modules/core/extensions";
+import type { AdminTodo } from "@/modules/types";
 
 const STAT_ICONS = {
   users: <Users className="h-4 w-4 text-slate-500" />,
@@ -33,68 +13,57 @@ const STAT_ICONS = {
   calendar: <Calendar className="h-4 w-4 text-emerald-500" />,
 };
 
-export default function AdminPage() {
-  const { user, isLoading, refreshSession } = useAuth();
+const SEVERITY: Record<AdminTodo["severity"], { label: string; icon: React.ReactNode; variant: "destructive" | "warning" | "secondary" }> = {
+  critical: { label: "Naléhavé", icon: <OctagonAlert className="h-4 w-4 text-destructive" />, variant: "destructive" },
+  warning: { label: "Ke zpracování", icon: <AlertTriangle className="h-4 w-4 text-amber-500" />, variant: "warning" },
+  info: { label: "Informace", icon: <Info className="h-4 w-4 text-slate-400" />, variant: "secondary" },
+};
 
-  const [stats, setStats] = useState<AdminStat[] | null>(null);
-  const [modules, setModules] = useState<AdminModuleInfo[]>([]);
-  const [auth, setAuth] = useState<AuthSettings | null>(null);
-  const [regEnabled, setRegEnabled] = useState(true);
-  const [defaultRole, setDefaultRoleState] = useState<"GUEST" | "STUDENT">("GUEST");
-  const [classMode, setClassMode] = useState<RegistrationClassMode>("off");
-  const [schoolYear, setSchoolYear] = useState<SchoolYearInfo | null>(null);
-
-
-  useEffect(() => {
-    if (can(user?.role, "core.admin")) {
-      loadData();
-    }
-  }, [user]);
-
-  async function loadData() {
-    try {
-      const overview = await getAdminOverview();
-      setStats(overview.stats);
-      setRegEnabled(overview.registrationEnabled);
-      setDefaultRoleState(overview.defaultRole);
-      setClassMode(overview.classMode);
-      setSchoolYear(overview.schoolYear);
-      setModules(overview.modules);
-      setAuth(overview.auth);
-    } catch {
-      toast.error("Nepodařilo se načíst data administrace.");
-    }
-  }
-
-
-
-  if (isLoading || !user || !can(user.role, "core.admin")) return (
-    <div className="space-y-6">
-      <div>
-        <div className="h-9 w-64 bg-muted animate-pulse rounded" />
-        <div className="h-4 w-96 bg-muted animate-pulse rounded mt-2" />
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="rounded-lg border bg-card p-6 space-y-3">
-            <div className="h-4 w-24 bg-muted animate-pulse rounded" />
-            <div className="h-8 w-16 bg-muted animate-pulse rounded" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+export default async function AdminOverviewPage() {
+  const user = (await getCurrentUser())!;
+  const [todos, stats] = await Promise.all([collectAdminTodos(user), collectAdminStats()]);
+  const actionable = todos.filter((t) => t.severity !== "info").length;
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Administrační centrum"
-        description="Správa globálního nastavení systému a přehled statistik."
-      />
+      <PageHeader title="Administrace" description="Co je potřeba udělat a základní přehled systému." />
+
+      <Card className="shadow-sm" data-testid="admin-todos">
+        <CardHeader>
+          <CardTitle>Co udělat</CardTitle>
+          <CardDescription>
+            {actionable === 0 ? "Nic nehoří." : `K vyřízení: ${actionable} ${actionable === 1 ? "položka" : actionable < 5 ? "položky" : "položek"}.`} Položky se
+            počtem 0 se nezobrazují.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {todos.length === 0 ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Vše je v pořádku, není co řešit.
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {todos.map((t) => {
+                const sev = SEVERITY[t.severity];
+                return (
+                  <li key={t.id} data-testid="admin-todo" data-todo={t.id} data-severity={t.severity}>
+                    <Link href={t.href} className="flex items-center gap-3 py-3 hover:bg-accent/50 -mx-2 px-2 rounded-md">
+                      {sev.icon}
+                      <span className="flex-1 text-sm">{t.label}</span>
+                      <Badge variant={sev.variant} title={sev.label} data-testid="todo-count">{t.count}</Badge>
+                      <span className="text-sm font-medium underline underline-offset-4 hidden sm:inline">Vyřešit</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       {/* STATISTIKY (dodávají je zapnuté moduly) */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {(stats ?? []).map((stat) => (
+      <div className="grid gap-4 md:grid-cols-3" data-testid="admin-stats">
+        {stats.map((stat) => (
           <Card key={stat.label} className="shadow-sm border-border">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
               <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
@@ -107,261 +76,6 @@ export default function AdminPage() {
           </Card>
         ))}
       </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* GLOBÁLNÍ NASTAVENÍ */}
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Globální nastavení</CardTitle>
-            <CardDescription>
-              Základní parametry ovlivňující chování celého systému.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="registration">Registrace nových uživatelů</Label>
-                <p className="text-xs text-muted-foreground">
-                  Pokud je vypnuta, nikdo se nemůže registrovat.
-                </p>
-              </div>
-              <Switch
-                id="registration"
-                checked={regEnabled}
-                onCheckedChange={async (checked) => {
-                  try {
-                    unwrap(await setRegistrationEnabled(checked));
-                    setRegEnabled(checked);
-                    toast.success(checked ? "Registrace povolena." : "Registrace zakázána.");
-                  } catch (err) {
-                    const error = err as Error;
-                    toast.error(error.message || "Nepodařilo se změnit nastavení.");
-                  }
-                }}
-              />
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t">
-              <div>
-                <Label htmlFor="defaultRole">Výchozí role pro nové uživatele</Label>
-                <p className="text-xs text-muted-foreground">
-                  Role, která bude přiřazena po dokončení registrace.
-                </p>
-              </div>
-              <Select 
-                value={defaultRole} 
-                onValueChange={async (value) => {
-                  try {
-                    const role = value as "GUEST" | "STUDENT";
-                    unwrap(await setDefaultRole(role));
-                    setDefaultRoleState(role);
-                    toast.success("Výchozí role byla úspěšně změněna.");
-                  } catch (err) {
-                    const error = err as Error;
-                    toast.error(error.message || "Nepodařilo se změnit nastavení.");
-                  }
-                }}
-              >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Vyberte roli" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GUEST">Host (Guest)</SelectItem>
-                  <SelectItem value="STUDENT">Student</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center justify-between gap-4 pt-2 border-t">
-              <div>
-                <Label htmlFor="classMode">Výběr třídy při registraci</Label>
-                <p className="text-xs text-muted-foreground">
-                  Nový uživatel uvede svou třídu; správce ji pak potvrdí při schválení.
-                </p>
-              </div>
-              <NativeSelect
-                id="classMode"
-                className="w-[160px]"
-                value={classMode}
-                onChange={async (e) => {
-                  const mode = e.target.value as RegistrationClassMode;
-                  try {
-                    unwrap(await setRegistrationClassMode(mode));
-                    setClassMode(mode);
-                    toast.success("Nastavení uloženo.");
-                  } catch (err) {
-                    toast.error((err as Error).message || "Nepodařilo se změnit nastavení.");
-                  }
-                }}
-              >
-                <option value="off">Vypnuto</option>
-                <option value="optional">Volitelný</option>
-                <option value="required">Povinný</option>
-              </NativeSelect>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* MODULY */}
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Moduly</CardTitle>
-            <CardDescription>
-              Vypnutý modul zmizí z menu a jeho stránky ani akce nejsou dostupné. Data zůstávají zachována.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {modules.map((m, idx) => (
-              <div key={m.id} className={`flex items-center justify-between gap-4 ${idx > 0 ? "pt-2 border-t" : ""}`}>
-                <div>
-                  <Label htmlFor={`module-${m.id}`}>{m.name}</Label>
-                  <p className="text-xs text-muted-foreground">{m.description}</p>
-                </div>
-                <Switch
-                  id={`module-${m.id}`}
-                  checked={m.enabled}
-                  disabled={m.core}
-                  onCheckedChange={async (checked) => {
-                    try {
-                      unwrap(await setModuleEnabledAction(m.id, checked));
-                      // Znovu načíst i statistiky – závisí na zapnutých modulech
-                      await loadData();
-                      toast.success(checked ? `Modul „${m.name}“ zapnut.` : `Modul „${m.name}“ vypnut.`);
-                      // Menu v hlavičce se skládá ze session
-                      await refreshSession();
-                    } catch (err) {
-                      const error = err as Error;
-                      toast.error(error.message || "Nepodařilo se změnit nastavení.");
-                    }
-                  }}
-                />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ŠKOLNÍ ROK */}
-      {schoolYear && <SchoolYearCard info={schoolYear} onChange={loadData} />}
-
-      {/* PŘIHLÁŠENÍ */}
-      {auth && <AuthSettingsCard auth={auth} onChange={setAuth} />}
-
-      {/* UPOZORNĚNÍ A HISTORIE */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="shadow-sm" data-testid="notifications-link">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" /> Upozornění</CardTitle>
-            <CardDescription>
-              E-mailová upozornění přes Resend: zapnutí, odesílatel, limity, texty, zkušební e-mail a přehled odeslaných e-mailů.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/admin/notifications" className="text-sm font-medium underline underline-offset-4">Otevřít nastavení upozornění</Link>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm" data-testid="history-link">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Historie změn</CardTitle>
-            <CardDescription>Kdo, co a kdy v systému změnil. Nastavení, jak dlouho se historie uchovává.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/admin/history" className="text-sm font-medium underline underline-offset-4">Otevřít historii</Link>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* BENCHMARK A DIAGNOSTIKA */}
-      <PerformanceBenchmarks />
     </div>
-  );
-}
-
-const PASSWORD_SCOPE_LABELS: Record<PasswordLoginScope, string> = {
-  ALL: "Všichni",
-  STAFF: "Jen učitelé a admini",
-  ADMIN: "Jen admini",
-};
-
-// eslint-disable-next-line no-unused-vars
-function AuthSettingsCard({ auth, onChange }: { auth: AuthSettings; onChange: (a: AuthSettings) => void }) {
-  async function save(data: Parameters<typeof setAuthSettings>[0], message: string) {
-    try {
-      onChange(unwrap(await setAuthSettings(data)));
-      toast.success(message);
-    } catch (err) {
-      toast.error((err as Error).message || "Nepodařilo se změnit nastavení.");
-    }
-  }
-
-  return (
-    <Card className="shadow-sm">
-      <CardHeader>
-        <CardTitle>Přihlášení</CardTitle>
-        <CardDescription>
-          Microsoft 365 a klasické heslo mohou fungovat současně; účty se párují podle e-mailu.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {!auth.microsoftConfigured && (
-          <p className="text-sm rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-            Microsoft 365 není nakonfigurováno. Je potřeba registrace aplikace v Microsoft Entra ID a proměnné
-            prostředí <code>AZURE_AD_TENANT_ID</code>, <code>AZURE_AD_CLIENT_ID</code> a <code>AZURE_AD_CLIENT_SECRET</code> na
-            Vercelu. Do té doby se všichni přihlašují heslem.
-          </p>
-        )}
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <Label htmlFor="auth-microsoft">Přihlášení přes Microsoft 365</Label>
-            <p className="text-xs text-muted-foreground">Tlačítko „Přihlásit přes Microsoft 365“ na přihlašovací stránce.</p>
-          </div>
-          <Switch
-            id="auth-microsoft"
-            checked={auth.microsoftEnabled}
-            disabled={!auth.microsoftConfigured}
-            onCheckedChange={(checked) =>
-              save({ microsoftEnabled: checked }, checked ? "Přihlášení přes Microsoft zapnuto." : "Přihlášení přes Microsoft vypnuto.")
-            }
-          />
-        </div>
-        <div className="flex items-center justify-between gap-4 pt-2 border-t">
-          <div>
-            <Label htmlFor="auth-autocreate">Zakládat účty při prvním přihlášení</Label>
-            <p className="text-xs text-muted-foreground">
-              Vypnuto: přes Microsoft se přihlásí jen uživatelé, kteří už v systému jsou (např. z importu).
-              Zapnuto: komukoli ze školy se účet založí s výchozí rolí.
-            </p>
-          </div>
-          <Switch
-            id="auth-autocreate"
-            checked={auth.microsoftAutoCreate}
-            disabled={!auth.microsoftConfigured}
-            onCheckedChange={(checked) => save({ microsoftAutoCreate: checked }, "Nastavení uloženo.")}
-          />
-        </div>
-        <div className="flex items-center justify-between gap-4 pt-2 border-t">
-          <div>
-            <Label htmlFor="auth-password">Kdo se smí přihlásit heslem</Label>
-            <p className="text-xs text-muted-foreground">
-              Platí jen při zapnutém Microsoft 365. Admin se heslem přihlásí vždy.
-            </p>
-          </div>
-          <Select
-            value={auth.passwordScope}
-            disabled={!auth.microsoftConfigured}
-            onValueChange={(value) => save({ passwordScope: value as PasswordLoginScope }, "Nastavení uloženo.")}
-          >
-            <SelectTrigger className="w-[200px]" id="auth-password">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(PASSWORD_SCOPE_LABELS) as PasswordLoginScope[]).map((scope) => (
-                <SelectItem key={scope} value={scope}>{PASSWORD_SCOPE_LABELS[scope]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

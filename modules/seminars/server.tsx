@@ -140,6 +140,22 @@ export const seminarsServer: ModuleServer = {
     ];
   },
 
+  // Přehled „co udělat“: otevřená okna, ve kterých ještě nemají zapsáno všichni studenti
+  async getAdminTodos(user) {
+    if (!can(user.role, "seminars.windows.view")) return [];
+    const open = await prisma.enrollmentWindow.findMany({ where: { status: "OPEN" }, orderBy: { endsAt: "asc" }, select: { id: true, name: true } });
+    const todos = await Promise.all(
+      open.map(async (w) => ({
+        id: `unenrolled.${w.id}`,
+        label: `Nezapsaní studenti v otevřeném zápisu „${w.name}“`,
+        count: (await computeUnenrolled(w.id))?.students.length ?? 0,
+        severity: "warning" as const,
+        href: `/enrollments/${w.id}`,
+      }))
+    );
+    return todos;
+  },
+
   async getAdminStats() {
     const [subjectCount, activeEnrollmentCount] = await Promise.all([
       prisma.subject.count({ where: { isActive: true } }),

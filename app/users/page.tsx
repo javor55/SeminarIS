@@ -27,6 +27,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   }
 
   const { tab } = await searchParams;
+  // Správa tříd se přesunula do administrace (staré odkazy zůstávají funkční)
+  if (tab === "classes" && can(currentUser.role, "core.admin")) redirect("/admin/school-year");
   const [dbUsers, classes] = await Promise.all([getAllUsers(), getClassesOverview()]);
 
   return (
@@ -34,7 +36,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       users={dbUsers as unknown as UserRow[]} 
       currentUser={currentUser} 
       classes={classes}
-      initialTab={tab === "classes" || tab === "approvals" ? (tab as UsersTab) : "users"}
+      initialTab={tab === "approvals" ? (tab as UsersTab) : "users"}
     />
   );
 }

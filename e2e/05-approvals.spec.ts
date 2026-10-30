@@ -21,8 +21,8 @@ test("registrace se třídou a schválení hosta jedním klikem", async ({ brows
   check('class select hidden by default', (await p0.locator('#classGroupId').count()) === 0);
 
   // admin zapne volitelný výběr třídy
-  await pa.goto('/admin'); await pa.waitForSelector('#classMode');
-  await pa.selectOption('#classMode', 'optional'); await pa.waitForTimeout(1200);
+  await pa.goto('/admin/registration'); await pa.waitForSelector('#setting-registration_class_mode');
+  await pa.selectOption('#setting-registration_class_mode', 'optional'); await pa.waitForTimeout(1200);
   check('class mode stored', sql(`select value from "SystemSetting" where key='registration_class_mode'`) === 'optional');
 
   // registrace se žádostí o třídu

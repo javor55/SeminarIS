@@ -23,12 +23,13 @@ test("třídy, předměty, import se třídou, přesun mezi třídami, cílení 
   check('/school is gone', (await pa.goto('/school')).status() === 404);
 
   // školní rok je v Administraci
-  await pa.goto('/admin'); await pa.waitForSelector('[data-testid=school-year-card]');
+  await pa.goto('/admin/school-year'); await pa.waitForSelector('[data-testid=school-year-card]');
   check('current school year in admin', sql(`select "startYear" from "SchoolYear" where "isCurrent"`) === `${Y}` && (await pa.locator('[data-testid=current-year]').innerText()).startsWith(`${Y}/`));
   check('admin links to year closure', (await pa.locator('a[href="/admin/close-year"]').count()) === 1);
 
   // třídy: generátor ročníky × písmena (seed má 3.A a 3.B)
-  await pa.goto('/users?tab=classes'); await pa.waitForLoadState('networkidle');
+  // staré umístění správy tříd (Uživatelé → Třídy) přesměruje do administrace
+  await pa.goto('/users?tab=classes'); await pa.waitForURL('**/admin/school-year'); await pa.waitForLoadState('networkidle');
   await pa.fill('#class-letters', 'A, B, C');
   await pa.click('[data-testid=create-classes]'); await pa.waitForTimeout(1500);
   check('classes 1–4 × A,B,C generated', classesOf() === '1A,1B,1C,2A,2B,2C,3A,3B,3C,4A,4B,4C', classesOf());
@@ -106,7 +107,7 @@ test("třídy, předměty, import se třídou, přesun mezi třídami, cílení 
   await pa.keyboard.press('Escape');
 
   // přesun mezi třídami: Jan 3.A → 4.A (okno pro 3. ročník mu zmizí), potom zpět
-  await pa.goto('/users?tab=classes'); await pa.waitForLoadState('networkidle');
+  await pa.goto('/admin/school-year'); await pa.waitForLoadState('networkidle');
   await pa.locator('tr[data-class="3.A"] button[aria-expanded]').click();
   await pa.selectOption('select[aria-label="Přesunout do třídy – Student Jan"]', { label: '4.A' }); await pa.waitForTimeout(1500);
   check('student moved to 4.A with reason MOVED', sql(`select c.grade||c.letter||'/'||m.reason from "User" u join "ClassGroup" c on c.id=u."classGroupId" join "ClassMembership" m on m."userId"=u.id where u.email='jan.student@skola.cz'`) === '4A/MOVED');
@@ -127,7 +128,7 @@ test("třídy, předměty, import se třídou, přesun mezi třídami, cílení 
   check('bulk move to class', sql(`select c.grade||c.letter from "User" u join "ClassGroup" c on c.id=u."classGroupId" where u.email='novy.zak@skola.cz'`) === '3B');
 
   // admin: přihlášení karta bez konfigurace
-  await pa.goto('/admin'); await pa.waitForSelector('#auth-microsoft');
+  await pa.goto('/admin/registration'); await pa.waitForSelector('#setting-auth-microsoft-enabled');
   check('admin auth card shows not configured', (await pa.locator('main').innerText()).includes('není nakonfigurováno'));
 });
 

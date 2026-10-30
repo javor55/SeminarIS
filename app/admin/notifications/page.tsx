@@ -7,7 +7,6 @@ export default function NotificationsPage() {
       <PageHeader
         title="Upozornění"
         description="E-mailová upozornění: zapnutí, odesílatel, limity, texty a přehled odeslaných e-mailů."
-        back={{ href: "/admin", label: "Administrace" }}
       />
       <NotificationsView />
     </div>
