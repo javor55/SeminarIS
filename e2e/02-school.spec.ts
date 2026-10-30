@@ -74,9 +74,9 @@ test("třídy, předměty, import se třídou, přesun mezi třídami, cílení 
   const wid = sql(`select id from "EnrollmentWindow" limit 1`);
   await pa.goto('/enrollments/' + wid); await pa.waitForLoadState('networkidle');
   await pa.getByRole('button', { name: /Upravit/ }).first().click();
-  await pa.locator('#targetGrades [data-grade="3"]').click();
+  await pa.locator('#audience-grades [data-grade="3"]').click();
   await pa.getByRole('button', { name: /Uložit/ }).last().click(); await pa.waitForTimeout(2000);
-  check('targetGrades saved', sql(`select "targetGrades"::text from "EnrollmentWindow" where id='${wid}'`) === '{3}');
+  check('audience grade saved', sql(`select string_agg(type||':'||grade, ',') from "EnrollmentWindowAudience" where "windowId"='${wid}'`) === 'GRADE:3');
   await pa.reload(); await pa.waitForLoadState('networkidle');
   check('header shows target', (await pa.locator('main').innerText()).includes('Pro: 3. ročník'));
 
