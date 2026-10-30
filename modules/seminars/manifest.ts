@@ -20,5 +20,29 @@ export const seminarsModule = {
   nav: [
     { label: "Zápisy", href: "/enrollments", permission: "seminars.windows.view", order: 10 },
   ],
-  routes: [{ prefix: "/enrollments", permission: "seminars.windows.view" }],
+  routes: [
+    { prefix: "/enrollments/settings", permission: "seminars.windows.manage" },
+    { prefix: "/enrollments", permission: "seminars.windows.view" },
+  ],
+  adminSections: [{ label: "Semináře", href: "/enrollments/settings", permission: "seminars.windows.manage", order: 100 }],
+  settings: [
+    {
+      key: "seminars.defaultVisibleToStudents",
+      type: "boolean",
+      default: false,
+      label: "Nový zápis je hned viditelný studentům",
+      description: "Výchozí hodnota při zakládání zápisového okna; v každém okně ji lze změnit.",
+      permission: "seminars.windows.manage",
+    },
+    {
+      key: "seminars.defaultReminderDaysBefore",
+      type: "number",
+      default: 0,
+      min: 0,
+      max: 60,
+      label: "Připomínka nezapsaným (dní před koncem)",
+      description: "Výchozí hodnota při zakládání zápisového okna. 0 = bez automatické připomínky.",
+      permission: "seminars.windows.manage",
+    },
+  ],
 } as const satisfies ModuleManifest;

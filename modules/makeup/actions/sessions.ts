@@ -9,6 +9,7 @@ import { requirePermission } from "@/lib/session";
 import { audit, describeChanges } from "@/lib/audit";
 import { formatMinutes, formatTimeRange } from "@/lib/datetime";
 import { classLabel } from "@/lib/school";
+import { getSetting } from "@/lib/settings-registry";
 import { can } from "@/modules/registry";
 import {
   MAX_CAPACITY,
@@ -101,6 +102,11 @@ export async function getSessionFormOptions() {
     teachers: teachers.map((t) => ({ id: t.id, name: fullName(t) })),
     canChooseTeacher: can(user.role, "makeup.sessions.manageAll"),
     currentUserId: user.id,
+    // Výchozí hodnoty nového termínu (Administrace → Dopisování)
+    defaults: {
+      capacity: await getSetting<number>("makeup.defaultCapacity"),
+      changeDeadlineMinutes: Number(await getSetting<string>("makeup.defaultChangeDeadlineMinutes")),
+    },
   };
 }
 

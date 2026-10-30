@@ -26,9 +26,11 @@ const newEnrollmentMock: Partial<EnrollmentWindow> = {
 interface EnrollmentsClientViewProps {
   enrollments: EnrollmentWindowWithBlocks[];
   currentUser: User;
+  // Výchozí hodnoty nového okna z nastavení modulu
+  newWindowDefaults?: { visibleToStudents: boolean; reminderDaysBefore: number | null };
 }
 
-export function EnrollmentsClientView({ enrollments, currentUser }: EnrollmentsClientViewProps) {
+export function EnrollmentsClientView({ enrollments, currentUser, newWindowDefaults }: EnrollmentsClientViewProps) {
   const [editEnrollment, setEditEnrollment] = useState<EnrollmentWindowWithBlocks | Partial<EnrollmentWindow> | null>(null);
 
   const rows: EnrollmentRow[] = useMemo(() => {
@@ -100,7 +102,7 @@ export function EnrollmentsClientView({ enrollments, currentUser }: EnrollmentsC
           description="Přehled všech zápisů, bloků a počtu unikátních studentů."
           actions={
             currentUser.role === "ADMIN" ? (
-              <Button onClick={() => setEditEnrollment(newEnrollmentMock)}>Vytvořit nový zápis</Button>
+              <Button onClick={() => setEditEnrollment({ ...newEnrollmentMock, ...newWindowDefaults })}>Vytvořit nový zápis</Button>
             ) : undefined
           }
         />
@@ -118,7 +120,7 @@ export function EnrollmentsClientView({ enrollments, currentUser }: EnrollmentsC
               </p>
             </div>
             {currentUser.role === "ADMIN" && (
-              <Button onClick={() => setEditEnrollment(newEnrollmentMock)}>
+              <Button onClick={() => setEditEnrollment({ ...newEnrollmentMock, ...newWindowDefaults })}>
                 Vytvořit první zápis
               </Button>
             )}
