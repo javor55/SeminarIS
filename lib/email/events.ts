@@ -15,6 +15,7 @@ export type EmailEventId =
   | "account.pending.digest"
   | "seminars.window.opened"
   | "seminars.window.reminder"
+  | "manual.bulk"
   | "test";
 
 export type EmailEventDef = {
@@ -250,11 +251,31 @@ export const EMAIL_EVENTS: readonly EmailEventDef[] = [
     defaultSubject: "Zkušební e-mail",
     defaultBody: "Dobrý den, {{jmeno}},\n\ntoto je zkušební e-mail ze školního informačního systému. Odesílání funguje.",
   },
+  {
+    id: "manual.bulk",
+    module: "core",
+    group: "Ostatní",
+    label: "Hromadný e-mail správce",
+    description:
+      "Ruční e-mail vybraným uživatelům ze seznamu uživatelů (předmět a text zadává správce). Posílá se vždy, i když jsou upozornění vypnutá; počítá se do denního a měsíčního limitu.",
+    defaultEnabled: true,
+    mandatory: true,
+    bulk: false,
+    variables: [JMENO],
+    defaultSubject: "",
+    defaultBody: "",
+  },
 ];
 
 export function getEmailEvent(id: string): EmailEventDef | undefined {
   return EMAIL_EVENTS.find((e) => e.id === id);
 }
 
-/** Události, které lze nastavovat v administraci (bez zkušebního e-mailu). */
-export const CONFIGURABLE_EMAIL_EVENTS = EMAIL_EVENTS.filter((e) => e.id !== "test");
+/**
+ * Ruční události: posílají se vždy (nezávisle na vypínačích upozornění) a mají jen limity.
+ * Text zadává ten, kdo je posílá (u zkušebního e-mailu je pevný).
+ */
+export const MANUAL_EMAIL_EVENTS: readonly EmailEventId[] = ["test", "manual.bulk"];
+
+/** Události, které lze nastavovat v administraci (bez ručních). */
+export const CONFIGURABLE_EMAIL_EVENTS = EMAIL_EVENTS.filter((e) => !MANUAL_EMAIL_EVENTS.includes(e.id));

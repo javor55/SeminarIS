@@ -1,13 +1,13 @@
 "use server";
 
 import { safeAction } from "@/lib/safe-action";
-import { prisma, type TxClient } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireAuth, requirePermission } from "@/lib/session";
-import { ensureCurrentSchoolYear, setStudentClass } from "@/modules/core/school";
+import { ensureCurrentSchoolYear } from "@/modules/core/school";
+import { approveInTx } from "@/modules/core/approve";
 import { getRegistrationClassMode } from "@/modules/core/settings";
-import { audit, type AuditActor } from "@/lib/audit";
-import { classLabel } from "@/lib/school";
+import { audit } from "@/lib/audit";
 import { notifyAccountsApproved } from "@/modules/core/notifications";
 
 // Schvalování nově registrovaných uživatelů (hostů) a jejich žádost o třídu.
@@ -15,29 +15,6 @@ import { notifyAccountsApproved } from "@/modules/core/notifications";
 function revalidateApprovals() {
   revalidatePath("/users");
   revalidatePath("/", "layout");
-}
-
-async function approveInTx(tx: TxClient, actor: AuditActor, userId: string, classGroupId: string | null, schoolYear: { id: string }) {
-  const target = await tx.user.findUnique({ where: { id: userId } });
-  if (!target) throw new Error("Uživatel nenalezen.");
-  if (target.role !== "GUEST") throw new Error(`${target.firstName} ${target.lastName} už není host, schválení není potřeba.`);
-  await tx.user.update({
-    where: { id: userId },
-    data: { role: "STUDENT", isActive: true, requestedClassGroupId: null },
-  });
-  let label = "";
-  if (classGroupId) {
-    await setStudentClass(tx, { userId, classGroupId, schoolYear, reason: "ASSIGNED" });
-    const cls = await tx.classGroup.findUnique({ where: { id: classGroupId } });
-    label = cls ? ` do třídy ${classLabel(cls)}` : "";
-  }
-  await audit(tx, actor, {
-    action: "users.approve",
-    entityType: "user",
-    entityId: userId,
-    summary: `Schválen účet ${target.firstName} ${target.lastName} jako student${label}`,
-    data: { role: "STUDENT", classGroupId },
-  });
 }
 
 /** Schválí hosta jako studenta: role STUDENT, zařazení do vybrané třídy, smaže žádost. */

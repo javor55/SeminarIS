@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getEmailEvent, type EmailEventId } from "@/lib/email/events";
+import { getEmailEvent, MANUAL_EMAIL_EVENTS, type EmailEventId } from "@/lib/email/events";
 import { loadEmailConfig, getEmailUsage } from "@/lib/email/settings";
 import { renderTemplate } from "@/lib/email/template";
 import { BATCH_SIZE, transportSend, type OutgoingEmail } from "@/lib/email/transport";
@@ -57,6 +57,8 @@ export type SendOptions = {
   // Ruční akce admina (např. tlačítko „Poslat připomínku nezapsaným“) se nezastaví na vypnuté události;
   // hlavní vypínač, odhlášení příjemců i limity platí vždy.
   ignoreEventSwitch?: boolean;
+  // Vlastní předmět a text místo šablony události (ruční e-mail, `manual.bulk`); proměnné `{{jmeno}}` platí i tady
+  content?: { subject: string; body: string };
 };
 
 export async function sendEventEmail(eventId: EmailEventId, recipients: EmailRecipient[], opts: SendOptions = {}): Promise<SendSummary> {
@@ -88,8 +90,8 @@ async function doSend(eventId: EmailEventId, input: EmailRecipient[], opts: Send
 
   const cfg = await loadEmailConfig();
   const eventCfg = cfg.events.get(eventId);
-  const subjectTpl = eventCfg?.subject ?? def.defaultSubject;
-  const bodyTpl = eventCfg?.body ?? def.defaultBody;
+  const subjectTpl = opts.content?.subject ?? eventCfg?.subject ?? def.defaultSubject;
+  const bodyTpl = opts.content?.body ?? eventCfg?.body ?? def.defaultBody;
   const summary: SendSummary = { ...EMPTY };
 
   const render = (r: EmailRecipient): OutgoingEmail => {
@@ -106,8 +108,9 @@ async function doSend(eventId: EmailEventId, input: EmailRecipient[], opts: Send
     providerId,
   });
 
-  // Zkušební e-mail se posílá i při vypnutých upozorněních (jinak by nešlo ověřit nastavení)
-  const isTest = eventId === "test";
+  // Zkušební a ruční e-maily se posílají i při vypnutých upozorněních (zkušební jinak by nešlo ověřit nastavení);
+  // limity a odhlášení platí vždy
+  const isTest = MANUAL_EMAIL_EVENTS.includes(eventId);
   const rows: LogRow[] = [];
   let candidates: { r: EmailRecipient; mail: OutgoingEmail }[] = [];
 

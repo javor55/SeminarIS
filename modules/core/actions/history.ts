@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { safeAction } from "@/lib/safe-action";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
-import { auditAreaLabel, AUDIT_AREAS } from "@/lib/audit";
+import { auditAreaLabel, auditUserWhere, AUDIT_AREAS } from "@/lib/audit";
 import { AUDIT_RETENTION_KEY, getAuditRetentionYears } from "@/lib/audit-settings";
 import { saveSettings } from "@/lib/settings-registry";
 import { startOfSchoolDay } from "@/lib/datetime";
@@ -60,15 +60,7 @@ export async function getAuditLog(filter: AuditFilter = {}): Promise<{ rows: Aud
   if (from) and.push({ createdAt: { gte: from } });
   // „do“ včetně celého dne: do půlnoci následujícího dne
   if (toDay) and.push({ createdAt: { lt: startOfSchoolDay(toDay, 1) } });
-  if (filter.userId) {
-    and.push({
-      OR: [
-        { actorId: filter.userId },
-        { entityType: "user", entityId: filter.userId },
-        { data: { path: ["studentId"], equals: filter.userId } },
-      ],
-    });
-  }
+  if (filter.userId) and.push(auditUserWhere(filter.userId));
   const where: Prisma.AuditLogWhereInput = and.length ? { AND: and } : {};
   const page = Math.max(0, Math.floor(filter.page ?? 0));
 
