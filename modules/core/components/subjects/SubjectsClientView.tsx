@@ -138,8 +138,8 @@ export function SubjectsClientView({ subjects, currentUser }: { subjects: Subjec
           <DataTable<SubjectRow>
             data={subjects}
             columns={subjectsColumns}
-            searchPlaceholder="Hledat podle názvu nebo zkratky…"
-            searchKeys={["name", "code"]}
+            searchPlaceholder="Hledat podle názvu, zkratky nebo vyučujícího…"
+            searchKeys={["name", "code", "teachers"]}
             selectFilters={[
               {
                 columnId: "grades",

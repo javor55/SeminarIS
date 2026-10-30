@@ -13,7 +13,7 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
 
   // --- Student ---
   let p = await login(browser, 'jan.student@skola.cz');
-  check('student nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Předměty', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(p)));
+  check('student nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Předměty', 'Moje předměty', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(p)));
   check('student dashboard shows window', (await p.content()).includes('Zápis LS 2025'));
   await p.goto('/users'); check('student /users redirected', p.url().endsWith('/dashboard'), p.url());
   await p.goto('/enrollments'); check('student /enrollments redirected', p.url().endsWith('/dashboard'), p.url());
@@ -42,7 +42,7 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
 
   // --- Teacher ---
   p = await login(browser, 'teacher@skola.cz');
-  check('teacher nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Dopisování', 'Uživatelé', 'Můj profil']), JSON.stringify(await navLabels(p)));
+  check('teacher nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Moje předměty', 'Dopisování', 'Uživatelé', 'Můj profil']), JSON.stringify(await navLabels(p)));
   await p.goto('/admin'); check('teacher /admin redirected', p.url().endsWith('/dashboard'), p.url());
   await p.goto('/users'); await p.waitForLoadState('networkidle');
   check('teacher /users ok', p.url().endsWith('/users') && !(await p.content()).includes('$2'));
@@ -56,7 +56,10 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   // detail předmětu: panel zápisů a štítek „v zápisu“ dodává modul Semináře (body rozšíření)
   const panel = pa.locator('[data-subject-tab="seminars.occurrences"]');
   await pa.goto('/subjects/' + subjId); await pa.waitForLoadState('networkidle');
+  check('subject detail has seminars tab link', (await pa.locator('[data-testid=subject-tabs] [data-tab="seminars.occurrences"]').count()) === 1);
+  await pa.goto('/subjects/' + subjId + '?tab=seminars.occurrences'); await pa.waitForLoadState('networkidle');
   check('subject detail has seminars panel', (await panel.count()) === 1 && (await pa.getByTestId('subject-occurrences').count()) === 1);
+  await pa.goto('/subjects/' + subjId); await pa.waitForLoadState('networkidle');
   check('subject detail has "v zápisu" badge', (await pa.getByTestId('subject-badges').innerText()).includes('v zápisu: Zápis LS 2025'));
   await pa.goto('/subjects'); await pa.waitForLoadState('networkidle');
   check('subject list has "v zápisu" badge', (await pa.getByTestId('subject-badges').first().innerText()).includes('v zápisu'));
@@ -70,7 +73,10 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   check('stats without seminars', !text2.includes('Aktivní předměty'));
   // předměty jsou v jádru, jdou vypnout jen zápisy
   await pa.goto('/subjects/' + subjId); await pa.waitForLoadState('networkidle');
-  check('subject detail without seminars panel', (await pa.locator('[data-subject-tab]').count()) === 0 && (await pa.getByTestId('subject-occurrences').count()) === 0);
+  check('subject detail without seminars tab', (await pa.locator('[data-testid=subject-tabs] [data-tab^="seminars."]').count()) === 0 && (await pa.getByTestId('subject-occurrences').count()) === 0);
+  await pa.goto('/subjects/' + subjId + '?tab=seminars.occurrences'); await pa.waitForLoadState('networkidle');
+  check('forced seminars tab falls back to overview', (await pa.locator('[data-subject-tab="overview"]').count()) === 1 && (await pa.getByTestId('subject-occurrences').count()) === 0);
+  await pa.goto('/subjects/' + subjId); await pa.waitForLoadState('networkidle');
   check('subject detail without "v zápisu" badge', (await pa.getByTestId('subject-badges').count()) === 0 && !(await pa.content()).includes('v zápisu:'));
   await pa.goto('/subjects'); await pa.waitForLoadState('networkidle');
   check('subject list without "v zápisu" badge', !(await pa.locator('main').innerText()).includes('v zápisu'));
@@ -79,13 +85,13 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   await pa.goto('/dashboard'); check('dashboard empty when disabled', (await pa.content()).includes('Vítejte'));
   // student: zápis přes action musí selhat → ověř přes dashboard a nav
   const ps = await login(browser, 'eva.studentova@skola.cz');
-  check('student nav without seminars', JSON.stringify(await navLabels(ps)) === JSON.stringify(['Dashboard', 'Předměty', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(ps)));
+  check('student nav without seminars', JSON.stringify(await navLabels(ps)) === JSON.stringify(['Dashboard', 'Předměty', 'Moje předměty', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(ps)));
   // zapnout zpět
   await pa.goto('/admin/modules'); await pa.waitForSelector('#module-seminars'); await pa.waitForTimeout(800);
   await pa.click('#module-seminars'); await pa.waitForTimeout(2500);
   check('seminars re-enabled', JSON.stringify(await navLabels(pa)).includes('Zápisy'));
   await pa.goto('/subjects/' + subjId); await pa.waitForLoadState('networkidle');
-  check('subject detail panel back', (await pa.locator('[data-subject-tab="seminars.occurrences"]').count()) === 1);
+  check('subject detail seminars tab back', (await pa.locator('[data-testid=subject-tabs] [data-tab="seminars.occurrences"]').count()) === 1);
   await pa.goto('/dashboard'); check('dashboard back', (await pa.content()).includes('Zápis LS 2025'));
 
 

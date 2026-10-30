@@ -92,6 +92,15 @@ async function teachingInclude() {
   };
 }
 
+/** Použití předmětu: úvazky v jádru + všechny moduly (i vypnuté, viz collectSubjectUsage). */
+async function getFullUsage(subjectId: string): Promise<SubjectUsageItem[]> {
+  const assignments = await prisma.teachingAssignment.count({ where: { subjectId } });
+  const core: SubjectUsageItem[] = [{ id: "core.assignments", label: "Úvazky vyučujících", count: assignments, href: `/subjects/${subjectId}?tab=teaching` }];
+  return [...core.filter((u) => u.count > 0), ...(await collectSubjectUsage(subjectId))];
+}
+
+const usageText = (usage: SubjectUsageItem[]) => usage.map((u) => `${u.label}: ${u.count}`).join("; ");
+
 // === ČTENÍ ===
 
 /**
@@ -150,7 +159,7 @@ export async function getSubjectDetail(id: string): Promise<SubjectDetail | null
   return {
     ...toItem(s, badges),
     syllabus: s.syllabus,
-    usage: can(user.role, "core.subjects.archive") ? await collectSubjectUsage(id) : [],
+    usage: can(user.role, "core.subjects.archive") ? await getFullUsage(id) : [],
     createdByName: s.createdBy ? fullName(s.createdBy) : null,
     updatedByName: s.updatedBy ? fullName(s.updatedBy) : null,
   };
@@ -247,24 +256,26 @@ export async function toggleSubjectActive(id: string) {
 }
 
 /**
- * Trvale smaže předmět včetně výskytů v zápisových oknech, zápisů studentů, úvazků
- * a vazeb dopisování. Kaskáda je zajištěna na úrovni DB. Pouze ADMIN.
+ * Trvale smaže předmět, který se nikde nepoužívá (žádné úvazky ani data modulů – zápisová okna,
+ * dopisování …). Použitý předmět nejde smazat ani vynuceně, nabídne se archivace. Pouze ADMIN.
  */
 export async function deleteSubjectPermanently(id: string) {
   return safeAction(async () => {
     const admin = await requirePermission("core.subjects.archive");
     const subject = await prisma.subject.findUnique({ where: { id } });
     if (!subject) throw new Error("Předmět nenalezen.");
-    const usage = await collectSubjectUsage(id);
-    const usageText = usage.map((u) => `${u.label}: ${u.count}`).join("; ");
+    const usage = await getFullUsage(id);
+    if (usage.length > 0) {
+      throw new Error(`Předmět se používá, nelze ho smazat (${usageText(usage)}). Archivujte ho, nebo nejdřív použití odstraňte.`);
+    }
     await prisma.$transaction(async (tx) => {
       await tx.subject.delete({ where: { id } });
       await audit(tx, admin, {
         action: "subjects.subject.delete",
         entityType: "subject",
         entityId: id,
-        summary: `Trvale smazán předmět „${subject.name}“ (včetně výskytů v zápisech, úvazků a vazeb dopisování)${usageText ? `. Použití: ${usageText}` : ""}`,
-        data: { name: subject.name, code: subject.code, usage },
+        summary: `Trvale smazán nepoužitý předmět „${subject.name}“`,
+        data: { name: subject.name, code: subject.code },
       });
     });
     revalidateSubjects();
