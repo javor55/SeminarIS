@@ -15,6 +15,7 @@ import { getSubjectOccurrences } from "@/modules/seminars/actions/occurrences";
 import { getSubjectWindows } from "@/modules/seminars/subject-windows";
 import { getSeminarsMySubjectsSections } from "@/modules/seminars/my-subjects";
 import { UserEnrollmentsPanel } from "@/modules/seminars/user-enrollments";
+import { seminarsBulkActions } from "@/modules/seminars/bulk-audience";
 import { getSeminarsEmailEstimates, runSeminarsDailyJob } from "@/modules/seminars/notifications";
 
 function findDashboardEnrollment(
@@ -53,6 +54,8 @@ function findDashboardEnrollment(
 
 export const seminarsServer: ModuleServer = {
   runDailyJob: runSeminarsDailyJob,
+  // Uživatelé → hromadné akce „Přidat do publika zápisu“ / „Odebrat z publika zápisu“
+  bulkUserActions: seminarsBulkActions,
   getEmailEstimates: () => getSeminarsEmailEstimates(),
 
   async getDashboardWidget(user) {

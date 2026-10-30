@@ -4,7 +4,7 @@ import { safeAction } from "@/lib/safe-action";
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { requirePermission } from "@/lib/session";
-import { computeUnenrolled, sendUnenrolledReminder } from "@/modules/seminars/unenrolled";
+import { computeUnenrolled, missingBlockLabel, sendUnenrolledReminder } from "@/modules/seminars/unenrolled";
 
 // Nezapsaní studenti zápisového okna (záložka „Nezapsaní“ v detailu okna).
 
@@ -33,7 +33,7 @@ export async function getUnenrolledView(windowId: string): Promise<UnenrolledVie
   return {
     windowName: o.windowName,
     blockCount: o.blockCount,
-    students: o.students.map((s) => ({ ...s, missingBlocks: s.missingBlocks.map((b) => b.name) })),
+    students: o.students.map((s) => ({ ...s, missingBlocks: s.missingBlocks.map((b) => missingBlockLabel(b)) })),
     classes: [...classes.entries()]
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label, "cs", { numeric: true })),

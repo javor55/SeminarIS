@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { User } from "@/lib/types";
-import { getViewerGrade, windowsForGradeWhere } from "@/modules/seminars/eligibility";
+import { getViewerContext, occurrencesForViewerWhere, windowsForViewerWhere } from "@/modules/seminars/eligibility";
 
 // Kde je předmět nabízen: odvozený štítek „v zápisu: <název okna>“ podle výskytů
 // (SubjectOccurrence) v nesmazaných blocích. Studenti vidí jen okna, která vidí i na dashboardu.
@@ -9,17 +9,16 @@ export type SubjectWindowRef = { id: string; name: string };
 
 /** Zápisová okna, ve kterých je předmět nabízen (podle viditelnosti pro daného uživatele). */
 export async function getSubjectWindows(user: User, subjectIds?: string[]): Promise<Map<string, SubjectWindowRef[]>> {
-  const grade = await getViewerGrade(user);
+  const ctx = await getViewerContext(user);
   const occurrences = await prisma.subjectOccurrence.findMany({
     where: {
       deletedAt: null,
       ...(subjectIds ? { subjectId: { in: subjectIds } } : {}),
+      // student vidí jen výskyty z oken, jejichž publikum zahrnuje jeho, a jen výskyty určené jemu
+      ...(ctx ? occurrencesForViewerWhere(ctx) : {}),
       block: {
         deletedAt: null,
-        enrollmentWindow:
-          grade === undefined
-            ? {}
-            : { visibleToStudents: true, status: { not: "DRAFT" }, ...windowsForGradeWhere(grade) },
+        enrollmentWindow: ctx === undefined ? {} : { visibleToStudents: true, status: { not: "DRAFT" }, ...windowsForViewerWhere(ctx) },
       },
     },
     select: { subjectId: true, block: { select: { enrollmentWindow: { select: { id: true, name: true, startsAt: true } } } } },

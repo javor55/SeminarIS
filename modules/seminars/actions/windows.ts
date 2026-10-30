@@ -8,24 +8,83 @@ import type { EnrollmentStatus } from "@/lib/types";
 import { requireAuth, requireModule, requirePermission } from "@/lib/session";
 import { can } from "@/modules/registry";
 import { syncEnrollmentWindowStatus } from "@/modules/seminars/window-status";
-import { eligibleStudentsWhere, getViewerGrade, isWindowForGrade, sanitizeTargetGrades, windowsForGradeWhere } from "@/modules/seminars/eligibility";
-import { classLabel, targetGradesLabel } from "@/lib/school";
+import { audienceWhere, audienceWhereForWindow, getViewerContext, isWindowVisibleTo, loadAudienceEntries, occurrencesForViewerWhere, replaceAudience, windowsForViewerWhere, type ViewerContext } from "@/modules/seminars/eligibility";
+import { audienceInclude, buildAudienceView } from "@/modules/seminars/audience-view";
+import { audienceSummary, draftFromEntries, EMPTY_AUDIENCE, entriesFromDraft, type AudienceDraft } from "@/modules/seminars/audience";
+import { blockRulesLabel, cleanBlockRules, type BlockRules } from "@/modules/seminars/window-rules";
+import { classLabel, compareClasses, sanitizeGrades } from "@/lib/school";
+import { activeStudentsWhere } from "@/modules/core/school";
+import type { Prisma } from "@prisma/client";
 import { audit, describeChanges } from "@/lib/audit";
 import { formatDateTime } from "@/lib/datetime";
 import { notifyWindowOpenedIfOpen } from "@/modules/seminars/notifications";
 
 // === ČTENÍ DAT ===
 
+/**
+ * Include okna s bloky, výskyty a zápisy. Studenti dostanou jen výskyty určené jim (omezení na ročníky / třídy)
+ * a bloky, které by po tomto omezení zůstaly prázdné, se skryjí. Publikum okna načítá jen učitel a admin.
+ */
+function windowInclude(ctx: ViewerContext | undefined) {
+  const occWhere = ctx ? occurrencesForViewerWhere(ctx) : {};
+  return {
+    ...(ctx ? {} : audienceInclude),
+    blocks: {
+      where: {
+        deletedAt: null,
+        ...(ctx
+          ? { OR: [{ subjectOccurrences: { none: { deletedAt: null } } }, { subjectOccurrences: { some: { deletedAt: null, ...occWhere } } }] }
+          : {}),
+      },
+      orderBy: { order: "asc" as const },
+      include: {
+        subjectOccurrences: {
+          where: { deletedAt: null, ...occWhere },
+          include: {
+            subject: true,
+            teacher: true,
+            restrictClasses: { select: { id: true, grade: true, letter: true } },
+            studentEnrollments: { where: { deletedAt: null } },
+          },
+        },
+      },
+    },
+  };
+}
+
+type WindowRow = Prisma.EnrollmentWindowGetPayload<{ include: ReturnType<typeof windowInclude> }>;
+
+/**
+ * Přidá k výskytům `enrollments` a `enrolledCount` a pro privilegované pohled na publikum.
+ * Studentovi se v `enrollments` nechají jen jeho vlastní zápisy: cizí zápisy by prozradily, kdo je kde zapsaný
+ * (jména ukazuje jen akce `getOccurrenceParticipants`, pokud to okno povoluje).
+ */
+function shapeWindow(ew: WindowRow, viewerId: string, privileged: boolean) {
+  const { audience, blocks, ...rest } = ew as WindowRow & { audience?: Parameters<typeof buildAudienceView>[0] };
+  return {
+    ...rest,
+    ...(privileged && audience ? { audienceView: buildAudienceView(audience) } : {}),
+    blocks: blocks.map(({ subjectOccurrences, ...block }) => ({
+      ...block,
+      occurrences: subjectOccurrences.map(({ studentEnrollments, ...occ }) => ({
+        ...occ,
+        enrolledCount: studentEnrollments.length,
+        enrollments: privileged ? studentEnrollments : studentEnrollments.filter((e) => e.studentId === viewerId),
+      })),
+    })),
+  };
+}
+
 export async function getEnrollmentWindowsVisible() {
   const user = await requireAuth();
   await requireModule("seminars");
-  // Studenti vidí jen okna určená pro jejich ročník
-  const grade = await getViewerGrade(user);
+  // Studenti vidí jen okna, jejichž publikum zahrnuje je
+  const ctx = await getViewerContext(user);
   const windows = await prisma.enrollmentWindow.findMany({
     where: {
       visibleToStudents: true,
       status: { not: "DRAFT" },
-      ...(grade !== undefined ? windowsForGradeWhere(grade) : {}),
+      ...(ctx ? windowsForViewerWhere(ctx) : {}),
     },
     orderBy: { startsAt: "desc" },
   });
@@ -48,33 +107,16 @@ export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = fal
   await requireModule("seminars");
   // Skrytá okna a koncepty vidí jen učitelé a admini, bez ohledu na parametr
   if (!can(user.role, "seminars.windows.view")) visibleOnly = true;
-  const grade = await getViewerGrade(user);
+  const ctx = await getViewerContext(user);
 
   const whereFilter = {
     ...(visibleOnly ? { visibleToStudents: true, status: { not: "DRAFT" as EnrollmentStatus } } : {}),
-    ...(grade !== undefined ? windowsForGradeWhere(grade) : {}),
+    ...(ctx ? windowsForViewerWhere(ctx) : {}),
   };
 
   const ews = await prisma.enrollmentWindow.findMany({
     where: whereFilter,
-    include: {
-      blocks: {
-        where: { deletedAt: null },
-        orderBy: { order: "asc" },
-        include: {
-          subjectOccurrences: {
-            where: { deletedAt: null },
-            include: {
-              subject: true,
-              teacher: true,
-              studentEnrollments: {
-                where: { deletedAt: null },
-              },
-            },
-          },
-        },
-      },
-    },
+    include: windowInclude(ctx),
     orderBy: { startsAt: "desc" },
   });
 
@@ -90,17 +132,7 @@ export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = fal
       : (computed.is === "closed" && ew.status !== "DRAFT") ? "CLOSED"
       : ew.status;
 
-    return {
-      ...ew,
-      status: currentStatus,
-      blocks: ew.blocks.map(b => ({
-        ...b,
-        occurrences: b.subjectOccurrences.map(o => ({
-          ...o,
-          enrollments: o.studentEnrollments,
-        })),
-      })),
-    };
+    return { ...shapeWindow(ew, user.id, !ctx), status: currentStatus };
   });
 
   return JSON.parse(JSON.stringify(parsed));
@@ -109,32 +141,14 @@ export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = fal
 export async function getEnrollmentWindowByIdWithBlocks(id: string) {
   const user = await requireAuth();
   await requireModule("seminars");
-  const ew = await prisma.enrollmentWindow.findUnique({
-    where: { id },
-    include: {
-      blocks: {
-        where: { deletedAt: null },
-        orderBy: { order: "asc" },
-        include: {
-          subjectOccurrences: {
-            where: { deletedAt: null },
-            include: {
-              subject: true,
-              teacher: true,
-              studentEnrollments: {
-                where: { deletedAt: null },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
+  const ctx = await getViewerContext(user);
+  const include = windowInclude(ctx);
+  const ew = await prisma.enrollmentWindow.findUnique({ where: { id }, include });
 
   if (!ew) return undefined;
-  if (!can(user.role, "seminars.windows.view")) {
+  if (ctx) {
     if (!ew.visibleToStudents || ew.status === "DRAFT") return undefined;
-    if (!isWindowForGrade(ew.targetGrades, (await getViewerGrade(user)) ?? null)) return undefined;
+    if (!(await isWindowVisibleTo(ctx, id))) return undefined;
   }
 
   // Sync stavu – pouze pokud se stav změní, refetchneme
@@ -142,42 +156,10 @@ export async function getEnrollmentWindowByIdWithBlocks(id: string) {
   const statusChanged = newStatus !== ew.status;
 
   // Refetch jen pokud se stav opravdu změnil, jinak použijeme stávající data
-  const source = statusChanged
-    ? await prisma.enrollmentWindow.findUnique({
-        where: { id },
-        include: {
-          blocks: {
-            where: { deletedAt: null },
-            orderBy: { order: "asc" },
-            include: {
-              subjectOccurrences: {
-                where: { deletedAt: null },
-                include: {
-                  subject: true,
-                  teacher: true,
-                  studentEnrollments: {
-                    where: { deletedAt: null },
-                  },
-                },
-              },
-            },
-          },
-        },
-      })
-    : ew;
-
+  const source = statusChanged ? await prisma.enrollmentWindow.findUnique({ where: { id }, include }) : ew;
   if (!source) return undefined;
 
-  return {
-    ...source,
-    blocks: source.blocks.map((b) => ({
-      ...b,
-      occurrences: b.subjectOccurrences.map((o) => ({
-        ...o,
-        enrollments: o.studentEnrollments,
-      })),
-    })),
-  };
+  return shapeWindow(source, user.id, !ctx);
 }
 
 // === EXPORTY A PŘEHLEDY ===
@@ -200,7 +182,7 @@ export async function getEnrollmentMatrixData(windowId: string) {
 
   // 2. Získáme aktivní studenty, pro které je okno určeno
   const students = await prisma.user.findMany({
-    where: eligibleStudentsWhere(window.targetGrades),
+    where: await audienceWhereForWindow(windowId),
     include: { classGroup: true },
     orderBy: [
       { lastName: "asc" },
@@ -289,7 +271,7 @@ export async function getEnrollmentDetails(windowId: string) {
 
     // Také potřebujeme všechny studenty (cílových ročníků) pro report nezapsaných
     const allStudents = await prisma.user.findMany({
-        where: eligibleStudentsWhere(window.targetGrades),
+        where: await audienceWhereForWindow(windowId),
         include: { classGroup: true },
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }]
     });
@@ -320,24 +302,36 @@ type WindowInput = {
   startsAt: string | Date;
   endsAt: string | Date;
   visibleToStudents: boolean;
-  targetGrades?: number[];
+  // Publikum: ročníky, třídy, studenti a vynechaní studenti; prázdné = všichni aktivní studenti
+  audience?: AudienceDraft;
   // Automatická připomínka nezapsaným N dní před koncem (prázdné = ne)
   reminderDaysBefore?: number | string | null;
+  // Může se student sám odepsat / přepsat?
+  allowSelfUnenroll?: boolean;
+  // Studenti mohou měnit zápis nejpozději do (null = do konce okna)
+  changesUntil?: string | Date | null;
+  // Co o zapsaných vidí studenti
+  resultsVisibility?: "COUNTS" | "NAMES";
 };
 
 const STATUS_LABELS: Record<string, string> = { DRAFT: "koncept", SCHEDULED: "naplánováno", OPEN: "otevřeno", CLOSED: "uzavřeno" };
 
 /** Údaje okna v podobě vhodné pro historii změn (čitelné texty). */
-function windowDisplay(w: {
-  name: string;
-  description: string | null;
-  status: string;
-  startsAt: Date;
-  endsAt: Date;
-  visibleToStudents: boolean;
-  targetGrades: number[];
-  reminderDaysBefore: number | null;
-}) {
+function windowDisplay(
+  w: {
+    name: string;
+    description: string | null;
+    status: string;
+    startsAt: Date;
+    endsAt: Date;
+    visibleToStudents: boolean;
+    reminderDaysBefore: number | null;
+    allowSelfUnenroll: boolean;
+    changesUntil: Date | null;
+    resultsVisibility: string;
+  },
+  audience: string
+) {
   return {
     name: w.name,
     description: w.description,
@@ -345,8 +339,11 @@ function windowDisplay(w: {
     startsAt: formatDateTime(w.startsAt),
     endsAt: formatDateTime(w.endsAt),
     visibleToStudents: w.visibleToStudents,
-    targetGrades: targetGradesLabel(w.targetGrades),
+    audience,
     reminderDaysBefore: w.reminderDaysBefore == null ? "ne" : `${w.reminderDaysBefore} dní před koncem`,
+    allowSelfUnenroll: w.allowSelfUnenroll ? "ano" : "ne",
+    changesUntil: w.changesUntil ? formatDateTime(w.changesUntil) : "konec okna",
+    resultsVisibility: w.resultsVisibility === "NAMES" ? "jména i počty" : "jen počty",
   };
 }
 
@@ -357,8 +354,11 @@ const WINDOW_LABELS = {
   startsAt: "začátek",
   endsAt: "konec",
   visibleToStudents: "viditelné pro studenty",
-  targetGrades: "ročníky",
+  audience: "publikum",
   reminderDaysBefore: "připomínka nezapsaným",
+  allowSelfUnenroll: "student se může sám odepsat",
+  changesUntil: "změny zápisu do",
+  resultsVisibility: "viditelnost zapsaných pro studenty",
 } as const;
 
 function cleanReminderDays(value: WindowInput["reminderDaysBefore"]): number | null {
@@ -366,6 +366,34 @@ function cleanReminderDays(value: WindowInput["reminderDaysBefore"]): number | n
   const n = Number(value);
   if (!Number.isInteger(n) || n < 1 || n > 60) throw new Error("Připomínka nezapsaným: zadejte 1–60 dní před koncem, nebo nechte prázdné.");
   return n;
+}
+
+/** Ověří časy a pravidla okna z formuláře. */
+function cleanWindowRules(data: WindowInput) {
+  const startsAt = new Date(data.startsAt);
+  const endsAt = new Date(data.endsAt);
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) throw new Error("Zadejte platný začátek a konec zápisu.");
+  let changesUntil: Date | null = null;
+  if (data.changesUntil) {
+    changesUntil = new Date(data.changesUntil);
+    if (Number.isNaN(changesUntil.getTime())) throw new Error("Zadejte platný termín pro změny zápisu.");
+    if (changesUntil <= startsAt || changesUntil > endsAt) throw new Error("Termín pro změny zápisu musí být po začátku a nejpozději na konci zápisu.");
+  }
+  return {
+    startsAt,
+    endsAt,
+    changesUntil,
+    allowSelfUnenroll: data.allowSelfUnenroll ?? true,
+    resultsVisibility: data.resultsVisibility === "NAMES" ? ("NAMES" as const) : ("COUNTS" as const),
+  };
+}
+
+/** Čitelný popis publika okna (z uložených položek) pro historii změn. */
+async function describeWindowAudience(db: TxClient, windowId: string): Promise<{ summary: string; draft: AudienceDraft }> {
+  const entries = await loadAudienceEntries(windowId, db);
+  const draft = draftFromEntries(entries);
+  const classes = draft.classIds.length ? await db.classGroup.findMany({ where: { id: { in: draft.classIds } } }) : [];
+  return { summary: audienceSummary(draft, classes.sort(compareClasses).map(classLabel)), draft };
 }
 
 export async function deleteBlock(blockId: string) {
@@ -428,30 +456,40 @@ export async function moveBlock(blockId: string, direction: "UP" | "DOWN") {
 }
 
 
-export async function updateBlock(block: { id: string; name: string; description?: string | null }) {
+type BlockInput = { id: string; name: string; description?: string | null } & Partial<BlockRules>;
+
+export async function updateBlock(block: BlockInput) {
   return safeAction(async () => {
     const admin = await requirePermission("seminars.windows.manage");
     const res = await prisma.$transaction(async (tx) => {
       const before = await tx.block.findUnique({ where: { id: block.id }, include: { enrollmentWindow: { select: { name: true } } } });
       if (!before) throw new Error("Blok nenalezen.");
+      const rules = cleanBlockRules({
+        required: block.required ?? before.required,
+        minEnrollments: block.minEnrollments ?? before.minEnrollments,
+        maxEnrollments: block.maxEnrollments ?? before.maxEnrollments,
+      });
+      // snížení maxima pod počet zápisů, které studenti už mají, by zanechalo nekonzistentní data
+      const perStudent = await tx.studentEnrollment.groupBy({
+        by: ["studentId"],
+        where: { deletedAt: null, subjectOccurrence: { blockId: block.id, deletedAt: null } },
+        _count: { _all: true },
+      });
+      const over = perStudent.filter((g) => g._count._all > rules.maxEnrollments).length;
+      if (over > 0) throw new Error(`Nejvyšší počet zápisů nelze snížit na ${rules.maxEnrollments}: ${over} studentů už má v bloku víc zápisů. Nejdřív je odepište.`);
+
       const updated = await tx.block.update({
         where: { id: block.id },
-        data: {
-          name: block.name,
-          description: block.description || null,
-        },
+        data: { name: block.name, description: block.description || null, ...rules },
       });
-      const changes = describeChanges(
-        { name: before.name, description: before.description },
-        { name: updated.name, description: updated.description },
-        { name: "název", description: "popis" }
-      );
+      const show = (b: { name: string; description: string | null } & BlockRules) => ({ name: b.name, description: b.description, rules: blockRulesLabel(b) });
+      const changes = describeChanges(show(before), show(updated), { name: "název", description: "popis", rules: "pravidla" });
       await audit(tx, admin, {
         action: "seminars.block.update",
         entityType: "block",
         entityId: block.id,
         summary: `Upraven blok „${before.name}“ v zápisu „${before.enrollmentWindow.name}“${changes ? `: ${changes}` : ""}`,
-        data: { before: { name: before.name, description: before.description }, after: { name: updated.name, description: updated.description } },
+        data: { before: show(before), after: show(updated) },
       });
       return updated;
     });
@@ -462,9 +500,10 @@ export async function updateBlock(block: { id: string; name: string; description
 
 
 
-export async function createBlock(enrollmentWindowId: string, name: string, description?: string | null) {
+export async function createBlock(enrollmentWindowId: string, name: string, description?: string | null, ruleInput?: Partial<BlockRules>) {
   return safeAction(async () => {
     const admin = await requirePermission("seminars.windows.manage");
+    const rules = cleanBlockRules(ruleInput);
   
     const block = await prisma.$transaction(async (tx) => {
       // Zjistíme nejvyšší order a přidáme + 1
@@ -482,6 +521,7 @@ export async function createBlock(enrollmentWindowId: string, name: string, desc
           order: nextOrder,
           enrollmentWindowId,
           createdById: admin.id,
+          ...rules,
         }
       });
       const ew = await tx.enrollmentWindow.findUnique({ where: { id: enrollmentWindowId }, select: { name: true } });
@@ -489,8 +529,8 @@ export async function createBlock(enrollmentWindowId: string, name: string, desc
         action: "seminars.block.create",
         entityType: "block",
         entityId: created.id,
-        summary: `Přidán blok „${name}“ do zápisu „${ew?.name ?? ""}“`,
-        data: { name, windowId: enrollmentWindowId },
+        summary: `Přidán blok „${name}“ (${blockRulesLabel(rules)}) do zápisu „${ew?.name ?? ""}“`,
+        data: { name, windowId: enrollmentWindowId, ...rules },
       });
       return created;
     });
@@ -506,27 +546,28 @@ export async function createEnrollmentWindow(data: WindowInput) {
   return safeAction(async () => {
     const admin = await requirePermission("seminars.windows.manage");
     const reminderDaysBefore = cleanReminderDays(data.reminderDaysBefore);
+    const rules = cleanWindowRules(data);
     const created = await prisma.$transaction(async (tx) => {
       const row = await tx.enrollmentWindow.create({
         data: {
           name: data.name,
           description: data.description || null,
           status: data.status,
-          startsAt: new Date(data.startsAt),
-          endsAt: new Date(data.endsAt),
           visibleToStudents: data.visibleToStudents,
-          targetGrades: sanitizeTargetGrades(data.targetGrades),
           reminderDaysBefore,
           createdById: admin.id,
+          ...rules,
         },
       });
-      const d = windowDisplay(row);
+      await replaceAudience(tx, row.id, data.audience ?? EMPTY_AUDIENCE);
+      const aud = await describeWindowAudience(tx, row.id);
+      const d = windowDisplay(row, aud.summary);
       await audit(tx, admin, {
         action: "seminars.window.create",
         entityType: "enrollmentWindow",
         entityId: row.id,
-        summary: `Vytvořeno zápisové okno „${row.name}“ (${d.status}, ${d.startsAt} – ${d.endsAt}, ${d.targetGrades})`,
-        data: { after: d },
+        summary: `Vytvořeno zápisové okno „${row.name}“ (${d.status}, ${d.startsAt} – ${d.endsAt}, ${d.audience})`,
+        data: { after: d, audience: aud.draft },
       });
       return row;
     });
@@ -542,35 +583,37 @@ export async function updateEnrollmentWindow(windowId: string, data: WindowInput
   return safeAction(async () => {
     const admin = await requirePermission("seminars.windows.manage");
     const reminderDaysBefore = cleanReminderDays(data.reminderDaysBefore);
+    const rules = cleanWindowRules(data);
     const updated = await prisma.$transaction(async (tx) => {
       const before = await tx.enrollmentWindow.findUnique({ where: { id: windowId } });
       if (!before) throw new Error("Zápisové okno nenalezeno.");
-      const endsAt = new Date(data.endsAt);
+      const beforeAud = await describeWindowAudience(tx, windowId);
       const row = await tx.enrollmentWindow.update({
         where: { id: windowId },
         data: {
           name: data.name,
           description: data.description || null,
           status: data.status,
-          startsAt: new Date(data.startsAt),
-          endsAt,
           visibleToStudents: data.visibleToStudents,
-          targetGrades: sanitizeTargetGrades(data.targetGrades),
           reminderDaysBefore,
+          ...rules,
           // Změna konce nebo nastavení připomínky = připomínka se může poslat znovu
-          ...(endsAt.getTime() !== before.endsAt.getTime() || reminderDaysBefore !== before.reminderDaysBefore ? { reminderSentOn: null } : {}),
+          ...(rules.endsAt.getTime() !== before.endsAt.getTime() || reminderDaysBefore !== before.reminderDaysBefore ? { reminderSentOn: null } : {}),
           updatedById: admin.id,
         },
       });
-      const b = windowDisplay(before);
-      const a = windowDisplay(row);
+      // Publikum se mění jen tehdy, když ho formulář poslal (jiní volající ho nechávají beze změny)
+      if (data.audience) await replaceAudience(tx, windowId, data.audience);
+      const afterAud = await describeWindowAudience(tx, windowId);
+      const b = windowDisplay(before, beforeAud.summary);
+      const a = windowDisplay(row, afterAud.summary);
       const changes = describeChanges(b, a, WINDOW_LABELS);
       await audit(tx, admin, {
         action: "seminars.window.update",
         entityType: "enrollmentWindow",
         entityId: windowId,
         summary: `Upraveno zápisové okno „${before.name}“${changes ? `: ${changes}` : " (beze změny)"}`,
-        data: { before: b, after: a },
+        data: { before: b, after: a, audienceBefore: beforeAud.draft, audienceAfter: afterAud.draft },
       });
       return row;
     });
@@ -589,6 +632,7 @@ export async function deleteEnrollmentWindow(windowId: string) {
     const res = await prisma.$transaction(async (tx) => {
       const before = await tx.enrollmentWindow.findUnique({ where: { id: windowId } });
       if (!before) throw new Error("Zápisové okno nenalezeno.");
+      const aud = await describeWindowAudience(tx, windowId);
       const enrollments = await tx.studentEnrollment.count({ where: { deletedAt: null, subjectOccurrence: { block: { enrollmentWindowId: windowId } } } });
       const deleted = await tx.enrollmentWindow.delete({ where: { id: windowId } });
       await audit(tx, admin, {
@@ -596,7 +640,7 @@ export async function deleteEnrollmentWindow(windowId: string) {
         entityType: "enrollmentWindow",
         entityId: windowId,
         summary: `Smazáno zápisové okno „${before.name}“ (včetně ${enrollments} zápisů studentů)`,
-        data: { before: windowDisplay(before), enrollments },
+        data: { before: windowDisplay(before, aud.summary), enrollments },
       });
       return deleted;
     });
@@ -605,12 +649,160 @@ export async function deleteEnrollmentWindow(windowId: string) {
   });
 }
 
+/**
+ * Duplikuje okno: zkopíruje bloky (s pravidly), výskyty (s omezením na ročníky / třídy), publikum a pravidla okna.
+ * Nové okno je KONCEPT, neviditelné studentům, bez zápisů a bez odeslaných upozornění.
+ */
+export async function duplicateEnrollmentWindow(windowId: string) {
+  return safeAction(async () => {
+    const admin = await requirePermission("seminars.windows.manage");
+    const created = await prisma.$transaction(async (tx) => {
+      const src = await tx.enrollmentWindow.findUnique({
+        where: { id: windowId },
+        include: {
+          audience: true,
+          blocks: {
+            where: { deletedAt: null },
+            orderBy: { order: "asc" },
+            include: { subjectOccurrences: { where: { deletedAt: null }, include: { restrictClasses: { select: { id: true } } } } },
+          },
+        },
+      });
+      if (!src) throw new Error("Zápisové okno nenalezeno.");
+      const copy = await tx.enrollmentWindow.create({
+        data: {
+          name: `${src.name} (kopie)`.slice(0, 200),
+          description: src.description,
+          status: "DRAFT",
+          startsAt: src.startsAt,
+          endsAt: src.endsAt,
+          visibleToStudents: false,
+          reminderDaysBefore: src.reminderDaysBefore,
+          allowSelfUnenroll: src.allowSelfUnenroll,
+          changesUntil: src.changesUntil,
+          resultsVisibility: src.resultsVisibility,
+          createdById: admin.id,
+        },
+      });
+      if (src.audience.length) {
+        await tx.enrollmentWindowAudience.createMany({
+          data: src.audience.map((a) => ({ windowId: copy.id, type: a.type, grade: a.grade, classGroupId: a.classGroupId, userId: a.userId, key: a.key })),
+        });
+      }
+      let occurrences = 0;
+      for (const b of src.blocks) {
+        const block = await tx.block.create({
+          data: {
+            name: b.name,
+            order: b.order,
+            description: b.description,
+            required: b.required,
+            minEnrollments: b.minEnrollments,
+            maxEnrollments: b.maxEnrollments,
+            enrollmentWindowId: copy.id,
+            createdById: admin.id,
+          },
+        });
+        for (const o of b.subjectOccurrences) {
+          await tx.subjectOccurrence.create({
+            data: {
+              subjectId: o.subjectId,
+              blockId: block.id,
+              teacherId: o.teacherId,
+              subCode: o.subCode,
+              capacity: o.capacity,
+              restrictGrades: o.restrictGrades,
+              restrictClasses: { connect: o.restrictClasses.map((c) => ({ id: c.id })) },
+              createdById: admin.id,
+            },
+          });
+          occurrences++;
+        }
+      }
+      await audit(tx, admin, {
+        action: "seminars.window.duplicate",
+        entityType: "enrollmentWindow",
+        entityId: copy.id,
+        summary: `Zápisové okno „${src.name}“ zduplikováno jako „${copy.name}“ (koncept; ${src.blocks.length} bloků, ${occurrences} předmětů, bez zápisů studentů)`,
+        data: { sourceId: src.id, blocks: src.blocks.length, occurrences },
+      });
+      return copy;
+    });
+    revalidatePath("/", "layout");
+    return JSON.parse(JSON.stringify(created));
+  });
+}
+
+// === PUBLIKUM OKNA: náhled a nabídka pro formulář ===
+
+/** Třídy pro výběr publika a omezení výskytů. */
+export async function getAudienceOptions() {
+  await requirePermission("seminars.windows.manage");
+  const classes = await prisma.classGroup.findMany();
+  return classes.sort(compareClasses).map((c) => ({ id: c.id, grade: c.grade, label: classLabel(c) }));
+}
+
+/** Hledání studentů (jméno nebo e-mail) pro přidání do publika / mezi vynechané. */
+export async function searchAudienceStudents(query: string) {
+  await requirePermission("seminars.windows.manage");
+  const q = (query ?? "").trim().slice(0, 100);
+  if (q.length < 2) return [];
+  const users = await prisma.user.findMany({
+    where: {
+      ...activeStudentsWhere,
+      OR: [
+        { firstName: { contains: q, mode: "insensitive" } },
+        { lastName: { contains: q, mode: "insensitive" } },
+        { email: { contains: q, mode: "insensitive" } },
+      ],
+    },
+    include: { classGroup: true },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    take: 12,
+  });
+  return users.map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim(), email: u.email, classLabel: u.classGroup ? classLabel(u.classGroup) : null }));
+}
+
+const AUDIENCE_PREVIEW_LIMIT = 300;
+
+/** Kolik studentů odpovídá publiku (a kdo), ještě před uložením okna. */
+export async function previewAudience(draft: AudienceDraft) {
+  await requirePermission("seminars.windows.manage");
+  const where = audienceWhere(entriesFromDraft({ grades: sanitizeGrades(draft?.grades), classIds: draft?.classIds ?? [], userIds: draft?.userIds ?? [], excludeUserIds: draft?.excludeUserIds ?? [] }));
+  const [count, students] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.findMany({ where, include: { classGroup: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }], take: AUDIENCE_PREVIEW_LIMIT }),
+  ]);
+  return {
+    count,
+    truncated: count > students.length,
+    students: students.map((u) => ({ id: u.id, name: `${u.lastName} ${u.firstName}`.trim(), classLabel: u.classGroup ? classLabel(u.classGroup) : null })),
+  };
+}
 
 
 // === VÝSKYTY PŘEDMĚTŮ (SubjectOccurrence) ===
-type OccurrenceInput = { subjectId: string; teacherId?: string; subCode?: string; capacity?: string | number };
+type OccurrenceInput = {
+  subjectId: string;
+  teacherId?: string;
+  subCode?: string;
+  capacity?: string | number;
+  // Omezení výskytu na ročníky a třídy (sjednocení); obojí prázdné = bez omezení
+  restrictGrades?: number[];
+  restrictClassIds?: string[];
+};
 
 const parseCapacity = (c: OccurrenceInput["capacity"]) => (c ? (typeof c === "string" ? parseInt(c, 10) : c) : null);
+
+/** Ověří omezení výskytu a vrátí ho v podobě pro Prisma. */
+async function cleanRestriction(tx: TxClient, data: OccurrenceInput) {
+  const grades = sanitizeGrades(data.restrictGrades);
+  const classIds = [...new Set((data.restrictClassIds ?? []).filter((x) => typeof x === "string" && x))];
+  const classes = classIds.length ? await tx.classGroup.findMany({ where: { id: { in: classIds } } }) : [];
+  if (classes.length !== classIds.length) throw new Error("Některá z vybraných tříd neexistuje.");
+  const label = [grades.length ? `${grades.map((g) => `${g}.`).join(", ")} ročník` : "", classes.length ? `třídy ${classes.sort(compareClasses).map(classLabel).join(", ")}` : ""].filter(Boolean).join(" + ");
+  return { grades, classIds, label: label || "bez omezení" };
+}
 
 async function occurrenceLabel(tx: TxClient, subjectId: string, blockId: string, teacherId?: string | null) {
   const [subject, block, teacher] = await Promise.all([
@@ -628,6 +820,7 @@ export async function createSubjectOccurrence(data: OccurrenceInput & { blockId:
   return safeAction(async () => {
     const admin = await requirePermission("seminars.windows.manage");
     const occ = await prisma.$transaction(async (tx) => {
+      const restriction = await cleanRestriction(tx, data);
       const row = await tx.subjectOccurrence.create({
         data: {
           subjectId: data.subjectId,
@@ -635,6 +828,8 @@ export async function createSubjectOccurrence(data: OccurrenceInput & { blockId:
           teacherId: data.teacherId || null,
           subCode: data.subCode || null,
           capacity: parseCapacity(data.capacity),
+          restrictGrades: restriction.grades,
+          restrictClasses: { connect: restriction.classIds.map((id) => ({ id })) },
           createdById: admin.id,
         },
       });
@@ -643,8 +838,8 @@ export async function createSubjectOccurrence(data: OccurrenceInput & { blockId:
         action: "seminars.occurrence.create",
         entityType: "subjectOccurrence",
         entityId: row.id,
-        summary: `Do zápisu přidán předmět ${l.text}${l.teacher ? `, vyučující ${l.teacher}` : ""}, kapacita ${row.capacity ?? "neomezená"}`,
-        data: { subjectId: row.subjectId, blockId: row.blockId, teacherId: row.teacherId, subCode: row.subCode, capacity: row.capacity },
+        summary: `Do zápisu přidán předmět ${l.text}${l.teacher ? `, vyučující ${l.teacher}` : ""}, kapacita ${row.capacity ?? "neomezená"}, pro: ${restriction.label}`,
+        data: { subjectId: row.subjectId, blockId: row.blockId, teacherId: row.teacherId, subCode: row.subCode, capacity: row.capacity, restrictGrades: restriction.grades, restrictClassIds: restriction.classIds },
       });
       return row;
     });
@@ -658,8 +853,13 @@ export async function updateSubjectOccurrence(occurrenceId: string, data: Occurr
   return safeAction(async () => {
     const admin = await requirePermission("seminars.windows.manage");
     const occ = await prisma.$transaction(async (tx) => {
-      const before = await tx.subjectOccurrence.findUnique({ where: { id: occurrenceId } });
+      const before = await tx.subjectOccurrence.findUnique({ where: { id: occurrenceId }, include: { restrictClasses: { select: { id: true, grade: true, letter: true } } } });
       if (!before) throw new Error("Předmět v zápisu nenalezen.");
+      const restriction = await cleanRestriction(tx, data);
+      const beforeRestriction = [
+        before.restrictGrades.length ? `${before.restrictGrades.map((g) => `${g}.`).join(", ")} ročník` : "",
+        before.restrictClasses.length ? `třídy ${[...before.restrictClasses].sort(compareClasses).map(classLabel).join(", ")}` : "",
+      ].filter(Boolean).join(" + ") || "bez omezení";
       const row = await tx.subjectOccurrence.update({
         where: { id: occurrenceId },
         data: {
@@ -667,15 +867,17 @@ export async function updateSubjectOccurrence(occurrenceId: string, data: Occurr
           teacherId: data.teacherId || null,
           subCode: data.subCode || null,
           capacity: parseCapacity(data.capacity),
+          restrictGrades: restriction.grades,
+          restrictClasses: { set: restriction.classIds.map((id) => ({ id })) },
           updatedById: admin.id,
         },
       });
       const l = await occurrenceLabel(tx, row.subjectId, row.blockId, row.teacherId);
       const lb = await occurrenceLabel(tx, before.subjectId, before.blockId, before.teacherId);
       const changes = describeChanges(
-        { subject: lb.text, teacher: lb.teacher, subCode: before.subCode, capacity: before.capacity ?? "neomezená" },
-        { subject: l.text, teacher: l.teacher, subCode: row.subCode, capacity: row.capacity ?? "neomezená" },
-        { subject: "předmět", teacher: "vyučující", subCode: "kód", capacity: "kapacita" }
+        { subject: lb.text, teacher: lb.teacher, subCode: before.subCode, capacity: before.capacity ?? "neomezená", restriction: beforeRestriction },
+        { subject: l.text, teacher: l.teacher, subCode: row.subCode, capacity: row.capacity ?? "neomezená", restriction: restriction.label },
+        { subject: "předmět", teacher: "vyučující", subCode: "kód", capacity: "kapacita", restriction: "určeno pro" }
       );
       await audit(tx, admin, {
         action: "seminars.occurrence.update",
@@ -683,8 +885,8 @@ export async function updateSubjectOccurrence(occurrenceId: string, data: Occurr
         entityId: occurrenceId,
         summary: `Upraven předmět ${lb.text}${changes ? `: ${changes}` : ""}`,
         data: {
-          before: { subjectId: before.subjectId, teacherId: before.teacherId, subCode: before.subCode, capacity: before.capacity },
-          after: { subjectId: row.subjectId, teacherId: row.teacherId, subCode: row.subCode, capacity: row.capacity },
+          before: { subjectId: before.subjectId, teacherId: before.teacherId, subCode: before.subCode, capacity: before.capacity, restrictGrades: before.restrictGrades, restrictClassIds: before.restrictClasses.map((c) => c.id) },
+          after: { subjectId: row.subjectId, teacherId: row.teacherId, subCode: row.subCode, capacity: row.capacity, restrictGrades: restriction.grades, restrictClassIds: restriction.classIds },
         },
       });
       return row;
