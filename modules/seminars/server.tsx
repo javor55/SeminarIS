@@ -13,6 +13,7 @@ import {
 import { SubjectOccurrencesPanel } from "@/modules/seminars/components/subjects/SubjectOccurrencesPanel";
 import { getSubjectOccurrences } from "@/modules/seminars/actions/occurrences";
 import { getSubjectWindows } from "@/modules/seminars/subject-windows";
+import { getSeminarsMySubjectsSections } from "@/modules/seminars/my-subjects";
 import { UserEnrollmentsPanel } from "@/modules/seminars/user-enrollments";
 import { getSeminarsEmailEstimates, runSeminarsDailyJob } from "@/modules/seminars/notifications";
 
@@ -93,6 +94,8 @@ export const seminarsServer: ModuleServer = {
       </div>
     );
   },
+
+  getMySubjectsSections: getSeminarsMySubjectsSections,
 
   // „v zápisu“: štítky předmětů nabízených v zápisových oknech (podle viditelnosti pro uživatele)
   async getSubjectBadges(subjectIds, user) {
