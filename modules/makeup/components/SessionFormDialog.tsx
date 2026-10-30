@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createSessions, getSessionFormOptions, updateSession } from "@/modules/makeup/actions/sessions";
 import { DEADLINE_OPTIONS, type MakeupSessionItem } from "@/modules/makeup/types";
+import { SubjectPicker } from "./SubjectPicker";
 import { deadlineText } from "./common";
 import { NativeSelect } from "@/components/ui/native-select";
 
@@ -191,19 +192,12 @@ export function SessionFormDialog({ session, trigger }: { session?: MakeupSessio
               ) : options.subjects.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nejsou založené žádné předměty (Škola → Předměty).</p>
               ) : (
-                <div className="flex flex-wrap gap-2" id="ms-subjects">
-                  {options.subjects.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      data-subject={s.code ?? s.id}
-                      onClick={() => toggleSubject(s.id)}
-                      className={`rounded-md border px-3 py-1 text-sm ${subjectIds.includes(s.id) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
-                    >
-                      {s.name}
-                    </button>
-                  ))}
-                </div>
+                <SubjectPicker
+                  subjects={options.subjects}
+                  mineIds={options.teacherSubjects[teacherId] ?? []}
+                  selected={subjectIds}
+                  onToggle={toggleSubject}
+                />
               )}
             </div>
             <div className="space-y-1">
