@@ -142,7 +142,7 @@ test("úvazky z detailu předmětu a z uživatelů", async ({ browser }) => {
   const tname = 'Učitel Petr';
 
   const pa = await login(b, 'admin@skola.cz');
-  await pa.goto('/subjects/sfy'); await pa.waitForSelector('[data-testid=teaching-grid]');
+  await pa.goto('/subjects/sfy?tab=teaching'); await pa.waitForSelector('[data-testid=teaching-grid]');
   const grid = pa.locator('[data-testid=teaching-grid]');
   check('grid has rows only for subject grades 3 and 4', (await grid.locator('tbody tr').count()) === 2 && (await grid.locator('tbody tr[data-grade="1"]').count()) === 0);
   // přidat učitele do 3.A přímo z buňky
@@ -160,7 +160,7 @@ test("úvazky z detailu předmětu a z uživatelů", async ({ browser }) => {
   // student vidí vyučující jen pro čtení
   const ps = await login(b, 'jan.student@skola.cz');
   sql(`update "Subject" set grades='{}' where id='sfy'`);
-  await ps.goto('/subjects/sfy'); await ps.waitForSelector('[data-testid=teaching-grid]');
+  await ps.goto('/subjects/sfy?tab=teaching'); await ps.waitForSelector('[data-testid=teaching-grid]');
   check('student sees teachers read-only', (await ps.locator('[data-testid=teaching-grid]').innerText()).includes('Druhá') && (await ps.locator('[data-testid=teaching-grid] select').count()) === 0);
   sql(`update "Subject" set grades='{3,4}' where id='sfy'`);
 

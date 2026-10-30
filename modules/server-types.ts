@@ -15,6 +15,17 @@ export type ModuleTab = {
   content: ReactNode;
 };
 
+/** Sekce stránky „Moje předměty“ (F4), kterou přispívá modul. Obsah je serverová komponenta modulu. */
+export type MySubjectsSection = {
+  // Jedinečné v rámci modulu; jádro ho prefixuje id modulu
+  id: string;
+  title: string;
+  description?: string;
+  // Pořadí sekcí (nižší = výš); sekce jádra mají 0–99, moduly 100+
+  order: number;
+  content: ReactNode;
+};
+
 /** Uživatel v hromadné akci (jádro ho načte jednou, akce nemusí sahat do DB kvůli základním údajům). */
 export type BulkUserInfo = {
   id: string;
@@ -122,12 +133,16 @@ export type ModuleServer = {
   // (collect*). Chyba jednoho modulu stránku jádra neshodí – položky modulu se jen vynechají.
   // Každý bod si hlídá oprávnění uživatele sám (jádro kontroluje jen zapnutí modulu).
 
-  // Záložky v detailu předmětu (v F1 se zobrazí pod sebou, od F4 jako záložky)
+  // Záložky v detailu předmětu (`?tab=<idModulu>.<id>`); respektují oprávnění uživatele
   getSubjectTabs?: (subjectId: string, user: User) => Promise<ModuleTab[]>;
   // Štítky předmětů pro seznam a detail. Vrací jen předměty, které štítek mají.
   getSubjectBadges?: (subjectIds: string[], user: User) => Promise<Map<string, SubjectBadge[]>>;
-  // Kde se předmět používá (varování před archivací/smazáním). Bez kontroly oprávnění uživatele.
+  // Kde se předmět používá (dialog archivace/mazání, smazání se při použití zakáže). Bez kontroly
+  // oprávnění uživatele; počítá všechna data modulu, nejen to, co by uživatel viděl.
   getSubjectUsage?: (subjectId: string) => Promise<SubjectUsageItem[]>;
+  // Sekce stránky „Moje předměty“ (F4): co uživatel v modulu k předmětům učí / navštěvuje. Vrací
+  // prázdné pole, když modul pro roli uživatele nemá co ukázat.
+  getMySubjectsSections?: (user: User) => Promise<MySubjectsSection[]>;
   // Záložky v detailu uživatele (F3); `viewer` je ten, kdo se dívá
   getUserTabs?: (userId: string, viewer: User) => Promise<ModuleTab[]>;
   // Položky přehledu „co udělat“ v administraci (F2)

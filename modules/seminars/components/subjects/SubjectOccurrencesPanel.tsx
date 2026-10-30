@@ -43,7 +43,11 @@ export function SubjectOccurrencesPanel({ occurrences, currentUser }: { occurren
     <div className="space-y-2" data-testid="subject-occurrences">
       <div className="space-y-1">
         <h2 className="text-base font-semibold">Zápisy, kde je předmět nabízen</h2>
-        <p className="text-sm text-muted-foreground">Přehled všech bloků a zápisových oken, kde je tento předmět zařazen.</p>
+        <p className="text-sm text-muted-foreground" data-testid="subject-occurrences-summary">
+          {occurrences.length === 0
+            ? "Přehled bloků a zápisových oken, kde je tento předmět zařazen."
+            : `Výskyty v zápisech: ${occurrences.length} (zápisová okna: ${new Set(occurrences.map((o) => o.enrollmentName)).size}, bloky: ${new Set(occurrences.map((o) => `${o.enrollmentName}/${o.blockName}`)).size}). Obsazenost a studenti jednotlivých výskytů jsou v tabulce.`}
+        </p>
       </div>
 
       {occurrences.length === 0 ? (

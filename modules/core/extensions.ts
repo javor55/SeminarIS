@@ -4,7 +4,7 @@ import { getEnabledModuleIds } from "@/lib/modules";
 import { MODULE_SERVERS } from "@/modules/server-registry";
 import type { ModuleId } from "@/modules/registry";
 import type { AdminSection, AdminTodo, SubjectBadge, SubjectUsageItem } from "@/modules/types";
-import type { AdminStat, BulkUserAction, ModuleServer, ModuleTab } from "@/modules/server-types";
+import type { AdminStat, BulkUserAction, ModuleServer, ModuleTab, MySubjectsSection } from "@/modules/server-types";
 import { MODULES, can, type Permission } from "@/modules/registry";
 
 // Sběr bodů rozšíření (viz ModuleServer) ze zapnutých modulů. Jádro nesmí importovat moduly
@@ -61,10 +61,32 @@ export async function collectSubjectBadges(subjectIds: string[], user: User): Pr
   return result;
 }
 
-/** Použití předmětu ve všech zapnutých modulech (jen položky s nenulovým počtem). */
+/**
+ * Použití předmětu v modulech (jen položky s nenulovým počtem). Počítá i vypnuté moduly (jejich data
+ * po vypnutí zůstávají a smazání předmětu by je zničilo); u nich se k popisku přidá „(modul je vypnutý)“.
+ */
 export async function collectSubjectUsage(subjectId: string): Promise<SubjectUsageItem[]> {
-  const parts = await collect((s) => s.getSubjectUsage?.(subjectId));
-  return parts.flatMap((p) => p.value.map((u) => ({ ...u, id: `${p.id}.${u.id}` }))).filter((u) => u.count > 0);
+  const enabled = await getEnabledModuleIds();
+  const parts = await Promise.all(
+    MODULE_SERVERS.map(async ({ id, server }) => {
+      try {
+        const items = (await server.getSubjectUsage?.(subjectId)) ?? [];
+        const suffix = enabled.includes(id) ? "" : " (modul je vypnutý)";
+        return items.map((u) => ({ ...u, id: `${id}.${u.id}`, label: u.label + suffix }));
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error(`Bod rozšíření modulu ${id} selhal:`, e);
+        return [];
+      }
+    })
+  );
+  return parts.flat().filter((u) => u.count > 0);
+}
+
+/** Sekce stránky „Moje předměty“ ze zapnutých modulů, seřazené. */
+export async function collectMySubjectsSections(user: User): Promise<MySubjectsSection[]> {
+  const parts = await collect((s) => s.getMySubjectsSections?.(user));
+  return parts.flatMap((p) => p.value.map((x) => ({ ...x, id: `${p.id}.${x.id}` }))).sort(byOrder);
 }
 
 /** Záložky detailu uživatele ze zapnutých modulů, seřazené. */

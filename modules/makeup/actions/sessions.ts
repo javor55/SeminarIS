@@ -11,6 +11,7 @@ import { formatMinutes, formatTimeRange } from "@/lib/datetime";
 import { classLabel } from "@/lib/school";
 import { getSetting } from "@/lib/settings-registry";
 import { can } from "@/modules/registry";
+import { getCurrentSchoolYear } from "@/modules/core/school";
 import {
   MAX_CAPACITY,
   MAX_SERIES_SIZE,
@@ -84,23 +85,39 @@ export async function getSessionDetail(
   };
 }
 
-/** Podklady pro formulář termínu: aktivní předměty a (pro admina) seznam učitelů. */
+/**
+ * Podklady pro formulář termínu: aktivní předměty (s ročníky), předměty z úvazků dozorujících
+ * učitelů (aktuální školní rok) a pro admina seznam učitelů.
+ */
 export async function getSessionFormOptions() {
   const user = await requirePermission("makeup.sessions.manage");
-  const [subjects, teachers] = await Promise.all([
+  const manageAll = can(user.role, "makeup.sessions.manageAll");
+  const year = await getCurrentSchoolYear();
+  const [subjects, teachers, assignments] = await Promise.all([
     prisma.subject.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
-    can(user.role, "makeup.sessions.manageAll")
+    manageAll
       ? prisma.user.findMany({
           where: { role: { in: ["TEACHER", "ADMIN"] }, isActive: true },
           orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
           select: { id: true, firstName: true, lastName: true },
         })
       : Promise.resolve([]),
+    year.id
+      ? prisma.teachingAssignment.findMany({
+          where: { schoolYearId: year.id, ...(manageAll ? {} : { teacherId: user.id }) },
+          select: { teacherId: true, subjectId: true },
+          distinct: ["teacherId", "subjectId"],
+        })
+      : Promise.resolve([]),
   ]);
+  const teacherSubjects: Record<string, string[]> = {};
+  for (const a of assignments) (teacherSubjects[a.teacherId] ??= []).push(a.subjectId);
   return {
-    subjects: subjects.map((s) => ({ id: s.id, name: s.name, code: s.code })),
+    subjects: subjects.map((s) => ({ id: s.id, name: s.name, code: s.code, grades: s.grades })),
+    // předměty z úvazků podle učitele (dozorujícího), pro zobrazení nahoře ve výběru
+    teacherSubjects,
     teachers: teachers.map((t) => ({ id: t.id, name: fullName(t) })),
-    canChooseTeacher: can(user.role, "makeup.sessions.manageAll"),
+    canChooseTeacher: manageAll,
     currentUserId: user.id,
     // Výchozí hodnoty nového termínu (Administrace → Dopisování)
     defaults: {
