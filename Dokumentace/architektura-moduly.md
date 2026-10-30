@@ -32,7 +32,12 @@ modules/
     manifest.ts
     server.tsx          widget na dashboard, statistiky, úklid při mazání uživatele
     window-status.ts    synchronizace stavu zápisového okna s časem
-    eligibility.ts      cílení zápisových oken na ročníky
+    audience.ts         publikum okna a omezení výskytu: typy a čistá logika (isInAudience), bez DB; audience-view.ts popisky pro UI
+    eligibility.ts      JEDINÝ zdroj pravdy o způsobilosti: audienceWhere, viditelnost oken a výskytů, zápis publika
+    window-rules.ts     pravidla okna (odepsání, termín změn) a bloků (min/max, povinnost), sdílená serverem i UI
+    bulk-audience.ts    hromadné akce Uživatelů „Přidat do / Odebrat z publika zápisu“ (bulkUserActions)
+    actions/            windows.ts (okna, bloky, výskyty, publikum, duplikace), enrollment.ts (zápis, odepsání, přepsání),
+                        participants.ts (jména zapsaných), unenrolled.ts, occurrences.ts
     unenrolled.ts       nezapsaní studenti okna a ruční/automatická připomínka
     notifications.ts    e-maily modulu (zápis otevřen, připomínka nezapsaným) a jeho denní úloha
     subject-windows.ts  „v zápisu“: ve kterých oknech je předmět nabízen (podklad pro štítky předmětů)
@@ -247,15 +252,13 @@ co se nevejde, se zapíše jako `SKIPPED_LIMIT`. Odhad (kolik se odešle a kolik
 odesláním, vyčerpaný limit akci zablokuje. Příjemci jsou aktivní uživatelé s platným e-mailem, text může obsahovat
 `{{jmeno}}`. Neběží v DB transakci (e-mail se nedá vrátit); souhrn do historie se zapíše po odeslání (bez textu zprávy).
 
-**TODO F5:** akce „přidat do publika zápisu“ patří do modulu Semináře (`bulkUserActions` v `modules/seminars/server.tsx`
-s parametrem `windowId` přes `params`, až bude existovat model publika okna); F3 ji záměrně neobsahuje.
+Akce modulů: Semináře přidávají **Přidat do publika zápisu** a **Odebrat z publika zápisu** (viz Zápisy seminářů).
 
 Pro moduly jsou připravené funkce v `modules/core/school.ts`: `getCurrentSchoolYear()`,
 `getStudentGrade(userId)`, `activeStudentsWhere`, `studentsInGradesWhere(grades)`,
 `setStudentClass(...)`, `findOrCreateClass(grade, letter)`.
 
-Zápisové okno (modul Semináře) má `targetGrades` (prázdné = všichni studující). Studenti jiných
-ročníků okno nevidí a nemůžou se do něj zapsat. Exporty obsahují jen studenty cílových ročníků.
+Zápisové okno (modul Semináře) určuje své **publikum** (kdo ho vidí a smí se zapsat), viz Zápisy seminářů.
 
 ## Přihlášení přes Microsoft 365
 
@@ -350,7 +353,7 @@ Pravidla pro autory kódu:
 | Denní souhrn „zítra dopisují“ | dozoru a vyučujícím předmětů (cron) | vypnuto | ne |
 | Účet schválen | uživateli | zapnuto | ano |
 | Souhrn účtů ke schválení | adminům, jen když N > 0 (cron) | zapnuto | ne |
-| Zápis otevřen | studentům cílových ročníků | vypnuto | ne |
+| Zápis otevřen | studentům z publika okna | vypnuto | ne |
 | Připomínka nezapsaným | nezapsaným studentům (ručně / cron) | vypnuto | ne |
 
 **Povinná** upozornění chodí vždy, když je událost zapnutá. **Nepovinná** (připomínky, souhrny, zápis
@@ -384,10 +387,71 @@ datum v pásmu Europe/Prague). Druhé volání téhož dne vrátí `{ skipped: t
 Při chybě celé úlohy se značka uvolní. Jednotlivé kroky si hlídají chyby samy a výsledek vrací odpověď.
 Vypnuté události se přeskočí (nic se nepočítá ani neloguje).
 
-## Nezapsaní studenti (Zápisy → detail okna → záložka Nezapsaní)
+## Zápisy seminářů (modul Semináře)
 
-Aktivní studenti cílových ročníků, kteří nemají zápis ve všech blocích (bloky bez nabízeného předmětu se
-nepočítají); u každého jsou vidět chybějící bloky. Filtr třídy a export CSV. Tlačítko **Poslat
+Okno (`EnrollmentWindow`) obsahuje **bloky**, blok **výskyty předmětů** a student se zapisuje do výskytů. Konfigurace
+(F5) je rozdělena na publikum okna, pravidla bloků a pravidla okna. Všechna pravidla vynucuje **server** v transakci
+(`modules/seminars/actions/enrollment.ts`, zápis v izolaci Serializable s opakováním při souběhu, takže kapacita a
+maximum v bloku platí i při současných zápisech); UI pravidla jen zobrazuje.
+
+### Publikum okna (`EnrollmentWindowAudience`)
+
+Publikum = **(ročníky ∪ třídy ∪ konkrétní studenti) \ vynechaní studenti**. Položka má typ `GRADE`, `CLASS`, `USER` nebo
+`EXCLUDE_USER`; okno **bez kladných položek** (GRADE/CLASS/USER) je určeno **všem aktivním studentům**. Vynechání vyhrává
+nad ročníkem, třídou i jmenovitým přidáním. Studenti mimo studium (absolventi, ukončení, neaktivní) v publiku nejsou.
+Migrace převedla dosavadní `targetGrades` na položky `GRADE` a sloupec zrušila.
+
+**Jediný zdroj pravdy** je `modules/seminars/eligibility.ts` (čistá logika bez DB v `audience.ts`):
+`isInAudience(položky, student)`, `audienceWhere(položky)` (stejná logika jako Prisma podmínka na uživatele),
+`windowsForViewerWhere` / `occurrencesForViewerWhere` (co smí vidět konkrétní student), `isStudentInWindowAudience`.
+Používá je viditelnost oken (dashboard, seznam, detail), kontrola při zápisu, seznam nezapsaných, exporty, e-mailové odhady,
+připomínky i „zápis otevřen“, štítky „v zápisu“ u předmětů a panel výskytů. Nikde jinde se způsobilost nepočítá.
+
+- **Formulář okna** (`AudiencePicker`): ročníky, třídy, hledání studentů (jmenovitě a „kromě“), živý počet a seznam
+  studentů, kterých se zápis týká (`previewAudience` na serveru). Publikum okna vidí a mění jen správce zápisů.
+- **Hromadné akce v Uživatelích** (bod rozšíření `bulkUserActions` modulu, `modules/seminars/bulk-audience.ts`,
+  oprávnění `seminars.windows.manage`): *Přidat do publika zápisu* (parametr = zápis; náhled: kolik studentů se přidá,
+  kdo už v publiku je, kdo není aktivní student; ruší případnou výjimku „kromě“) a *Odebrat z publika zápisu* (smaže
+  jmenovitou položku, a pokud studenta pokrývá ročník či třída, přidá ho mezi vynechané; už existující zápisy zůstanou).
+  Obě akce se **zablokují u okna určeného všem** (přidání by okno omylem zúžilo / odebrání nemá smysl) a odebrání se
+  zablokuje, pokud by publikum zůstalo bez kladných položek (to by znamenalo „všichni“). Audit: souhrnný záznam
+  `users.bulk.seminars.audience[-remove]` a záznam `seminars.window.audience` u okna.
+
+### Pravidla bloků (`Block`)
+
+- `required`: povinný blok (výchozí). **Nezapsaní** (záložka, dashboard, připomínky, přehled „co udělat“) se počítají
+  jen z povinných bloků.
+- `minEnrollments` / `maxEnrollments` (výchozí 1 / 1): kolik různých výskytů bloku si student vybere. Povinný blok má
+  minimum alespoň 1. Server nedovolí zapsat víc, než je maximum; maximum nejde snížit pod počet zápisů, které studenti
+  už mají. V bloku s maximem 1 je v UI „přepsání“ zápisu (jedna transakce `switchEnrollment`: když nový zápis selže,
+  původní zůstane).
+- Nezapsaný = student z publika, kterému v povinném bloku chybí zápisy do `min` (nebo do počtu výskytů, které si
+  může vybrat). Blok bez výskytů nebo bez výskytu určeného pro studenta se mu nepočítá.
+- `SubjectOccurrence.restrictGrades` + `restrictClasses`: volitelné **omezení výskytu na ročníky a třídy** (sjednocení,
+  obojí prázdné = pro všechny z publika). Student jiné třídy výskyt nevidí (ani blok, který by zůstal prázdný) a server
+  ho nenechá zapsat. Učitel a admin vidí omezení u řádku výskytu; zápis za jiné (učitel/admin) omezení obchází.
+
+### Pravidla okna
+
+- `allowSelfUnenroll` (výchozí ano): smí se student sám odepsat **a přepsat** zápis. Učitel a admin mohou vždy.
+- `changesUntil` (null = konec okna): student může měnit (odepsat, přepsat) nejpozději do tohoto času; musí ležet mezi
+  začátkem a koncem okna. Nový zápis do bloku, kde student zápis nemá, je možný do konce okna.
+- `resultsVisibility`: `COUNTS` (výchozí, studenti vidí jen obsazenost) nebo `NAMES` (studenti si v dashboardu otevřou
+  seznam jmen zapsaných na výskytu, bez e-mailů; `getOccurrenceParticipants`). Studentovi se do prohlížeče neposílají
+  cizí zápisy ani při `COUNTS` (jen jeho vlastní a počty).
+- Všechny změny a zápisy jdou do historie (`seminars.enrollment.*`, `seminars.window.*`, `seminars.block.*`,
+  `seminars.occurrence.*`), v režimu „zobrazit jako“ se nic neprovede.
+
+### Duplikace okna
+
+*Duplikovat* v hlavičce okna (admin) vytvoří **koncept** `<název> (kopie)`, neviditelný studentům, s bloky (pravidla),
+výskyty (kapacita, vyučující, omezení), publikem a pravidly okna; bez zápisů studentů a bez odeslaných upozornění
+(`openedNotifiedAt`, `reminderSentOn`). Audit `seminars.window.duplicate`.
+
+### Nezapsaní studenti (Zápisy → detail okna → záložka Nezapsaní)
+
+Aktivní studenti z publika okna, kterým chybí zápisy v povinných blocích (viz Pravidla bloků); u každého jsou vidět
+chybějící bloky (u bloků s víc zápisy „zapsáno 1 z 2“). Filtr třídy a export CSV. Tlačítko **Poslat
 připomínku nezapsaným (N e-mailů)** (s potvrzením, jen admin) pošle e-maily a zapíše souhrn do historie.
 Na dashboardu admina a učitele je u otevřeného okna počet nezapsaných.
 
@@ -487,7 +551,7 @@ vynechají, stránka jádra se neshodí. Id záložek, štítků a položek jád
 Zapojené jsou `getSubjectTabs`, `getSubjectBadges`, `getSubjectUsage`, `getMySubjectsSections` (Semináře
 i Dopisování), `getAdminTodos` (jádro, Semináře, Dopisování), `getAdminStats`,
 `adminSections` a `settings`. `getUserTabs` dodávají Semináře (Zápisy) a Dopisování, `bulkUserActions` jádro
-(viz Seznam a detail uživatele); „přidat do publika zápisu“ přijde ve F5.
+(viz Seznam a detail uživatele) i Semináře („Přidat do publika zápisu“, „Odebrat z publika zápisu“).
 
 ### Hranice mezi jádrem a moduly
 
@@ -805,6 +869,12 @@ Migrace `20261025000000_predmety_tridy` (předměty a pevné třídy) data zacho
 třídy z kohort (rok nástupu) převede na pevné třídy podle dnešního ročníku a historii zařazení
 a úvazky z minulých let přepojí na třídu, ve které studenti v tom roce skutečně byli. Třídy mimo
 ročníky 1–4 smaže (studující zůstanou bez třídy, absolventi si ponechají poslední třídu).
+
+Migrace `20261030000000_zapisy_publikum_pravidla` (F5) přidá tabulku publika okna (`EnrollmentWindowAudience`),
+pravidla bloků a oken a omezení výskytů. Dosavadní `EnrollmentWindow.targetGrades` převede na položky publika
+typu `GRADE` (okna s prázdným polem zůstanou bez položek, tedy pro všechny studenty) a sloupec zruší; stávající
+bloky dostanou výchozí hodnoty (povinný, 1 až 1 zápis), okna povolené odepsání a viditelnost jen počtů,
+takže se chování existujících zápisů nemění.
 
 Do budoucna platí: každá změna schématu = nová migrace (`npx prisma migrate dev`), na
 produkci ji aplikuje produkční build. Migrace musí být kompatibilní s běžící verzí
