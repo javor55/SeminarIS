@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, Download, Loader2, Upload } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { unwrap, type ActionResult } from "@/lib/action-result";
 import type { ImportPreview, ImportResult, ImportRowStatus } from "@/modules/core/imports/types";
@@ -49,6 +48,7 @@ export function ImportDialog({ open, onOpenChange, kind, title, description, sam
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const token = React.useRef(0);
+  const fileInput = React.useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setContent(null);
@@ -158,7 +158,15 @@ export function ImportDialog({ open, onOpenChange, kind, title, description, sam
 
           <div className="space-y-2">
             <h4 className="text-sm font-medium">2. Nahrát soubor</h4>
-            <Input id="csv-file" type="file" accept=".csv,text/csv,text/plain" onChange={(e) => void onFile(e.target.files?.[0] ?? null)} />
+            {/* Vlastní české tlačítko místo systémového (jazyk systémového výběru souboru určuje prohlížeč); skrytý vstup zůstává */}
+            <div className="flex flex-wrap items-center gap-3">
+              <input id="csv-file" ref={fileInput} className="sr-only" type="file" accept=".csv,text/csv,text/plain" onChange={(e) => void onFile(e.target.files?.[0] ?? null)} />
+              <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => fileInput.current?.click()} data-testid="import-pick-file">
+                <Upload className="h-4 w-4" />
+                Vybrat soubor
+              </Button>
+              <span className="text-sm text-muted-foreground" data-testid="import-file-name">{fileName || "Soubor nevybrán"}</span>
+            </div>
           </div>
 
           {options.length > 0 && (

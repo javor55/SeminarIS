@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { saveSettings } from "@/lib/settings-registry";
 import { requirePermission } from "@/lib/session";
 import { MODULES } from "@/modules/registry";
+import { audit } from "@/lib/audit";
+import { revalidatePath } from "next/cache";
+import { getHiddenTodoIds, setHiddenTodoIds } from "@/modules/core/admin-todo-hidden";
 
 export type AdminModuleInfo = {
   id: string;
@@ -30,6 +33,39 @@ export async function setModuleEnabledAction(moduleId: string, enabled: boolean)
         data: { module: moduleId, enabled },
       },
     });
+  });
+}
+
+/**
+ * Skryje informační položku přehledu „co udělat“ (Nezobrazovat), nebo všechny skryté znovu zobrazí.
+ * Platí pro všechny správce; uloženo v nastavení systému.
+ */
+export async function hideAdminTodo(todoId: string) {
+  return safeAction(async () => {
+    const admin = await requirePermission("core.admin");
+    if (!todoId || todoId.length > 200) throw new Error("Neplatná položka.");
+    await prisma.$transaction(async (tx) => {
+      const ids = await getHiddenTodoIds(tx);
+      if (ids.includes(todoId)) return;
+      await setHiddenTodoIds([...ids, todoId], tx);
+      await audit(tx, admin, { action: "settings.todos.hide", entityType: "setting", entityId: todoId, summary: `Informace „${todoId}“ v přehledu administrace skryta (Nezobrazovat)`, data: { todoId } });
+    });
+    revalidatePath("/admin");
+    revalidatePath("/dashboard");
+  });
+}
+
+export async function showHiddenAdminTodos() {
+  return safeAction(async () => {
+    const admin = await requirePermission("core.admin");
+    await prisma.$transaction(async (tx) => {
+      const ids = await getHiddenTodoIds(tx);
+      if (ids.length === 0) return;
+      await setHiddenTodoIds([], tx);
+      await audit(tx, admin, { action: "settings.todos.show", entityType: "setting", entityId: null, summary: `Skryté informace v přehledu administrace znovu zobrazeny (${ids.length})`, data: { todoIds: ids } });
+    });
+    revalidatePath("/admin");
+    revalidatePath("/dashboard");
   });
 }
 

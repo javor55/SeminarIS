@@ -3,6 +3,7 @@ import type { User } from "@/lib/types";
 import { getEnabledModuleIds } from "@/lib/modules";
 import { MODULE_SERVERS } from "@/modules/server-registry";
 import type { ModuleId } from "@/modules/registry";
+import { getHiddenTodoIds } from "@/modules/core/admin-todo-hidden";
 import type { AdminSection, AdminTodo, SubjectBadge, SubjectUsageItem } from "@/modules/types";
 import type { AdminStat, BulkUserAction, DashboardCard, ModuleServer, ModuleTab, MySubjectsSection } from "@/modules/server-types";
 import { MODULES, can, type Permission } from "@/modules/registry";
@@ -107,11 +108,15 @@ const SEVERITY_RANK = { critical: 0, warning: 1, info: 2 } as const;
  * Položky přehledu „co udělat“ ze zapnutých modulů (jen s nenulovým počtem), nejzávažnější první.
  * Uživatel dostane jen položky, na jejichž `permission` má právo (bez ní jen admin).
  */
-export async function collectAdminTodos(user: User): Promise<AdminTodo[]> {
-  const parts = await collect((s) => s.getAdminTodos?.(user));
+export async function collectAdminTodos(user: User, opts: { includeHidden?: boolean } = {}): Promise<(AdminTodo & { hidden: boolean })[]> {
+  const [parts, hiddenIds] = await Promise.all([collect((s) => s.getAdminTodos?.(user)), getHiddenTodoIds()]);
+  const hiddenSet = new Set(hiddenIds);
   return parts
     .flatMap((p) => p.value.map((t) => ({ ...t, id: `${p.id}.${t.id}` })))
     .filter((t) => t.count > 0 && can(user.role, (t.permission ?? "core.admin") as Permission))
+    // skrýt jde jen informace; skryté se vracejí jen na požádání (přehled administrace je umí zobrazit znovu)
+    .map((t) => ({ ...t, hidden: t.severity === "info" && hiddenSet.has(t.id) }))
+    .filter((t) => opts.includeHidden || !t.hidden)
     .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
 }
 

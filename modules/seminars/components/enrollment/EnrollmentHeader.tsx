@@ -93,7 +93,7 @@ export function EnrollmentHeader({
 
       const csv = [headers.map(h => `"${h}"`), ...rows].map(e => e.join(";")).join("\n");
       downloadCSV(csv, `export_matice_${ew.name.replace(/\s+/g, "_")}.csv`);
-      toast.success("Matrix export dokončen.");
+      toast.success("Export matice dokončen.");
     } catch (err: unknown) {
       const error = err as Error;
       toast.error(error.message || "Export se nezdařil.");
@@ -205,7 +205,7 @@ export function EnrollmentHeader({
       const rows = view.students.map((s) => [s.lastName, s.firstName, s.email, s.classLabel ?? "", s.missingBlocks.join(", ")]);
       const csv = [headers.map(h => `"${h}"`), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`))].map(e => e.join(";")).join("\n");
       downloadCSV(csv, `chybejici_zapisy_${ew.name.replace(/\s+/g, "_")}.csv`);
-      toast.success("Report nezapsaných exportován.");
+      toast.success("Seznam nezapsaných exportován.");
     } catch (err: unknown) {
       const error = err as Error;
       toast.error(error.message || "Export se nezdařil.");

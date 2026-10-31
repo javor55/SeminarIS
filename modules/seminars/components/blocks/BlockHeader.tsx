@@ -10,6 +10,8 @@ import { EditBlockDialog } from "@/modules/seminars/components/blocks/EditBlockD
 import { EditSubjectOccurrenceDialog } from "@/modules/seminars/components/occurrences/EditSubjectOccurrenceDialog";
 import { moveBlock, deleteBlock, updateBlock, createSubjectOccurrence, updateSubjectOccurrence, deleteSubjectOccurrence } from "@/modules/seminars/actions/windows";
 import { toast } from "sonner";
+import { MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { blockRulesLabel } from "@/modules/seminars/window-rules";
 import {
   AlertDialog,
@@ -43,21 +45,21 @@ export function BlockHeader({
 
   return (
     <>
-      <div className="px-4 py-3 border-b flex items-center justify-between gap-2">
+      <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
         <div className="min-w-0 flex-1">
-          <h2 className="font-medium truncate">{block.name}</h2>
+          <h2 className="font-medium" data-testid="block-name">{block.name}</h2>
           <p className="text-xs text-muted-foreground" data-testid="block-rules">
             {blockRulesLabel({ required: block.required ?? true, minEnrollments: block.minEnrollments ?? 1, maxEnrollments: block.maxEnrollments ?? 1 })}
           </p>
           {block.description ? (
-            <p className="text-sm text-muted-foreground truncate">
+            <p className="mt-1 text-sm text-muted-foreground">
               {block.description}
             </p>
           ) : null}
         </div>
 
         {isAdmin && (
-          <div className="flex items-center gap-2 flex-wrap justify-end">
+          <div className="flex shrink-0 items-center gap-1">
             <Button
               variant="default"
               size="sm"
@@ -79,52 +81,56 @@ export function BlockHeader({
               Přidat předmět
             </Button>
 
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setEditBlock(block)}
-            >
-              Upravit
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={blockIndex === 0}
-              onClick={async () => {
-                const ok = unwrap(await moveBlock(block.id, "UP"));
-                if (ok) {
-                  toast.success("Blok posunut nahoru");
-                  router.refresh();
-                } else toast.error("Blok nelze posunout výš");
-              }}
-            >
-              ↑
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={blockIndex === totalBlocks - 1}
-              onClick={async () => {
-                const ok = unwrap(await moveBlock(block.id, "DOWN"));
-                if (ok) {
-                  toast.success("Blok posunut dolů");
-                  router.refresh();
-                } else toast.error("Blok nelze posunout níž");
-              }}
-            >
-              ↓
-            </Button>
-
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={hasOccurrences}
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              Smazat
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label={`Akce bloku ${block.name}`} data-testid="block-menu">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setEditBlock(block)}>Upravit blok</DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={blockIndex === 0}
+                  onSelect={async () => {
+                    try {
+                      const ok = unwrap(await moveBlock(block.id, "UP"));
+                      if (ok) {
+                        toast.success("Blok posunut nahoru");
+                        router.refresh();
+                      } else toast.error("Blok nelze posunout výš");
+                    } catch (e) {
+                      toast.error((e as Error).message || "Blok se nepodařilo posunout");
+                    }
+                  }}
+                >
+                  Posunout nahoru
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={blockIndex === totalBlocks - 1}
+                  onSelect={async () => {
+                    try {
+                      const ok = unwrap(await moveBlock(block.id, "DOWN"));
+                      if (ok) {
+                        toast.success("Blok posunut dolů");
+                        router.refresh();
+                      } else toast.error("Blok nelze posunout níž");
+                    } catch (e) {
+                      toast.error((e as Error).message || "Blok se nepodařilo posunout");
+                    }
+                  }}
+                >
+                  Posunout dolů
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-danger"
+                  disabled={hasOccurrences}
+                  onSelect={() => setShowDeleteConfirm(true)}
+                >
+                  {hasOccurrences ? "Smazat blok (nejdřív odeberte předměty)" : "Smazat blok"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </div>

@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requirePagePermission } from "@/lib/session";
+import { can } from "@/modules/registry";
+import { TodoHideButton, TodoShowHiddenButton } from "@/modules/core/components/admin/TodoHideButton";
 import { collectAdminStats, collectAdminTodos } from "@/modules/core/extensions";
 import type { AdminTodo } from "@/modules/types";
 
@@ -21,8 +23,13 @@ const SEVERITY: Record<AdminTodo["severity"], { label: string; icon: React.React
 
 export default async function AdminOverviewPage() {
   const user = await requirePagePermission("core.admin.view");
-  const [todos, stats] = await Promise.all([collectAdminTodos(user), collectAdminStats()]);
+  const [allTodos, stats] = await Promise.all([collectAdminTodos(user, { includeHidden: true }), collectAdminStats()]);
+  const todos = allTodos.filter((t) => !t.hidden);
+  const hiddenCount = allTodos.length - todos.length;
+  // Počty v podtitulku sedí s viditelnými řádky: ke zpracování (naléhavé + ke zpracování) a informace zvlášť
   const actionable = todos.filter((t) => t.severity !== "info").length;
+  const infoCount = todos.length - actionable;
+  const canHide = can(user.role, "core.admin");
 
   return (
     <div className="space-y-6">
@@ -32,8 +39,10 @@ export default async function AdminOverviewPage() {
         <CardHeader>
           <CardTitle>Co udělat</CardTitle>
           <CardDescription>
-            {actionable === 0 ? "Nic nehoří." : `K vyřízení: ${actionable} ${actionable === 1 ? "položka" : actionable < 5 ? "položky" : "položek"}.`} Položky se
-            počtem 0 se nezobrazují.
+            <span data-testid="todos-summary">
+              K vyřízení: {actionable} · Informace: {infoCount}
+            </span>
+            . Položky s počtem 0 se nezobrazují.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -46,17 +55,23 @@ export default async function AdminOverviewPage() {
               {todos.map((t) => {
                 const sev = SEVERITY[t.severity];
                 return (
-                  <li key={t.id} data-testid="admin-todo" data-todo={t.id} data-severity={t.severity}>
-                    <Link href={t.href} className="flex items-center gap-3 py-3 hover:bg-accent/50 -mx-2 px-2 rounded-md">
+                  <li key={t.id} data-testid="admin-todo" data-todo={t.id} data-severity={t.severity} className="flex items-center gap-1">
+                    <Link href={t.href} className="flex flex-1 items-center gap-3 py-3 hover:bg-accent/50 -mx-2 px-2 rounded-md">
                       {sev.icon}
                       <span className="flex-1 text-sm">{t.label}</span>
                       <Badge variant={sev.variant} title={sev.label} data-testid="todo-count">{t.count}</Badge>
                       <span className="text-sm font-medium underline underline-offset-4 hidden sm:inline">Vyřešit</span>
                     </Link>
+                    {t.severity === "info" && canHide && <TodoHideButton todoId={t.id} />}
                   </li>
                 );
               })}
             </ul>
+          )}
+          {hiddenCount > 0 && canHide && (
+            <div className="mt-3 border-t pt-3">
+              <TodoShowHiddenButton count={hiddenCount} />
+            </div>
           )}
         </CardContent>
       </Card>

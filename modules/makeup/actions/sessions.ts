@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import type { User } from "@/lib/types";
 import { requirePermission } from "@/lib/session";
 import { audit, describeChanges } from "@/lib/audit";
-import { formatMinutes, formatTimeRange } from "@/lib/datetime";
+import { formatMinutes, formatTimeRange, schoolDayParts, startOfSchoolDay } from "@/lib/datetime";
 import { classLabel } from "@/lib/school";
 import { getSetting } from "@/lib/settings-registry";
 import { can } from "@/modules/registry";
@@ -39,6 +39,7 @@ import {
   type SessionInput,
 } from "@/modules/makeup/types";
 import { sortByName, sortByText } from "@/lib/names";
+import type { SessionFilter } from "@/modules/makeup/session-filter";
 
 function revalidateMakeup() {
   revalidatePath("/makeup", "layout");
@@ -64,6 +65,74 @@ export async function getUpcomingSessions(): Promise<MakeupSessionItem[]> {
   return sessions
     .map((s) => toSessionItem(s, user, s.registrations[0]?.id ?? null))
     .filter((s) => !s.cancelledAt || s.canManage || s.myRegistrationId);
+}
+
+/** Hranice období (týden = pondělí až neděle ve školním pásmu); `null` = bez omezení. */
+function periodRange(period: SessionFilter["period"], now: Date): { gte?: Date; lt?: Date } {
+  const { year, month, day } = schoolDayParts(now);
+  const weekday = (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7; // 0 = pondělí
+  const monday = startOfSchoolDay(now, -weekday);
+  switch (period) {
+    case "upcoming":
+      return { gte: now };
+    case "thisWeek":
+      return { gte: monday, lt: startOfSchoolDay(now, 7 - weekday) };
+    case "nextWeek":
+      return { gte: startOfSchoolDay(now, 7 - weekday), lt: startOfSchoolDay(now, 14 - weekday) };
+    case "past":
+      return { lt: now };
+    default:
+      return {};
+  }
+}
+
+const MAX_LISTED_SESSIONS = 300;
+
+/**
+ * Termíny podle filtru (učitel, předmět, období, jen s volným místem) pro seznam učitele a admina.
+ * Zrušené termíny vidí jen ten, kdo je spravuje. Nadcházející řazené od nejbližšího, proběhlé od nejnovějšího.
+ */
+export async function getSessions(filter: SessionFilter): Promise<{ sessions: MakeupSessionItem[]; truncated: boolean }> {
+  const user = await requirePermission("makeup.view");
+  const range = periodRange(filter.period, new Date());
+  const rows = await prisma.makeupSession.findMany({
+    where: {
+      ...(filter.teacher ? { teacherId: filter.teacher } : {}),
+      ...(filter.subject ? { subjects: { some: { subjectId: filter.subject } } } : {}),
+      ...(range.gte || range.lt ? { endsAt: { ...(range.gte ? { gte: range.gte } : {}), ...(range.lt ? { lt: range.lt } : {}) } } : {}),
+    },
+    include: { ...sessionInclude, registrations: { where: { studentId: user.id }, select: { id: true } } },
+    orderBy: { startsAt: filter.period === "past" ? "desc" : "asc" },
+  });
+  const items = rows
+    .map((s) => toSessionItem(s, user, s.registrations[0]?.id ?? null))
+    .filter((s) => !s.cancelledAt || s.canManage || s.myRegistrationId)
+    .filter((s) => !filter.freeOnly || (!s.cancelledAt && s.registeredCount < s.capacity));
+  return { sessions: items.slice(0, MAX_LISTED_SESSIONS), truncated: items.length > MAX_LISTED_SESSIONS };
+}
+
+/** Nabídka filtrů: učitelé, kteří dozorují, a předměty, které se v termínech dopisují. */
+export async function getSessionFilterOptions() {
+  await requirePermission("makeup.view");
+  const [teachers, subjects] = await Promise.all([
+    prisma.user.findMany({ where: { makeupSessionsSupervised: { some: {} } }, select: { id: true, firstName: true, lastName: true } }),
+    prisma.subject.findMany({ where: { makeupSessions: { some: {} } }, select: { id: true, name: true } }),
+  ]);
+  return {
+    teachers: sortByName(teachers).map((t) => ({ id: t.id, name: fullName(t) })),
+    subjects: sortByText(subjects, (s) => s.name),
+  };
+}
+
+/** Má přihlášený uživatel vypsaný nějaký termín a má úvazky v aktuálním roce? (Řídí osobní sekce stránky.) */
+export async function getMakeupPersonalInfo() {
+  const user = await requirePermission("makeup.view");
+  const year = await getCurrentSchoolYear();
+  const [supervised, assignments] = await Promise.all([
+    prisma.makeupSession.count({ where: { teacherId: user.id } }),
+    year.id ? prisma.teachingAssignment.count({ where: { teacherId: user.id, schoolYearId: year.id } }) : 0,
+  ]);
+  return { supervises: supervised > 0, hasAssignments: assignments > 0 };
 }
 
 /** Detail termínu se seznamem zapsaných – jen pro toho, kdo termín spravuje. */

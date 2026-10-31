@@ -11,21 +11,37 @@ import type { getMySubjectRegistrations } from "@/modules/makeup/actions/session
 import { ATTENDANCE_LABELS, type MakeupSessionItem } from "@/modules/makeup/types";
 import { SessionsTable } from "./common";
 import { SessionFormDialog } from "./SessionFormDialog";
+import { SessionFilters } from "./SessionFilters";
 import { PageHeader } from "@/components/page-header";
 
 type SubjectRegistration = Awaited<ReturnType<typeof getMySubjectRegistrations>>[number];
 
 export function TeacherMakeupView({
-  sessions,
+  upcoming,
+  listed,
+  truncated,
   currentUserId,
+  isAdmin,
+  supervises,
   subjectRegistrations,
+  filterOptions,
 }: {
-  sessions: MakeupSessionItem[];
+  // nadcházející termíny (z nich „Moje termíny“)
+  upcoming: MakeupSessionItem[];
+  // termíny podle filtru z adresy
+  listed: MakeupSessionItem[];
+  truncated: boolean;
   currentUserId: string;
+  isAdmin: boolean;
+  // má vypsané termíny (řídí sekci „Moje termíny“)
+  supervises: boolean;
+  // „Kdo dopisuje moje písemky“; null = uživatel nemá úvazky, sekce se nezobrazuje
   subjectRegistrations: SubjectRegistration[] | null;
+  filterOptions: { teachers: { id: string; name: string }[]; subjects: { id: string; name: string }[] };
 }) {
-  const mine = sessions.filter((s) => s.teacherId === currentUserId);
-  const others = sessions.filter((s) => s.teacherId !== currentUserId && !s.cancelledAt);
+  const mine = upcoming.filter((s) => s.teacherId === currentUserId);
+  // Učitel vidí v seznamu jen cizí termíny (vlastní má nahoře), admin všechny
+  const rows = isAdmin ? listed : listed.filter((s) => s.teacherId !== currentUserId);
   const manageLink = (s: MakeupSessionItem) =>
     s.canManage ? (
       <Button asChild size="sm" variant="outline">
@@ -49,14 +65,16 @@ export function TeacherMakeupView({
         }
       />
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle>Moje termíny (dozor)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SessionsTable sessions={mine} action={manageLink} empty="Zatím nemáte vypsané žádné termíny." />
-        </CardContent>
-      </Card>
+      {supervises && (
+        <Card className="shadow-sm" data-testid="my-sessions">
+          <CardHeader>
+            <CardTitle>Moje termíny (dozor)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SessionsTable sessions={mine} action={manageLink} empty="Žádné nadcházející termíny, které dozorujete." />
+          </CardContent>
+        </Card>
+      )}
 
       {subjectRegistrations && (
         <Card className="shadow-sm">
@@ -101,12 +119,14 @@ export function TeacherMakeupView({
         </Card>
       )}
 
-      <Card className="shadow-sm">
+      <Card className="shadow-sm" data-testid="all-sessions">
         <CardHeader>
-          <CardTitle>Termíny ostatních učitelů</CardTitle>
+          <CardTitle>{isAdmin ? "Všechny termíny" : "Termíny ostatních učitelů"}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <SessionsTable sessions={others} action={manageLink} empty="Žádné další termíny." />
+        <CardContent className="space-y-4">
+          <SessionFilters teachers={filterOptions.teachers} subjects={filterOptions.subjects} />
+          <SessionsTable sessions={rows} action={manageLink} empty="Filtru neodpovídá žádný termín." />
+          {truncated && <p className="text-xs text-muted-foreground">Zobrazeno prvních 300 termínů, zúžte filtr.</p>}
         </CardContent>
       </Card>
     </div>
