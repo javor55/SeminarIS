@@ -3,7 +3,7 @@ import { AlertTriangle, BookOpen, Calendar, CheckCircle2, Info, OctagonAlert, Us
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCurrentUser } from "@/lib/session";
+import { requirePagePermission } from "@/lib/session";
 import { collectAdminStats, collectAdminTodos } from "@/modules/core/extensions";
 import type { AdminTodo } from "@/modules/types";
 
@@ -20,7 +20,7 @@ const SEVERITY: Record<AdminTodo["severity"], { label: string; icon: React.React
 };
 
 export default async function AdminOverviewPage() {
-  const user = (await getCurrentUser())!;
+  const user = await requirePagePermission("core.admin.view");
   const [todos, stats] = await Promise.all([collectAdminTodos(user), collectAdminStats()]);
   const actionable = todos.filter((t) => t.severity !== "info").length;
 

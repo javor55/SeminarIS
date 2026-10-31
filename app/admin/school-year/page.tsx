@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/page-header";
 import { can } from "@/modules/registry";
-import { getCurrentUser } from "@/lib/session";
+import { requirePagePermission } from "@/lib/session";
 import { getSchoolYearInfo } from "@/modules/core/school";
 import { getClassStudents, getClassesOverview } from "@/modules/core/actions/classes";
 import { SchoolYearCard } from "@/modules/core/components/admin/SchoolYearCard";
@@ -9,13 +9,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ClassesTab } from "@/modules/core/components/admin/ClassesTab";
 
 export default async function SchoolYearPage() {
-  const user = (await getCurrentUser())!;
+  const user = await requirePagePermission("core.classes.view");
+  const canClose = can(user.role, "core.school.manage");
+  const canImport = can(user.role, "core.users.manage");
   const [info, classes, students] = await Promise.all([getSchoolYearInfo(), getClassesOverview(), getClassStudents()]);
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Školní rok a třídy" description="Aktuální školní rok, jeho uzavření a správa tříd." />
-      <SchoolYearCard info={info} />
+      <PageHeader title="Školní rok a třídy" description={canClose ? "Aktuální školní rok, jeho uzavření a správa tříd." : "Aktuální školní rok a třídy se studenty (jen pro čtení)."} />
+      <SchoolYearCard info={info} canManage={canClose} />
+      {canImport && (
       <Card className="shadow-sm" data-testid="imports-card">
         <CardHeader>
           <CardTitle>Importy</CardTitle>
@@ -27,7 +30,8 @@ export default async function SchoolYearPage() {
           <ImportButton kind="subjects" label="Import předmětů" />
         </CardContent>
       </Card>
-      <ClassesTab classes={classes} users={students} canManage={can(user.role, "core.users.manage")} />
+      )}
+      <ClassesTab classes={classes} users={students} canManage={canImport} />
     </div>
   );
 }

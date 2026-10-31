@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { requirePagePermission } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ const Bad = ({ children }: { children: ReactNode }) => <Badge variant="destructi
 const Warn = ({ children }: { children: ReactNode }) => <Badge variant="warning">{children}</Badge>;
 
 export default async function DiagnosticsPage() {
+  await requirePagePermission("core.admin");
   const [db, migrations, cron, email] = await Promise.all([getDatabaseStatus(), getMigrationStatus(), getCronStatus(), getEmailDiagnostics()]);
   const deployment = getDeploymentInfo();
 

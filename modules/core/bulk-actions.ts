@@ -281,6 +281,9 @@ const sendEmail: BulkUserAction = {
       { reason: "nemají platný e-mail", skip: (u) => !isValidEmail(u.email.trim()) },
     ]);
     const cfg = await loadEmailConfig();
+    if (!cfg.settings.enabled) {
+      return preview(eligible, skipped, [], "E-mailová upozornění jsou vypnutá (hlavní vypínač v sekci Upozornění), hromadný e-mail se neodešle.");
+    }
     if (!cfg.status.configured) {
       return preview(eligible, skipped, [], `Odesílání e-mailů není nastavené (chybí ${cfg.status.missing.join(", ")}).`);
     }
@@ -307,6 +310,7 @@ const sendEmail: BulkUserAction = {
       { content: { subject, body } }
     );
     const parts = [`odesláno ${res.sent} z ${users.length}`];
+    if (res.skippedDisabled) parts.push(`přeskočeno ${res.skippedDisabled} (vypnuté e-maily nebo odhlášení příjemce)`);
     if (res.skippedLimit) parts.push(`přeskočeno kvůli limitu ${res.skippedLimit}`);
     if (res.failed) parts.push(`selhalo ${res.failed}${res.firstError ? ` (${res.firstError})` : ""}`);
     return {

@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import type { User } from "@/lib/types";
 import { can, moduleIdOfPermission, type ModuleId, type Permission } from "@/modules/registry";
+import { redirect } from "next/navigation";
 import { isModuleEnabled } from "@/lib/modules";
 
 // Serverové pomocné funkce pro autorizaci. Záměrně NEJSOU v "use server" souboru,
@@ -51,5 +52,16 @@ export async function requirePermission(permission: Permission): Promise<User> {
   if (!can(user.role, permission)) {
     throw new Error("Unauthorized: Access denied");
   }
+  return user;
+}
+
+/**
+ * Pro stránky: přihlášený uživatel s oprávněním, jinak přesměrování (nepřihlášený na úvod, bez práva na
+ * dashboard). Middleware hlídá totéž podle manifestu, tohle je druhá, serverová pojistka přímo ve stránce.
+ */
+export async function requirePagePermission(permission: Permission): Promise<User> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/");
+  if (!can(user.role, permission)) redirect("/dashboard");
   return user;
 }

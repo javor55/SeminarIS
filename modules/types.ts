@@ -14,6 +14,8 @@ export type NavItem = {
 export type RouteRule = {
   prefix: string;
   permission: string;
+  // Pravidlo platí jen pro přesně tuto cestu, ne pro podstránky (např. přehled `/admin` bez `/admin/…`)
+  exact?: boolean;
 };
 
 // Položka bočního menu administrace (F2). Zobrazí se jen uživateli s daným oprávněním
@@ -96,6 +98,9 @@ export type AdminTodo = {
   severity: "info" | "warning" | "critical";
   // Kde to vyřešit
   href: string;
+  // Oprávnění, které uživatel musí mít, aby položku viděl (výchozí `core.admin`, tj. jen admin).
+  // Přehled administrace vidí i učitel, proto každá položka říká, komu patří.
+  permission?: string;
 };
 
 /**

@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/session";
+import { requirePagePermission } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { describeSettings } from "@/lib/settings-registry";
 import { isMicrosoftConfigured } from "@/lib/auth-settings";
@@ -8,7 +8,7 @@ const REGISTRATION_KEYS = ["registration_enabled", "default_user_role", "registr
 const AUTH_KEYS = ["auth.microsoft.enabled", "auth.microsoft.autoCreate", "auth.password.scope"];
 
 export default async function RegistrationSettingsPage() {
-  const user = (await getCurrentUser())!;
+  const user = await requirePagePermission("core.admin");
   const [registration, auth] = await Promise.all([
     describeSettings(user, (d) => REGISTRATION_KEYS.includes(d.key)),
     describeSettings(user, (d) => AUTH_KEYS.includes(d.key)),

@@ -167,6 +167,7 @@ export const seminarsServer: ModuleServer = {
         count: (await computeUnenrolled(w.id))?.students.length ?? 0,
         severity: "warning" as const,
         href: `/enrollments/${w.id}`,
+        permission: "seminars.windows.view",
       }))
     );
     return todos;

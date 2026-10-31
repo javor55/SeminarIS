@@ -14,7 +14,7 @@ import { DEFAULT_STUDY_YEARS } from "@/lib/school";
 import type { SchoolYearInfo } from "@/modules/core/school";
 
 /** Administrace → Školní rok a třídy: aktuální rok, počáteční nastavení a odkaz na uzavření roku. */
-export function SchoolYearCard({ info }: { info: SchoolYearInfo }) {
+export function SchoolYearCard({ info, canManage }: { info: SchoolYearInfo; canManage: boolean }) {
   const router = useRouter();
   const [selected, setSelected] = useState(String(info.currentYear.startYear));
   const [busy, setBusy] = useState(false);
@@ -38,10 +38,12 @@ export function SchoolYearCard({ info }: { info: SchoolYearInfo }) {
       <CardHeader>
         <CardTitle>Školní rok</CardTitle>
         <CardDescription>
-          Aktuální rok: <strong data-testid="current-year">{info.currentYear.label}</strong>. Na konci roku ho uzavřete:
-          studenti postoupí do vyšších tříd, {DEFAULT_STUDY_YEARS}. ročníky absolvují a vyřeší se opakování ročníku, odchody a úvazky.
+          Aktuální rok: <strong data-testid="current-year">{info.currentYear.label}</strong>.
+          {canManage &&
+            ` Na konci roku ho uzavřete: studenti postoupí do vyšších tříd, ${DEFAULT_STUDY_YEARS}. ročníky absolvují a vyřeší se opakování ročníku, odchody a úvazky.`}
         </CardDescription>
       </CardHeader>
+      {canManage && (
       <CardContent className="space-y-3">
         <Button asChild>
           <Link href="/admin/close-year">Uzavřít školní rok {info.currentYear.label}…</Link>
@@ -68,6 +70,7 @@ export function SchoolYearCard({ info }: { info: SchoolYearInfo }) {
           </div>
         )}
       </CardContent>
+      )}
     </Card>
   );
 }

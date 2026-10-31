@@ -1,7 +1,9 @@
+import { requirePagePermission } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { NotificationsView } from "@/modules/core/components/admin/notifications/NotificationsView";
 
-export default function NotificationsPage() {
+export default async function NotificationsPage() {
+  await requirePagePermission("core.admin");
   return (
     <div className="space-y-6">
       <PageHeader
