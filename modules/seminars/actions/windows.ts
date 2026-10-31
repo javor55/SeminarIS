@@ -75,33 +75,6 @@ function shapeWindow(ew: WindowRow, viewerId: string, privileged: boolean) {
   };
 }
 
-export async function getEnrollmentWindowsVisible() {
-  const user = await requireAuth();
-  await requireModule("seminars");
-  // Studenti vidí jen okna, jejichž publikum zahrnuje je
-  const ctx = await getViewerContext(user);
-  const windows = await prisma.enrollmentWindow.findMany({
-    where: {
-      visibleToStudents: true,
-      status: { not: "DRAFT" },
-      ...(ctx ? windowsForViewerWhere(ctx) : {}),
-    },
-    orderBy: { startsAt: "desc" },
-  });
-
-  // Paralelní sync – všechna okna najednou místo sekvenčního cyklu
-  const syncResults = await Promise.all(
-    windows.map(async (ew) => {
-      const newStatus = await syncEnrollmentWindowStatus(ew);
-      return { ...ew, status: newStatus as typeof ew.status };
-    })
-  );
-
-  // Vrátíme přímo aktualizovaná data, žádný druhý fetch
-  // Filtrujeme okna, která po syncu zůstala ne-DRAFT
-  return syncResults.filter(ew => ew.status !== "DRAFT");
-}
-
 export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = false) {
   const user = await requireAuth();
   await requireModule("seminars");

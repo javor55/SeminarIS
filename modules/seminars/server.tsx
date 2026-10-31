@@ -1,56 +1,16 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/modules/registry";
 import { computeUnenrolled } from "@/modules/seminars/unenrolled";
-import type { EnrollmentWindow, User } from "@/lib/types";
 import type { ModuleServer } from "@/modules/server-types";
 import type { SubjectBadge } from "@/modules/types";
-import { EnrollmentView } from "@/modules/seminars/components/enrollment/EnrollmentView";
-import {
-  getEnrollmentWindowsVisible,
-  getEnrollmentWindowByIdWithBlocks,
-} from "@/modules/seminars/actions/windows";
 import { SubjectOccurrencesPanel } from "@/modules/seminars/components/subjects/SubjectOccurrencesPanel";
 import { getSubjectOccurrences } from "@/modules/seminars/actions/occurrences";
 import { getSubjectWindows } from "@/modules/seminars/subject-windows";
+import { getSeminarsDashboardCards } from "@/modules/seminars/dashboard-cards";
 import { getSeminarsMySubjectsSections } from "@/modules/seminars/my-subjects";
 import { UserEnrollmentsPanel } from "@/modules/seminars/user-enrollments";
 import { seminarsBulkActions } from "@/modules/seminars/bulk-audience";
 import { getSeminarsEmailEstimates, runSeminarsDailyJob } from "@/modules/seminars/notifications";
-
-function findDashboardEnrollment(
-  allWindows: EnrollmentWindow[],
-  currentUser: User
-): EnrollmentWindow | null {
-  const windowsToSearch =
-    currentUser.role === "STUDENT" || currentUser.role === "GUEST"
-      ? allWindows.filter((ew) => ew.visibleToStudents)
-      : allWindows;
-
-  const openWindows = windowsToSearch
-    .filter((ew) => ew.status === "OPEN")
-    .sort((a, b) => new Date(a.endsAt).getTime() - new Date(b.endsAt).getTime());
-  if (openWindows.length > 0) return openWindows[0];
-
-  const scheduledWindows = windowsToSearch
-    .filter((ew) => ew.status === "SCHEDULED")
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-  if (scheduledWindows.length > 0) return scheduledWindows[0];
-
-  if (currentUser.role !== "STUDENT") {
-    const draftWindows = windowsToSearch
-      .filter((ew) => ew.status === "DRAFT")
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    if (draftWindows.length > 0) return draftWindows[0];
-  }
-
-  const closedWindows = windowsToSearch
-    .filter((ew) => ew.status === "CLOSED")
-    .sort((a, b) => new Date(b.endsAt).getTime() - new Date(a.endsAt).getTime());
-  if (closedWindows.length > 0) return closedWindows[0];
-
-  return null;
-}
 
 export const seminarsServer: ModuleServer = {
   runDailyJob: runSeminarsDailyJob,
@@ -58,45 +18,7 @@ export const seminarsServer: ModuleServer = {
   bulkUserActions: seminarsBulkActions,
   getEmailEstimates: () => getSeminarsEmailEstimates(),
 
-  async getDashboardWidget(user) {
-    const visible = await getEnrollmentWindowsVisible();
-    const found = findDashboardEnrollment(visible as EnrollmentWindow[], user);
-    if (!found) return null;
-
-    const ew = await getEnrollmentWindowByIdWithBlocks(found.id);
-    if (!ew) {
-      return (
-        <div className="space-y-6">
-          <h1 className="text-2xl font-semibold">Chyba</h1>
-          <p className="text-muted-foreground">
-            Nepodařilo se načíst detaily zápisového období.
-          </p>
-        </div>
-      );
-    }
-
-    // Učitel a admin: u otevřeného okna kolik studentů ještě nemá zapsáno vše
-    let unenrolled: number | null = null;
-    if (ew.status === "OPEN" && can(user.role, "seminars.windows.view")) {
-      unenrolled = (await computeUnenrolled(ew.id))?.students.length ?? null;
-    }
-
-    return (
-      <div className="space-y-6">
-        {unenrolled != null && (
-          <div className="rounded-lg border bg-card p-4 text-sm flex flex-wrap items-center justify-between gap-2" data-testid="unenrolled-widget">
-            <span>
-              V otevřeném zápisu „{ew.name}“ {unenrolled === 0 ? "mají zapsáno všichni studenti." : <>zbývá zapsat <strong>{unenrolled}</strong> {unenrolled === 1 ? "student" : "studentů"}.</>}
-            </span>
-            {unenrolled > 0 && (
-              <Link href={`/enrollments/${ew.id}`} className="font-medium underline underline-offset-4">Zobrazit nezapsané</Link>
-            )}
-          </div>
-        )}
-        <EnrollmentView enrollmentWindow={ew} currentUser={user} />
-      </div>
-    );
-  },
+  getDashboardCards: getSeminarsDashboardCards,
 
   getMySubjectsSections: getSeminarsMySubjectsSections,
 
@@ -104,6 +26,7 @@ export const seminarsServer: ModuleServer = {
   async getSubjectBadges(subjectIds, user) {
     const windows = await getSubjectWindows(user, subjectIds);
     const canOpen = can(user.role, "seminars.windows.view");
+    const canEnrollView = can(user.role, "seminars.enroll.view");
     const result = new Map<string, SubjectBadge[]>();
     for (const [subjectId, list] of windows) {
       result.set(
@@ -111,7 +34,8 @@ export const seminarsServer: ModuleServer = {
         list.map((w) => ({
           id: `window.${w.id}`,
           label: `v zápisu: ${w.name}`,
-          href: canOpen ? `/enrollments/${w.id}` : undefined,
+          // Učitel a admin do správy okna, student a host na stránku Zápisy (server stejně pustí jen viditelná okna)
+          href: canOpen ? `/enrollments/${w.id}` : canEnrollView ? `/zapisy/${w.id}` : undefined,
           filter: { key: "inWindow", label: "V zápisu", yesLabel: "Nabízené v zápisu", noLabel: "Mimo zápis" },
           grantsAccess: true,
         }))

@@ -4,7 +4,7 @@ import { getEnabledModuleIds } from "@/lib/modules";
 import { MODULE_SERVERS } from "@/modules/server-registry";
 import type { ModuleId } from "@/modules/registry";
 import type { AdminSection, AdminTodo, SubjectBadge, SubjectUsageItem } from "@/modules/types";
-import type { AdminStat, BulkUserAction, ModuleServer, ModuleTab, MySubjectsSection } from "@/modules/server-types";
+import type { AdminStat, BulkUserAction, DashboardCard, ModuleServer, ModuleTab, MySubjectsSection } from "@/modules/server-types";
 import { MODULES, can, type Permission } from "@/modules/registry";
 
 // Sběr bodů rozšíření (viz ModuleServer) ze zapnutých modulů. Jádro nesmí importovat moduly
@@ -87,6 +87,12 @@ export async function collectSubjectUsage(subjectId: string): Promise<SubjectUsa
 export async function collectMySubjectsSections(user: User): Promise<MySubjectsSection[]> {
   const parts = await collect((s) => s.getMySubjectsSections?.(user));
   return parts.flatMap((p) => p.value.map((x) => ({ ...x, id: `${p.id}.${x.id}` }))).sort(byOrder);
+}
+
+/** Karty dashboardu ze zapnutých modulů (id prefixované id modulu), seřazené. Chyba modulu jeho karty vynechá. */
+export async function collectDashboardCards(user: User): Promise<DashboardCard[]> {
+  const parts = await collect((s) => s.getDashboardCards?.(user));
+  return parts.flatMap((p) => p.value.map((c) => ({ ...c, id: `${p.id}.${c.id}` }))).sort(byOrder);
 }
 
 /** Záložky detailu uživatele ze zapnutých modulů, seřazené. */

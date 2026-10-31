@@ -1,9 +1,5 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { can } from "@/modules/registry";
 import type { ModuleServer } from "@/modules/server-types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { getPublicClassOptions } from "@/modules/core/school";
 import { getRegistrationClassMode } from "@/modules/core/settings";
 import { ClassRequestCard } from "@/modules/core/components/users/ClassRequestCard";
@@ -18,38 +14,26 @@ export const coreServer: ModuleServer = {
   // Hromadné akce v seznamu uživatelů (moduly přidávají další stejným bodem rozšíření)
   bulkUserActions: CORE_BULK_ACTIONS,
 
-  async getDashboardWidget(user) {
-    // Host čekající na schválení: výzva k výběru třídy (když je zapnutý výběr třídy)
-    if (user.role === "GUEST") {
-      const mode = await getRegistrationClassMode();
-      if (mode === "off") return null;
-      const [classes, me] = await Promise.all([
-        getPublicClassOptions(),
-        prisma.user.findUnique({ where: { id: user.id }, select: { requestedClassGroupId: true } }),
-      ]);
-      if (classes.length === 0) return null;
-      return <ClassRequestCard classes={classes} current={me?.requestedClassGroupId ?? null} required={mode === "required"} />;
-    }
-
-    // Admin: kolik účtů čeká na schválení
-    if (can(user.role, "core.users.manage")) {
-      const pending = await prisma.user.count({ where: { role: "GUEST", isActive: true } });
-      if (pending === 0) return null;
-      return (
-        <Card data-testid="approvals-widget">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-lg">
-              {pending} {pending === 1 ? "účet čeká" : pending < 5 ? "účty čekají" : "účtů čeká"} na schválení
-            </CardTitle>
-            <Button asChild variant="outline" size="sm"><Link href="/users?tab=approvals">Schválit</Link></Button>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Noví uživatelé jsou hosté, dokud je nepotvrdíte jako studenty nebo učitele.
-          </CardContent>
-        </Card>
-      );
-    }
-    return null;
+  // Host čekající na schválení: výzva k výběru třídy (když je zapnutý výběr třídy). Ostatní karty jádra
+  // (co udělat, statistiky) skládá `modules/core/dashboard-cards.tsx` z bodů rozšíření všech modulů.
+  async getDashboardCards(user) {
+    if (user.role !== "GUEST") return [];
+    const mode = await getRegistrationClassMode();
+    if (mode === "off") return [];
+    const [classes, me] = await Promise.all([
+      getPublicClassOptions(),
+      prisma.user.findUnique({ where: { id: user.id }, select: { requestedClassGroupId: true } }),
+    ]);
+    if (classes.length === 0) return [];
+    return [
+      {
+        id: "class-request",
+        title: "Vyberte svou třídu",
+        order: 0,
+        size: "md",
+        content: <ClassRequestCard classes={classes} current={me?.requestedClassGroupId ?? null} required={mode === "required"} />,
+      },
+    ];
   },
 
   async getAdminStats() {

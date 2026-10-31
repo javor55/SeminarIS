@@ -15,6 +15,21 @@ export type ModuleTab = {
   content: ReactNode;
 };
 
+/** Karta na dashboardu (F8). Obsah je serverová komponenta modulu; vlastní práce probíhá na stránkách modulů. */
+export type DashboardCard = {
+  // Jedinečné v rámci modulu; jádro ho prefixuje id modulu
+  id: string;
+  title: string;
+  // Pořadí karet (nižší = dříve)
+  order: number;
+  // Šířka v mřížce: sm = třetina, md = polovina (výchozí), lg = celá šířka
+  size?: "sm" | "md" | "lg";
+  content: ReactNode;
+  // Odkaz v záhlaví karty (stránka modulu, kde se pracuje) a jeho popisek
+  href?: string;
+  linkLabel?: string;
+};
+
 /** Sekce stránky „Moje předměty“ (F4), kterou přispívá modul. Obsah je serverová komponenta modulu. */
 export type MySubjectsSection = {
   // Jedinečné v rámci modulu; jádro ho prefixuje id modulu
@@ -115,8 +130,6 @@ export type DailyJobStep = { task: string; ok: boolean; detail: string };
  * nezůstala viset data vypnutého modulu).
  */
 export type ModuleServer = {
-  // Obsah na dashboardu pro daného uživatele, nebo null, když není co ukázat
-  getDashboardWidget?: (user: User) => Promise<ReactNode | null>;
   // Statistiky pro administrační centrum
   getAdminStats?: () => Promise<AdminStat[]>;
   // Úklid dat modulu před trvalým smazáním uživatele (v transakci).
@@ -140,6 +153,9 @@ export type ModuleServer = {
   // Kde se předmět používá (dialog archivace/mazání, smazání se při použití zakáže). Bez kontroly
   // oprávnění uživatele; počítá všechna data modulu, nejen to, co by uživatel viděl.
   getSubjectUsage?: (subjectId: string) => Promise<SubjectUsageItem[]>;
+  // Karty dashboardu (F8) pro daného uživatele; prázdné pole, když modul pro jeho roli nemá co ukázat.
+  // Karta respektuje oprávnění uživatele (viditelnost zápisů, vlastní data) a vrací jen to, co smí vidět.
+  getDashboardCards?: (user: User) => Promise<DashboardCard[]>;
   // Sekce stránky „Moje předměty“ (F4): co uživatel v modulu k předmětům učí / navštěvuje. Vrací
   // prázdné pole, když modul pro roli uživatele nemá co ukázat.
   getMySubjectsSections?: (user: User) => Promise<MySubjectsSection[]>;
