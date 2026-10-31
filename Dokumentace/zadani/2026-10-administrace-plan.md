@@ -12,12 +12,13 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 4. V tomto souboru fázi označit `[x]` s číslem PR (commit spolu s fází nebo hned po mergi).
 
 ## Stav
-- [x] F1 Body rozšíření a hranice modulů
-- [x] F2 Administrace se sekcemi a přehled „co udělat“, jednotné nastavení
-- [x] F3 Detail uživatele a hromadné akce
-- [x] F4 Předměty napříč moduly
-- [x] F5 Konfigurovatelné zápisy (publikum, pravidla bloků)
-- [x] F6 Importy s náhledem (uživatelé, úvazky)
+- [x] F1 Body rozšíření a hranice modulů (PR #6)
+- [x] F2 Administrace se sekcemi a přehled „co udělat“, jednotné nastavení (PR #7)
+- [x] F3 Detail uživatele a hromadné akce (PR #8)
+- [x] F4 Předměty napříč moduly (PR #9)
+- [x] F5 Konfigurovatelné zápisy (publikum, pravidla bloků) (PR #10)
+- [x] F6 Importy s náhledem (uživatelé, úvazky) (PR #11)
+- [ ] F7 Učitel v administraci, vypínač hromadného e-mailu, jednotné UI, úklid lintu
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,
@@ -142,3 +143,35 @@ Zápisy se dnes cílí jen na ročníky (`EnrollmentWindow.targetGrades`). Nově
 - Import úvazků z CSV (`email_ucitele;kod_predmetu;trida` např. `novak@…;M;2.A`) se stejným
   náhledem, pro aktuální školní rok; vzorový soubor ke stažení.
 - Volitelně import předmětů (název, kód, ročníky) se stejným mechanismem.
+
+## F7 Učitel v administraci, vypínač hromadného e-mailu, jednotné UI, úklid lintu
+- **Učitel v administraci (jen čtení):** položka menu „Administrace“ i pro učitele, sekce
+  podle oprávnění. Učitel vidí: Přehled (jen položky, které se ho týkají / které smí řešit:
+  nezapsaní v oknech, termíny dopisování; položky jen pro admina skrýt) a Školní rok a třídy
+  (aktuální rok, seznam tříd s počty a studenty – bez úprav, bez importů a bez uzavření roku).
+  Ostatní sekce (Registrace a přihlášení, Moduly, Upozornění, Historie, Diagnostika, nastavení
+  modulů) zůstávají jen pro admina. Nová oprávnění podle konvence (např. `core.admin.view`
+  pro TEACHER+ADMIN, `core.classes.view`), kontraktový test a E2E (učitel vidí jen povolené
+  sekce, nic nezmění, přímé URL na adminské sekce ho odmítnou).
+- **Hromadný e-mail a hlavní vypínač:** událost `manual.bulk` respektuje hlavní vypínač
+  e-mailů (při vypnutém se neodešle, náhled akce to řekne a akci zablokuje). Zkušební e-mail
+  sobě může vypínač dál ignorovat. E2E.
+- **Jednotné UI** (zjištěno auditem):
+  - Radix `Select` → `NativeSelect` (EditEnrollmentDialog, EditSubjectOccurrenceDialog,
+    StudyStatusDialog, EditUserDialog),
+  - nová komponenta `components/ui/checkbox.tsx` (shadcn styl, přístupná, s labelem) a nahradit
+    holé `<input type="checkbox">` (cca 7 souborů),
+  - `alert()` / `window.confirm()` → toast / `ConfirmAction` (Semináře: EditEnrollmentDialog,
+    EditSubjectOccurrenceDialog, SubjectOccurrencesPanel),
+  - formátování dat v `EnrollmentHeader` → `lib/datetime.ts`,
+  - holá `<table>` v náhledu importu → `components/ui/table`,
+  - natvrdo zadané barvy (`bg-*/text-*/border-*-NNN`, cca 100 výskytů mimo `components/ui`)
+    → sémantické tokeny / varianty `Badge` (success, warning, destructive, muted…); doplnit
+    chybějící varianty, ověřit tmavý režim,
+  - holé `<button>` → `Button` (případně sdílený `Chip` pro čipy učitelů/tříd),
+  - dokumentace: oddíl „UI konvence“ doplnit o seznam komponent a pravidlo „žádné holé
+    prvky formuláře, žádné natvrdo barvy“; pokud to jde levně, ESLint pravidlo
+    (`no-restricted-syntax`) proti `alert`/`confirm`.
+- **Úklid lintu:** `npm run lint` ať pokrývá celý repozitář včetně `e2e/` a `scripts/`
+  (`next lint --dir .` nebo `eslint .`), opravit všechny chyby (nepoužité importy
+  a proměnné v E2E) a ideálně i varování.
