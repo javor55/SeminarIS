@@ -31,7 +31,8 @@ test("uzavření školního roku: změna třídy, opakování, absolvování, od
   await pa.goto('/users'); await pa.waitForLoadState('networkidle');
   await pa.getByRole('button', { name: /Import/ }).first().click();
   await pa.setInputFiles('#csv-file', csvFile);
-  await pa.getByRole('button', { name: /Importovat|Spustit import|Nahrát/ }).last().click(); await pa.waitForTimeout(3000);
+  await pa.waitForSelector('[data-testid=import-preview]');
+  await pa.getByTestId('import-confirm').click(); await pa.waitForSelector('[data-testid=import-result]');
   check('imported with history', hist('k2@skola.cz') === `${Y}:2A:ASSIGNED`, hist('k2@skola.cz'));
   await pa.keyboard.press('Escape');
 

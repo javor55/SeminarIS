@@ -11,6 +11,7 @@ import { User } from "@/lib/types";
 import { PageHeader } from "@/components/page-header";
 import { GRADES, subjectGradesLabel } from "@/lib/school";
 import { can } from "@/modules/registry";
+import { ImportButton } from "@/modules/core/components/import/ImportDialogs";
 
 function downloadCsv(filename: string, headers: string[], rows: string[][]) {
   const csvContent = "﻿" + [headers, ...rows].map((e) => e.join(";")).join("\n");
@@ -87,6 +88,8 @@ export function SubjectsClientView({ subjects, currentUser }: { subjects: Subjec
                   Katalog sylabů
                 </Button>
               )}
+              <ImportButton kind="subjects" label="Import předmětů" />
+              {can(currentUser.role, "core.school.manage") && <ImportButton kind="assignments" label="Import úvazků" />}
               <Button asChild size="sm">
                 <Link href="/subjects/new/edit">
                   <Plus className="mr-2 h-4 w-4" />
