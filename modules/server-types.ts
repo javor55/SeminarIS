@@ -5,6 +5,84 @@ import type { User } from "@/lib/types";
 import type { EmailEventId } from "@/lib/email/events";
 import type { AdminTodo, SubjectBadge, SubjectUsageItem } from "@/modules/types";
 
+// === Ukázková data pro prezentaci (F9) ===
+
+/** Osoba z ukázkových dat jádra (učitel, student, host). */
+export type DemoPerson = { id: string; firstName: string; lastName: string; email: string };
+export type DemoStudent = DemoPerson & { classGroupId: string; grade: number };
+export type DemoClass = { id: string; grade: number; letter: string; label: string };
+export type DemoSubject = {
+  id: string;
+  name: string;
+  code: string | null;
+  // Ročníky, ve kterých se předmět vyučuje
+  grades: number[];
+  // Povinný předmět (false = seminář pro 4. ročník)
+  compulsory: boolean;
+  // Učitelé, kteří předmět učí (id)
+  teacherIds: string[];
+};
+export type DemoTeaching = { teacherId: string; subjectId: string; classGroupId: string };
+
+/** Deterministický generátor (stejný seed = stejná data). */
+export type DemoRandom = {
+  // Desetinné číslo z [0, 1)
+  next(): number;
+  // Celé číslo z [min, max]
+  int(min: number, max: number): number;
+  pick<T>(items: readonly T[]): T;
+  // Nová pole v náhodném pořadí
+  shuffle<T>(items: readonly T[]): T[];
+  // true s danou pravděpodobností
+  chance(p: number): boolean;
+};
+
+/** Referenční data jádra, která ukázková data jádra vytvořila (nebo našla) a moduly na nich staví. */
+export type DemoCoreData = {
+  schoolYear: { id: string; startYear: number };
+  classes: DemoClass[];
+  teachers: DemoPerson[];
+  students: DemoStudent[];
+  guests: DemoPerson[];
+  subjects: DemoSubject[];
+  // Úvazky ukázkových učitelů (kdo učí jaký předmět v jaké třídě)
+  teaching: DemoTeaching[];
+};
+
+/** Společné pro seed i clear. */
+export type DemoBaseContext = {
+  // Admin, který akci spustil (autor záznamů a náhradník za smazané uživatele)
+  actor: User;
+  now: Date;
+  // Zapíše záznamy do evidence (ve stejné transakci jako samotné záznamy)
+  track(model: string, ids: readonly string[]): Promise<void>;
+};
+
+export type DemoSeedContext = DemoBaseContext & {
+  rng: DemoRandom;
+  core: DemoCoreData;
+  // Společný hash hesla ukázkových účtů
+  passwordHash: string;
+};
+
+export type DemoClearContext = DemoBaseContext & {
+  // Id ze evidence pro daný model (načtené před mazáním)
+  ids(model: string): string[];
+};
+
+/**
+ * Ukázková data modulu. `seed` vytvoří záznamy a každý zapíše přes `ctx.track`; nesmí volat
+ * e-mailové události. `clear` smaže záznamy modulu podle evidence (`ctx.ids`) a uklidí vazby
+ * skutečných záznamů na ukázkové uživatele; jádro po něm smaže ukázkové uživatele, třídy a předměty
+ * (včetně kaskády). Jádro volá `seed` jen u zapnutých modulů, `clear` u všech.
+ */
+export type ModuleDemoData = {
+  // Popisky modelů evidence pro přehled v administraci, např. { StudentEnrollment: "Zápisy studentů" }
+  labels: Record<string, string>;
+  seed(tx: TxClient, ctx: DemoSeedContext): Promise<void>;
+  clear(tx: TxClient, ctx: DemoClearContext): Promise<void>;
+};
+
 /** Záložka (detail předmětu, detail uživatele). Obsah je serverová komponenta modulu. */
 export type ModuleTab = {
   // Jedinečné v rámci modulu; jádro ho před použitím prefixuje id modulu
@@ -165,4 +243,6 @@ export type ModuleServer = {
   getAdminTodos?: (user: User) => Promise<AdminTodo[]>;
   // Vlastní hromadné akce v seznamu uživatelů (F3)
   bulkUserActions?: readonly BulkUserAction[];
+  // Ukázková data pro prezentaci (F9): Administrace → Ukázková data
+  demoData?: ModuleDemoData;
 };

@@ -559,3 +559,19 @@ model MakeupRegistrationSubject {
   @@id([registrationId, subjectId])
   @@index([subjectTeacherId])
 }
+
+// =====================================================================
+// JÁDRO – UKÁZKOVÁ DATA PRO PREZENTACI
+// =====================================================================
+
+// Evidence záznamů vytvořených funkcí „Naplnit ukázkovými daty“ (Administrace → Ukázková data).
+// Zapisuje se ve stejné transakci jako samotný záznam. Mazání ukázkových dat smí smazat jen to,
+// co je tady uvedeno (a co na tom závisí přes kaskádu). Bez relací: `model` je název modelu Prisma.
+model DemoRecord {
+  id        String   @id @default(cuid())
+  model     String
+  recordId  String
+  createdAt DateTime @default(now())
+
+  @@unique([model, recordId])
+}
