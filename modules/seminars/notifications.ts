@@ -44,7 +44,7 @@ export async function notifyWindowOpened(windowId: string) {
           okno: ew.name,
           zacatek: formatDateTime(ew.startsAt),
           konec: formatDateTime(ew.endsAt),
-          odkaz: appUrl("/dashboard"),
+          odkaz: appUrl(`/zapisy/${ew.id}`),
         },
       }))
     );

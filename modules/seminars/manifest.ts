@@ -10,6 +10,8 @@ export const seminarsModule = {
     "seminars.windows.view": ["TEACHER", "ADMIN"],
     // Správa oken, bloků, výskytů a exporty
     "seminars.windows.manage": ["ADMIN"],
+    // Stránka Zápisy pro studenty a hosty (/zapisy): jen okna, která smí vidět (zveřejněná, ne koncept, určená jim)
+    "seminars.enroll.view": ["STUDENT", "GUEST"],
     // Zápis sebe sama
     "seminars.enroll.self": ["STUDENT", "TEACHER", "ADMIN"],
     // Zápis/odepsání jiných studentů
@@ -18,9 +20,12 @@ export const seminarsModule = {
     "seminars.enroll.anytime": ["ADMIN"],
   },
   nav: [
+    // Učitel a admin: přehled a správa oken; student a host: vlastní stránka Zápisy
     { label: "Zápisy", href: "/enrollments", permission: "seminars.windows.view", order: 10 },
+    { label: "Zápisy", href: "/zapisy", permission: "seminars.enroll.view", order: 10 },
   ],
   routes: [
+    { prefix: "/zapisy", permission: "seminars.enroll.view" },
     { prefix: "/enrollments/settings", permission: "seminars.windows.manage" },
     { prefix: "/enrollments", permission: "seminars.windows.view" },
   ],

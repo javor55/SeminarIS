@@ -29,8 +29,9 @@ function addBlockThree() {
   );
 }
 
-async function dashboard(p: Page) {
-  await p.goto("/dashboard");
+/** Student se zapisuje na stránce Zápisy (detail okna), dashboard má jen přehledové karty. */
+async function enrollPage(p: Page) {
+  await p.goto("/zapisy/" + WINDOW);
   await p.waitForLoadState("networkidle");
 }
 
@@ -43,8 +44,8 @@ test("publikum: třída + konkrétní student + výjimka (viditelnost, zápis po
   // stránky studentů se načtou, dokud je publikum prázdné (= všichni): potom je admin zúží
   const eva = await login(browser, "eva.studentova@skola.cz");
   const kamil = await login(browser, "kamil@skola.cz");
-  await dashboard(eva);
-  await dashboard(kamil);
+  await enrollPage(eva);
+  await enrollPage(kamil);
   check("before: everybody sees the window", (await hasWindow(eva)) && (await hasWindow(kamil)));
 
   const pa = await login(browser, "admin@skola.cz");
@@ -81,9 +82,9 @@ test("publikum: třída + konkrétní student + výjimka (viditelnost, zápis po
   const cenek = await login(browser, "cenek@skola.cz");
   check("class member sees the window", await hasWindow(jan));
   check("specific user sees the window", await hasWindow(cenek));
-  await dashboard(eva);
+  await enrollPage(eva);
   check("excluded class member does not see it", !(await hasWindow(eva)));
-  await dashboard(kamil);
+  await enrollPage(kamil);
   check("student of another class does not see it", !(await hasWindow(kamil)));
 
   // server odmítne zápis i ze zastaralé stránky (stránky Evy a Kamila se po změně nenačetly znovu)
@@ -91,8 +92,8 @@ test("publikum: třída + konkrétní student + výjimka (viditelnost, zápis po
   sql(`delete from "EnrollmentWindowAudience" where "windowId"='${WINDOW}'`);
   const evaStale = await login(browser, "eva.studentova@skola.cz");
   const kamilStale = await login(browser, "kamil@skola.cz");
-  await dashboard(evaStale);
-  await dashboard(kamilStale);
+  await enrollPage(evaStale);
+  await enrollPage(kamilStale);
   sql(`insert into "EnrollmentWindowAudience"(id,"windowId",type,"classGroupId",key) values ('a1','${WINDOW}','CLASS','${classId(3, "A")}','CLASS:${classId(3, "A")}'),('a2','${WINDOW}','CLASS','${classId(3, "B")}','CLASS:${classId(3, "B")}')`);
   sql(`insert into "EnrollmentWindowAudience"(id,"windowId",type,"userId",key) values ('a3','${WINDOW}','USER','cenek','USER:cenek'),('a4','${WINDOW}','EXCLUDE_USER','usr_stud2','EXCLUDE_USER:usr_stud2')`);
   await row(evaStale, "Základy IoT").getByTestId("enroll-button").click();
@@ -102,10 +103,10 @@ test("publikum: třída + konkrétní student + výjimka (viditelnost, zápis po
   check("nothing was enrolled for them", enrolled("kamil@skola.cz") === 0 && enrolled("eva.studentova@skola.cz") === 1);
 
   // zápis povolen členům publika
-  await dashboard(jan);
+  await enrollPage(jan);
   await row(jan, "Základy IoT").getByTestId("enroll-button").click();
   await toastText(jan);
-  await dashboard(cenek);
+  await enrollPage(cenek);
   await row(cenek, "Programování mikrokontrolérů").getByTestId("enroll-button").click();
   await toastText(cenek);
   check("members of the audience can enroll", enrolled("jan.student@skola.cz") === 2 && enrolled("cenek@skola.cz") === 1);
@@ -234,7 +235,7 @@ test("pravidla bloků: povinný/nepovinný, min a max zápisů, nezapsaní poč�
 
   // student: průběh v bloku, max 2 zápisy, třetí server odmítne
   const jan = await login(browser, "jan.student@skola.cz");
-  await dashboard(jan);
+  await enrollPage(jan);
   const progress = jan.locator("h2", { hasText: "Blok 3 – dva" }).locator('xpath=ancestor::div[contains(@class,"rounded-lg")][1]').getByTestId("block-progress");
   check("student sees block progress", (await progress.innerText()).includes("Zapsáno 0 z 2"));
   await row(jan, "Alfa").getByTestId("enroll-button").click();
@@ -246,7 +247,7 @@ test("pravidla bloků: povinný/nepovinný, min a max zápisů, nezapsaní poč�
   check("third enrollment refused by the block maximum", (await toastText(jan)).includes("nejvyšší povolený počet zápisů (2)"));
   check("still three", enrolled("jan.student@skola.cz") === 3);
   // v bloku s max 1 se zápis přepisuje jednou transakcí (původní zůstane, když nový selže)
-  await dashboard(jan);
+  await enrollPage(jan);
   sql(`update "SubjectOccurrence" set capacity=1 where id='occ_aj_b_b1'`);
   sql(`insert into "StudentEnrollment"(id,"studentId","subjectOccurrenceId","createdById","updatedAt") values ('blocker','usr_stud2','occ_aj_b_b1','usr_stud2',now())`);
   sql(`delete from "StudentEnrollment" where id='enroll_stud2_aj'`);
@@ -302,7 +303,7 @@ test("pravidla okna: zákaz odepsání, termín změn, viditelnost zapsaných, u
   // server vynucuje: zastaralá stránka studenta, který se ještě „může“ odepsat
   sql(`update "EnrollmentWindow" set "allowSelfUnenroll"=true, "changesUntil"=null, "resultsVisibility"='COUNTS' where id='${WINDOW}'`);
   const jan = await login(browser, "jan.student@skola.cz");
-  await dashboard(jan);
+  await enrollPage(jan);
   check("counts only: no participants button", (await jan.getByTestId("participants-button").count()) === 0);
   const janHtml = await jan.content();
   check("other students' ids are not sent to a student", !janHtml.includes("usr_stud2"), janHtml.slice(Math.max(0, janHtml.indexOf("usr_stud2") - 200), janHtml.indexOf("usr_stud2") + 100));
@@ -312,7 +313,7 @@ test("pravidla okna: zákaz odepsání, termín změn, viditelnost zapsaných, u
   await jan.getByRole("button", { name: "Odhlásit se" }).click();
   check("unenrolling refused by the server when disabled", (await toastText(jan)).includes("nemůžete odepsat ani přepsat"), await toastText(jan));
   check("enrollment kept", enrolled("jan.student@skola.cz") === 1);
-  await dashboard(jan);
+  await enrollPage(jan);
   check("button disabled with a reason after reload", await row(jan, "Programování mikrokontrolérů").getByTestId("unenroll-button").isDisabled());
   // přepsání v bloku s max 1 je také zakázáno (zápis zůstává)
   await jan.locator("tr", { hasText: "AJT/A" }).getByTestId("enroll-button").click();
@@ -320,7 +321,7 @@ test("pravidla okna: zákaz odepsání, termín změn, viditelnost zapsaných, u
 
   // termín změn uplynul: odepsání nejde, nový zápis do prázdného bloku ano
   sql(`update "EnrollmentWindow" set "allowSelfUnenroll"=true where id='${WINDOW}'`);
-  await dashboard(jan);
+  await enrollPage(jan);
   sql(`update "EnrollmentWindow" set "changesUntil"=now()-interval '10 minutes' where id='${WINDOW}'`);
   await row(jan, "Programování mikrokontrolérů").getByTestId("unenroll-button").click();
   await jan.getByRole("button", { name: "Odhlásit se" }).click();
@@ -331,7 +332,7 @@ test("pravidla okna: zákaz odepsání, termín změn, viditelnost zapsaných, u
 
   // viditelnost výsledků: jména
   sql(`update "EnrollmentWindow" set "resultsVisibility"='NAMES', "changesUntil"=null where id='${WINDOW}'`);
-  await dashboard(jan);
+  await enrollPage(jan);
   await jan.locator("tr", { hasText: "AJT/A" }).getByTestId("participants-button").click();
   await jan.waitForSelector("[data-testid=participants-dialog] [data-testid=participant]");
   const names = await jan.getByTestId("participants-dialog").innerText();
@@ -343,7 +344,7 @@ test("výskyt omezený na třídu: viditelnost, zápis, štítek předmětu, nez
   resetDb();
   const jan = await login(browser, "jan.student@skola.cz");
   const eva = await login(browser, "eva.studentova@skola.cz");
-  await dashboard(jan);
+  await enrollPage(jan);
 
   // admin omezí „Základy IoT“ na třídu 3.B přes dialog výskytu
   const pa = await login(browser, "admin@skola.cz");
@@ -364,9 +365,9 @@ test("výskyt omezený na třídu: viditelnost, zápis, štítek předmětu, nez
   check("student of another class refused by the server", (await toastText(jan)).includes("není určen pro váš ročník nebo třídu"), await toastText(jan));
   check("not enrolled", enrolled("jan.student@skola.cz") === 1);
   // po obnovení Jan předmět ani blok nevidí, Eva (3.B) ano
-  await dashboard(jan);
+  await enrollPage(jan);
   check("student of another class does not see the occurrence or its block", !(await jan.content()).includes("Základy IoT") && !(await jan.content()).includes("Blok 2 – volitelné"));
-  await dashboard(eva);
+  await enrollPage(eva);
   check("student of the class sees it", (await eva.content()).includes("Základy IoT"));
   await row(eva, "Základy IoT").getByTestId("enroll-button").click();
   await toastText(eva);
@@ -421,8 +422,8 @@ test("souběh: dva studenti zároveň na poslední místo – zapíše se jen je
   sql(`update "SubjectOccurrence" set capacity=1 where id='occ_iot_b2'`);
   const jan = await login(browser, "jan.student@skola.cz");
   const eva = await login(browser, "eva.studentova@skola.cz");
-  await dashboard(jan);
-  await dashboard(eva);
+  await enrollPage(jan);
+  await enrollPage(eva);
   await Promise.all([row(jan, "Základy IoT").getByTestId("enroll-button").click(), row(eva, "Základy IoT").getByTestId("enroll-button").click()]);
   const [t1, t2] = await Promise.all([toastText(jan), toastText(eva)]);
   check("exactly one enrollment on the last seat", sql(`select count(*) from "StudentEnrollment" where "subjectOccurrenceId"='occ_iot_b2'`) === "1", `${t1} | ${t2}`);

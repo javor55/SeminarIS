@@ -19,7 +19,8 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F5 Konfigurovatelné zápisy (publikum, pravidla bloků) (PR #10)
 - [x] F6 Importy s náhledem (uživatelé, úvazky) (PR #11)
 - [x] F7 Učitel v administraci, vypínač hromadného e-mailu, jednotné UI, úklid lintu (PR #12)
-- [ ] F8 Dashboard jako přehled (karty z modulů) a stránka Zápisy pro studenty
+- [x] F8 Dashboard jako přehled (karty z modulů) a stránka Zápisy pro studenty
+- [ ] F9 Ukázková data (naplnit / smazat) pro prezentaci
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,
@@ -209,3 +210,37 @@ vlastní práce na stránkách modulů.
 - Odstranit `getDashboardWidget` a staré komponenty dashboardu, aktualizovat dokumentaci,
   kontraktový test (nové cesty) a E2E (student se zapisuje na stránce Zápisy, karty podle
   rolí, karta zmizí po vypnutí modulu, skrytý / nepřístupný zápis se nikde neukáže).
+
+## F9 Ukázková data pro prezentaci
+Administrace → nová sekce „Ukázková data“ (jen ADMIN): **Naplnit ukázkovými daty** a **Smazat
+ukázková data**. Smí se smazat jen to, co ukázková data vytvořila; skutečná data zůstanou.
+
+- **Evidence:** nová tabulka (např. `DemoRecord { model, recordId, createdAt }`, unikátní dvojice)
+  – každý vytvořený záznam se do ní zapíše ve stejné transakci. Mazání jde podle evidence
+  (v pořadí opačném k závislostem, moduly nejdřív, jádro nakonec); co skutečný uživatel
+  vytvořil nad ukázkovými daty (např. zápis skutečného studenta do ukázkového okna), smaže
+  kaskáda nebo modul – nikdy nic, co není v evidenci nebo na ní nezávisí.
+- **Bod rozšíření:** `ModuleServer.demoData?: { seed(tx, ctx), clear(tx, ctx) }`, kde `ctx`
+  nese evidenci (`track(model, id)`), referenční data z jádra (třídy, učitelé, studenti,
+  předměty) a deterministický generátor (stejný seed = stejná data). Jádro volá zapnuté
+  moduly; vypnutý modul se přeskočí (a při mazání se smaže podle evidence i tak).
+- **Obsah (realistický, česky):**
+  - jádro: aktuální školní rok; třídy 1.A–4.C (existující třídy použít, nové evidovat),
+    ~20 studentů na třídu s českými jmény, ~15 učitelů, 3–5 hostů čekajících na schválení
+    (s žádostí o třídu), předměty s ročníky (povinné i semináře pro 4. ročník), úvazky
+    podle ročníků;
+  - Semináře: jedno otevřené okno pro 4. ročník (publikum), 2–3 bloky s výskyty, kapacitami
+    a vyučujícími, část studentů zapsaná (aby byli i nezapsaní), jedno uzavřené starší okno;
+  - Dopisování: termíny na příští 2 týdny (různí dozoři, učebny, předměty), zápisy studentů
+    s poznámkami, jeden proběhlý termín s docházkou.
+- **Bezpečnost:** e-maily `…@ukazka.invalid` (nic neodejde; e-mailová vrstva doménu `.invalid`
+  vždy přeskočí), během naplnění se nevolají žádné e-mailové události, společné heslo
+  ukázkových účtů zobrazené v sekci (bcrypt), akce jen pro admina s potvrzením (napsat
+  „UKÁZKA“ / „SMAZAT“), audit, nelze naplnit podruhé, dokud ukázková data existují,
+  transakce (timeout dle potřeby), náhled jako uživatel = jen čtení.
+- **UI sekce:** stav (jsou/nejsou ukázková data, počty podle druhu), heslo ukázkových účtů,
+  tip „Zobrazit jako“ s odkazy na pár ukázkových účtů (student 4. ročníku, učitel, host).
+- **Testy:** E2E naplnit → počty a stránky (dashboard studenta/učitele, zápis, dopisování,
+  ke schválení) → smazat → zůstanou jen původní data (seed), skutečný záznam vytvořený
+  nad ukázkovými daty se neztratí, pokud na nich nezávisí; druhé naplnění zablokováno;
+  učitel sekci nevidí.

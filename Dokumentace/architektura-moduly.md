@@ -15,7 +15,8 @@ modules/
   server-registry.ts    serverové části modulů                           ← jen server
   core/                 jádro: uživatelé, třídy, předměty, profil, administrace
     manifest.ts
-    server.tsx          dashboard (výzva k výběru třídy, čekající účty), statistiky do administrace
+    server.tsx          karta dashboardu (výzva k výběru třídy), statistiky do administrace
+    dashboard-cards.tsx karty jádra poskládané z bodů rozšíření všech modulů (Co udělat, Statistiky) + sběr karet modulů
     extensions.ts       sběr bodů rozšíření ze zapnutých modulů (collectSubjectTabs, collectAdminTodos, collectAdminSections, …)
     settings.ts         tenké obálky nad registrem nastavení (registrace, výchozí role, výběr třídy)
     admin-todos.ts      položky přehledu „co udělat“ patřící jádru; system-status.ts stav DB, migrací, cronu, e-mailu
@@ -32,7 +33,9 @@ modules/
                         ModulesForm, školní rok a třídy, uzavření roku, upozornění, historie)
   seminars/             zápisová okna a zápis studentů do předmětů (semináře)
     manifest.ts
-    server.tsx          widget na dashboard, statistiky, úklid při mazání uživatele
+    server.tsx          body rozšíření (karty dashboardu, štítky, záložky, todo), statistiky, úklid při mazání uživatele
+    dashboard-cards.tsx karty dashboardu: student (Zápis seminářů), učitel (moje semináře v zápisu), admin (průběh zápisů)
+    student-windows.ts  JEDINÉ místo, které vybírá okna pro studenta/hosta (stránka Zápisy i karty): viditelná, ne koncept, publikum, průběh
     window-status.ts    synchronizace stavu zápisového okna s časem
     audience.ts         publikum okna a omezení výskytu: typy a čistá logika (isInAudience), bez DB; audience-view.ts popisky pro UI
     eligibility.ts      JEDINÝ zdroj pravdy o způsobilosti: audienceWhere, viditelnost oken a výskytů, zápis publika
@@ -45,6 +48,7 @@ modules/
     subject-windows.ts  „v zápisu“: ve kterých oknech je předmět nabízen (podklad pro štítky předmětů)
   makeup/               dopisování písemek (termíny, zápisy, docházka)
     manifest.ts, server.tsx, data.ts (interní dotazy), types.ts, notifications.ts (e-maily a denní úloha)
+    dashboard-cards.tsx karty dashboardu: student (moje zápisy, volné termíny), učitel (dozory, kdo u mě dopisuje), admin (dnes a zítra)
     actions/            sessions.ts (dozor), registrations.ts (student)
     components/
     actions/            subjects.ts, windows.ts, enrollment.ts
@@ -157,7 +161,7 @@ Jeden model `Subject` pro všechno (dřív zvlášť `Seminar` a `Subject`). Ž�
   (`setStudentClass`, důvod „zařazen“), smazání žádosti. V menu u řádku **Schválit jako učitele**
   a **Zamítnout** (deaktivuje účet a smaže žádost; trvalé smazání je ve správě uživatelů).
   Zaškrtnuté řádky lze schválit hromadně (`approveUsers`, každý do své třídy, vše nebo nic).
-- Dashboard admina ukazuje, kolik účtů čeká na schválení.
+- Na dashboardu admina je v kartě **Co udělat** položka „Účty čekající na schválení“ (počet, odkaz na záložku).
 
 ### Úvazky
 
@@ -407,7 +411,7 @@ Migrace převedla dosavadní `targetGrades` na položky `GRADE` a sloupec zruši
 **Jediný zdroj pravdy** je `modules/seminars/eligibility.ts` (čistá logika bez DB v `audience.ts`):
 `isInAudience(položky, student)`, `audienceWhere(položky)` (stejná logika jako Prisma podmínka na uživatele),
 `windowsForViewerWhere` / `occurrencesForViewerWhere` (co smí vidět konkrétní student), `isStudentInWindowAudience`.
-Používá je viditelnost oken (dashboard, seznam, detail), kontrola při zápisu, seznam nezapsaných, exporty, e-mailové odhady,
+Používá je viditelnost oken (stránka Zápisy, karty dashboardu, seznam, detail), kontrola při zápisu, seznam nezapsaných, exporty, e-mailové odhady,
 připomínky i „zápis otevřen“, štítky „v zápisu“ u předmětů a panel výskytů. Nikde jinde se způsobilost nepočítá.
 
 - **Formulář okna** (`AudiencePicker`): ročníky, třídy, hledání studentů (jmenovitě a „kromě“), živý počet a seznam
@@ -422,7 +426,7 @@ připomínky i „zápis otevřen“, štítky „v zápisu“ u předmětů a p
 
 ### Pravidla bloků (`Block`)
 
-- `required`: povinný blok (výchozí). **Nezapsaní** (záložka, dashboard, připomínky, přehled „co udělat“) se počítají
+- `required`: povinný blok (výchozí). **Nezapsaní** (záložka, karty dashboardu, připomínky, přehled „co udělat“) se počítají
   jen z povinných bloků.
 - `minEnrollments` / `maxEnrollments` (výchozí 1 / 1): kolik různých výskytů bloku si student vybere. Povinný blok má
   minimum alespoň 1. Server nedovolí zapsat víc, než je maximum; maximum nejde snížit pod počet zápisů, které studenti
@@ -439,7 +443,7 @@ připomínky i „zápis otevřen“, štítky „v zápisu“ u předmětů a p
 - `allowSelfUnenroll` (výchozí ano): smí se student sám odepsat **a přepsat** zápis. Učitel a admin mohou vždy.
 - `changesUntil` (null = konec okna): student může měnit (odepsat, přepsat) nejpozději do tohoto času; musí ležet mezi
   začátkem a koncem okna. Nový zápis do bloku, kde student zápis nemá, je možný do konce okna.
-- `resultsVisibility`: `COUNTS` (výchozí, studenti vidí jen obsazenost) nebo `NAMES` (studenti si v dashboardu otevřou
+- `resultsVisibility`: `COUNTS` (výchozí, studenti vidí jen obsazenost) nebo `NAMES` (studenti si na stránce Zápisy otevřou
   seznam jmen zapsaných na výskytu, bez e-mailů; `getOccurrenceParticipants`). Studentovi se do prohlížeče neposílají
   cizí zápisy ani při `COUNTS` (jen jeho vlastní a počty).
 - Všechny změny a zápisy jdou do historie (`seminars.enrollment.*`, `seminars.window.*`, `seminars.block.*`,
@@ -456,7 +460,51 @@ výskyty (kapacita, vyučující, omezení), publikem a pravidly okna; bez zápi
 Aktivní studenti z publika okna, kterým chybí zápisy v povinných blocích (viz Pravidla bloků); u každého jsou vidět
 chybějící bloky (u bloků s víc zápisy „zapsáno 1 z 2“). Filtr třídy a export CSV. Tlačítko **Poslat
 připomínku nezapsaným (N e-mailů)** (s potvrzením, jen admin) pošle e-maily a zapíše souhrn do historie.
-Na dashboardu admina a učitele je u otevřeného okna počet nezapsaných.
+Na dashboardu je počet nezapsaných v kartách učitele („Moje semináře v zápisu“) a admina („Průběh otevřených zápisů“).
+
+## Dashboard a stránka Zápisy pro studenty (F8)
+
+**Dashboard (`/dashboard`) je jen přehled s kartami**; vlastní práce probíhá na stránkách modulů. Moduly dodávají
+karty bodem rozšíření `getDashboardCards(user)` (typ `DashboardCard` v `modules/server-types.ts`), jádro je sbírá jen
+ze zapnutých modulů (`collectDashboardCards`, chyba modulu jeho karty vynechá) a stránka je vykreslí v mřížce
+(`DashboardGrid`; mobil pod sebou, `size` sm / md / lg = třetina / polovina / celá šířka). Karta má nadpis, volitelný
+odkaz na stránku modulu a obsah, který si modul připraví podle oprávnění uživatele. `modules/core/dashboard-cards.tsx`
+přidává dvě karty jádra poskládané z bodů rozšíření všech modulů, takže zmizí s modulem, který je dodával:
+**Co udělat** (`collectAdminTodos`: učitel jen své položky, admin vše, zkrácené na 6 s odkazem do administrace) a
+**Statistiky** (`collectAdminStats`, jen admin). Bez karet se ukáže pozdrav a prázdný stav. Karty (`data-card`):
+
+| Role | Karta | Obsah |
+| --- | --- | --- |
+| Student, host | `seminars.windows` | otevřená / blížící se okna (stav, do kdy, chybějící povinné bloky, „Zapsat se“ / „Upravit zápis“ / „Zobrazit“ → `/zapisy/[id]`); když nic neběží, zapsané semináře z posledního uzavřeného okna |
+| Student | `makeup.student` | nadcházející zápisy (termín, učebna, předměty, uzávěrka změn) a počet volných termínů |
+| Host | `core.class-request` | výzva „Vyberte svou třídu“ (při zapnutém výběru třídy) |
+| Učitel, admin | `seminars.my-occurrences` | semináře, které vedu v otevřených / blížících se oknech: obsazenost a počet nezapsaných v okně |
+| Učitel, admin | `makeup.supervision`, `makeup.who-writes` | moje nadcházející dozory (zapsáno / kapacita); kdo dopisuje písemky mých předmětů |
+| Učitel, admin | `core.todos` | položky „co udělat“, které se týkají uživatele |
+| Admin | `seminars.progress` | průběh otevřených zápisů (hotovo / nezapsaní) s odkazem na detail okna |
+| Admin | `makeup.today` | termíny dopisování dnes a zítra |
+| Admin | `core.stats` | statistiky modulů |
+
+Dotazy karet jsou hromadné (jeden `findMany` na kartu); jediná smyčka je výpočet nezapsaných pro otevřená okna
+(`computeUnenrolled`), kterých je zpravidla málo.
+
+### Stránka Zápisy (`/zapisy`, `/zapisy/[id]`)
+
+Student a host mají v menu **Zápisy** (oprávnění `seminars.enroll.view` = STUDENT, GUEST; cesta `/zapisy` v manifestu
+Semináří). Učitel a admin ji nemají (middleware je přesměruje na dashboard) a dál používají `/enrollments`
+(`seminars.windows.view`); naopak student se do `/enrollments` nedostane. Zápis do okna je stále chráněn
+`seminars.enroll.self` (host jen čte).
+
+- **Seznam** (`listStudentWindows`, `modules/seminars/student-windows.ts`) je jediné místo, které vybírá okna pro
+  studenta: jen `visibleToStudents`, ne koncept, jen okna s publikem zahrnujícím studenta (`windowsForViewerWhere`)
+  a výskyty zúžené na jeho ročník / třídu (`occurrencesForViewerWhere`). Řadí otevřená (podle konce), naplánovaná,
+  uzavřená; u každého okna stav, termíny, zapsané předměty a **chybějící povinné bloky** (`missingBlocksFor` z
+  `unenrolled.ts` – stejná logika jako seznam nezapsaných). Okna, bloky, výskyty i moje zápisy načte jeden dotaz.
+- **Detail** `/zapisy/[id]` používá dnešní zápisové UI (`EnrollmentView`: zapsat, odepsat, přepsat). Data dává
+  `getEnrollmentWindowByIdWithBlocks`, která skryté okno, koncept i okno mimo publikum vrátí jako „nenalezeno“ –
+  rozhoduje server, ne UI; zápis, odepsání a přepsání navíc vynucují stejná pravidla v transakci (viz Zápisy).
+- Štítek „v zápisu“ u předmětů vede studentovi na `/zapisy/[id]`, e-maily „zápis otevřen“ a připomínka nezapsaným
+  na detail okna ve `/zapisy`.
 
 ## Historie změn (Administrace → Historie, `/admin/history`)
 
@@ -523,7 +571,7 @@ klient i server:
 
 `modules/<id>/server.ts(x)` implementuje `ModuleServer`. Všechny části jsou volitelné:
 
-- `getDashboardWidget(user)` vrací obsah na dashboard, nebo `null`,
+- `getDashboardCards(user)` vrací karty dashboardu pro uživatele (viz Dashboard a stránka Zápisy),
 - `getAdminStats()` vrací karty se statistikami v administraci,
 - `onUserDelete(tx, userId, replacementUserId)` uklidí data modulu v transakci před
   trvalým smazáním uživatele. Běží i u vypnutého modulu.
@@ -547,11 +595,12 @@ vynechají, stránka jádra se neshodí. Id záložek, štítků a položek jád
 | `getUserTabs(userId, viewer)` | `collectUserTabs` | záložky detailu uživatele `/users/[id]` (`?tab=<modul>.<id>`), jádro má 0–99, moduly 100+ |
 | `getAdminTodos(user)` | `collectAdminTodos` | přehled „co udělat“ v administraci (F2) |
 | `bulkUserActions` | `collectBulkUserActions` | hromadné akce v seznamu uživatelů (parametry, náhled dopadu, jedna transakce, audit) |
-| `getAdminStats()` | `collectAdminStats` | krátké statistiky pod přehledem v administraci |
+| `getAdminStats()` | `collectAdminStats` | krátké statistiky pod přehledem v administraci a na dashboardu admina |
+| `getDashboardCards(user)` | `collectDashboardCards` | karty dashboardu (`{ id, title, order, size?, content, href?, linkLabel? }`), id prefixované id modulu |
 | `adminSections` (v manifestu) | `collectAdminSections` | boční menu administrace (jádro i moduly, podle oprávnění) |
 | `settings` (v manifestu) | registr nastavení | deklarace nastavení modulu |
 
-Zapojené jsou `getSubjectTabs`, `getSubjectBadges`, `getSubjectUsage`, `getMySubjectsSections` (Semináře
+Zapojené jsou `getDashboardCards` (jádro, Semináře, Dopisování), `getSubjectTabs`, `getSubjectBadges`, `getSubjectUsage`, `getMySubjectsSections` (Semináře
 i Dopisování), `getAdminTodos` (jádro, Semináře, Dopisování), `getAdminStats`,
 `adminSections` a `settings`. `getUserTabs` dodávají Semináře (Zápisy) a Dopisování, `bulkUserActions` jádro
 (viz Seznam a detail uživatele) i Semináře („Přidat do publika zápisu“, „Odebrat z publika zápisu“).
@@ -562,7 +611,7 @@ ESLint (`no-restricted-imports` v `.eslintrc.json`, chyba při `npm run lint`):
 
 - `modules/core/**`, `lib/**`, `components/**` a stránky jádra (`app/**` kromě složek modulů)
   nesmějí importovat `@/modules/seminars/**` ani `@/modules/makeup/**`,
-- `modules/seminars/**` (a `app/enrollments/**`) nesmí importovat `modules/makeup` a naopak,
+- `modules/seminars/**` (a `app/enrollments/**`, `app/zapisy/**`) nesmí importovat `modules/makeup` a naopak,
 - jediná výjimka: `modules/registry.ts` a `modules/server-registry.ts`.
 
 Co moduly sdílejí, patří do jádra; co jádro potřebuje od modulů, jde přes body rozšíření.
@@ -661,7 +710,7 @@ Administrace → **Moduly**. Vypnutý modul:
 - zmizí z menu (seznam zapnutých modulů je v session, `useAuth().enabledModules`) i z menu administrace,
 - má stránky vracející 404 (layout volá `ensureModulePage("<id>")`),
 - má server actions, které vyhodí chybu (`requirePermission` / `requireModule`),
-- nepřispívá na dashboard ani do statistik.
+- nepřispívá kartami na dashboard ani do statistik.
 
 Data zůstávají v databázi.
 
@@ -687,7 +736,7 @@ Dál ručně:
    `requirePermission(...)`.
 4. Stránky do `app/<cesta>/` (každá složka cest modulu má `layout.tsx` s `ensureModulePage("<id>")`
    a `export const dynamic = "force-dynamic"`).
-5. V `server.tsx` implementovat potřebné body rozšíření (widget, statistiky, `onUserDelete` pro tabulky
+5. V `server.tsx` implementovat potřebné body rozšíření (karty dashboardu, statistiky, `onUserDelete` pro tabulky
    odkazující na uživatele, `getSubjectTabs` / `getSubjectBadges` / `getSubjectUsage` / `getMySubjectsSections`, `getAdminTodos`, …).
 6. Časy zobrazovat přes `lib/datetime.ts` (pásmo Europe/Prague). Server na Vercelu běží v UTC.
 7. Modul nesmí importovat jiný modul ani ho jádro (ESLint to hlídá); sdílené věci do jádra.

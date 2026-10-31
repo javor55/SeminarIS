@@ -166,6 +166,16 @@ for (const m of manifests) {
   }
 }
 
+// Zrušený bod rozšíření: dashboard skládají karty (getDashboardCards), ne widgety
+for (const dir of manifestDirs) {
+  for (const file of ["server.tsx", "server.ts"]) {
+    const full = path.join(root, "modules", dir, file);
+    if (fs.existsSync(full) && fs.readFileSync(full, "utf8").includes("getDashboardWidget")) {
+      fail(`modules/${dir}/${file}: getDashboardWidget už neexistuje, použijte getDashboardCards.`);
+    }
+  }
+}
+
 if (errors.length > 0) {
   console.error(`Kontraktový test modulů selhal (${errors.length}):\n` + errors.map((e) => `  - ${e}`).join("\n"));
   process.exit(1);
