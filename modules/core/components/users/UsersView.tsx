@@ -20,7 +20,7 @@ import { exportUsersCsv } from "@/modules/core/actions/user-bulk";
 import { BULK_MAX, type BulkActionDescriptor, type BulkSelection } from "@/modules/core/bulk-runner-types";
 import { BulkActionDialog } from "@/modules/core/components/users/BulkActionDialog";
 import { ApprovalsTab } from "@/modules/core/components/users/ApprovalsTab";
-import { ImportUsersDialog } from "@/modules/core/components/users/ImportUsersDialog";
+import { ImportUsersDialog } from "@/modules/core/components/import/ImportDialogs";
 import { ActiveCell, RoleCell } from "@/modules/core/components/users/users-cells";
 import { ImpersonateButton } from "@/modules/core/components/users/ImpersonateButton";
 import {
@@ -51,7 +51,6 @@ type Props = {
 export function UsersView({ tab, query, list, approvals, classes, counts, actions, currentUser }: Props) {
   const canManage = can(currentUser.role, "core.users.manage");
   const [showImport, setShowImport] = React.useState(false);
-  const router = useRouter();
 
   return (
     <div className="space-y-6">
@@ -92,7 +91,7 @@ export function UsersView({ tab, query, list, approvals, classes, counts, action
         )}
       </div>
 
-      <ImportUsersDialog open={showImport} onOpenChange={setShowImport} onSuccess={() => router.refresh()} />
+      <ImportUsersDialog open={showImport} onOpenChange={setShowImport} />
 
       {tab === "approvals" && canManage && approvals && <ApprovalsTab users={approvals} classes={classes} />}
       {tab === "users" && list && (

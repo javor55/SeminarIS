@@ -8,16 +8,14 @@ import { revalidatePath } from "next/cache";
 import { requireAuth, requirePermission } from "@/lib/session";
 import { can } from "@/modules/registry";
 import { MODULE_SERVERS } from "@/modules/server-registry";
-import { ensureCurrentSchoolYear, findOrCreateClass, setStudentClass } from "@/modules/core/school";
+import { ensureCurrentSchoolYear, setStudentClass } from "@/modules/core/school";
 import { audit } from "@/lib/audit";
 import {
   classLabel as formatClassLabel,
-  parseClassLabel,
   schoolYearLabel,
   studyStatusLabel,
   ROLE_LABELS,
   STUDY_END_REASON_LABELS,
-  DEFAULT_STUDY_YEARS,
   type StudyEndReasonValue,
 } from "@/lib/school";
 
@@ -51,120 +49,6 @@ export async function getUsersForFilters(): Promise<User[]> {
     orderBy: { lastName: 'asc' }
   });
   return users;
-}
-
-// Hromadný import uživatelů
-export async function importUsers(data: Array<{ 
-  firstName?: string, 
-  lastName?: string, 
-  email: string, 
-  // Třída v aktuálním školním roce, např. "3.A" (prázdné = beze změny)
-  class?: string,
-  role?: string, 
-  isActive?: boolean | string | number, 
-  password?: string 
-}>) {
-  return safeAction(async () => {
-    try {
-      const admin = await requirePermission("core.users.manage");
-      let created = 0;
-      let updated = 0;
-      let errors = 0;
-      // Popis chyb pro admina (první desítky řádků)
-      const messages: string[] = [];
-      const schoolYear = await ensureCurrentSchoolYear();
-
-      for (const [index, row] of data.entries()) {
-        // +2: číslování od 1 a řádek s hlavičkou
-        const line = index + 2;
-        try {
-          const email = row.email?.toLowerCase().trim();
-          if (!email) {
-            errors++;
-            messages.push(`Řádek ${line}: chybí e-mail.`);
-            continue;
-          }
-
-          // Třída "3.A" → záznam ClassGroup (založí se, pokud ještě neexistuje)
-          let classGroupId: string | undefined;
-          const classText = row.class?.trim();
-          if (classText) {
-            const parsed = parseClassLabel(classText);
-            if (!parsed || parsed.grade > DEFAULT_STUDY_YEARS) {
-              errors++;
-              messages.push(`Řádek ${line} (${email}): neplatná třída „${classText}“, očekává se např. 3.A.`);
-              continue;
-            }
-            classGroupId = (await findOrCreateClass(parsed.grade, parsed.letter)).id;
-          }
-
-          const existing = await prisma.user.findUnique({ where: { email } });
-        
-          let isActiveValue = true;
-          if (typeof row.isActive === "boolean") {
-            isActiveValue = row.isActive;
-          } else if (typeof row.isActive === "string") {
-            isActiveValue = row.isActive.toUpperCase() === "TRUE" || row.isActive === "1";
-          } else if (typeof row.isActive === "number") {
-            isActiveValue = row.isActive === 1;
-          }
-
-          const payload = {
-            firstName: row.firstName || "",
-            lastName: row.lastName || "",
-            role: parseRole(row.role, "STUDENT"),
-            isActive: isActiveValue,
-          };
-
-          const passwordHash = row.password ? await bcrypt.hash(row.password, 10) : undefined;
-
-          let userId: string;
-          if (existing) {
-            await prisma.user.update({
-              where: { id: existing.id },
-              data: { 
-                ...payload,
-                ...(passwordHash ? { passwordHash } : {})
-              }
-            });
-            userId = existing.id;
-            updated++;
-          } else {
-            const createdUser = await prisma.user.create({
-              data: {
-                ...payload,
-                email,
-                passwordHash: passwordHash || await bcrypt.hash(Math.random().toString(36), 10),
-              }
-            });
-            userId = createdUser.id;
-            created++;
-          }
-          if (classGroupId) {
-            await setStudentClass(prisma, { userId, classGroupId, schoolYear });
-          }
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.error("Chyba při importu řádku:", e);
-          errors++;
-          messages.push(`Řádek ${line}: ${(e as Error).message || "neznámá chyba"}`);
-        }
-      }
-
-      // Import se do historie zapisuje souhrnně (jednotlivé řádky by ji zahltily)
-      await audit(prisma, admin, {
-        action: "users.import",
-        entityType: "user",
-        summary: `Import uživatelů: ${created} nových, ${updated} upravených, ${errors} chyb (řádků celkem ${data.length})`,
-        data: { created, updated, errors, rows: data.length },
-      });
-      revalidatePath("/users");
-      return { created, updated, errors, messages: messages.slice(0, 20) };
-    } catch (err: unknown) {
-      const error = err as Error;
-      throw new Error(error.message || "Import se nezdařil.");
-    }
-  });
 }
 
 // Rozšířené získání uživatelů vcetne historie tříd a zapisů (seminářů – zatím vazba jádra na modul seminars)
