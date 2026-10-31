@@ -18,7 +18,8 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F4 Předměty napříč moduly (PR #9)
 - [x] F5 Konfigurovatelné zápisy (publikum, pravidla bloků) (PR #10)
 - [x] F6 Importy s náhledem (uživatelé, úvazky) (PR #11)
-- [x] F7 Učitel v administraci, vypínač hromadného e-mailu, jednotné UI, úklid lintu
+- [x] F7 Učitel v administraci, vypínač hromadného e-mailu, jednotné UI, úklid lintu (PR #12)
+- [ ] F8 Dashboard jako přehled (karty z modulů) a stránka Zápisy pro studenty
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,
@@ -175,3 +176,36 @@ Zápisy se dnes cílí jen na ročníky (`EnrollmentWindow.targetGrades`). Nově
 - **Úklid lintu:** `npm run lint` ať pokrývá celý repozitář včetně `e2e/` a `scripts/`
   (`next lint --dir .` nebo `eslint .`), opravit všechny chyby (nepoužité importy
   a proměnné v E2E) a ideálně i varování.
+
+## F8 Dashboard jako přehled a stránka Zápisy pro studenty
+Dnes modul Semináře vykresluje na dashboard celou tabulku zápisu a student se zapisuje
+právě tam, kdežto dopisování je jinde. Cíl: dashboard = **přehled s kartami** pro každou roli,
+vlastní práce na stránkách modulů.
+
+- **Bod rozšíření:** místo `getDashboardWidget` nový `getDashboardCards(user)` →
+  `{ id, title, order, size?: "sm"|"md"|"lg", content, href?, linkLabel? }[]` (sběr v
+  `modules/core/extensions.ts`, jen zapnuté moduly, chyba modulu kartu vynechá). Stránka
+  `/dashboard` vykreslí mřížku karet (mobil: pod sebou), pozdrav v `PageHeader`, prázdný stav.
+- **Stránka Zápisy pro studenty:** student (a host podle dnešních pravidel) dostane položku menu
+  „Zápisy“ a stránku se seznamem jemu viditelných oken (stav, termíny, co má hotovo / co
+  chybí v povinných blocích) a detailem okna, kde se zapisuje, odepisuje a přepisuje (přesunout
+  sem dnešní zápisové UI z dashboardu; učitel/admin dál používají `/enrollments`). Oprávnění
+  a cesty upravit tak, aby student viděl jen okna, která smí (stejné filtry jako dnes:
+  `visibleToStudents`, ne koncept, publikum).
+- **Student – karty:**
+  - Semináře: otevřená / blížící se okna – stav, do kdy, kolik povinných bloků chybí, tlačítko
+    „Zapsat se“ / „Upravit zápis“ → stránka Zápisy; po uzavření jeho zapsané semináře.
+  - Dopisování: moje nadcházející zápisy (datum, učebna, předměty, uzávěrka změn), počet
+    volných termínů, odkaz na Dopisování.
+  - Jádro: výzva „Vyberte svou třídu“ (host), případně další upozornění.
+- **Učitel – karty:**
+  - Dopisování: moje nadcházející dozory (datum, učebna, zapsáno/kapacita), kdo u mě
+    dopisuje (nadcházející zápisy na předměty, které učím).
+  - Semináře: moje výskyty v otevřených/blížících se oknech s obsazeností a počtem nezapsaných
+    v okně (průběh zápisu), odkaz na detail okna.
+  - Jádro: položky přehledu „co udělat“, které se ho týkají (z `getAdminTodos`).
+- **Admin – karty:** „co udělat“ (zkrácený přehled s odkazem do administrace), průběh
+  otevřených zápisů (zapsáno / nezapsaní), dnešní a zítřejší termíny dopisování, statistiky.
+- Odstranit `getDashboardWidget` a staré komponenty dashboardu, aktualizovat dokumentaci,
+  kontraktový test (nové cesty) a E2E (student se zapisuje na stránce Zápisy, karty podle
+  rolí, karta zmizí po vypnutí modulu, skrytý / nepřístupný zápis se nikde neukáže).

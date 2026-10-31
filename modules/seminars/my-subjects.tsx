@@ -1,5 +1,7 @@
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getViewerContext, windowsForViewerWhere } from "@/modules/seminars/eligibility";
 import type { User } from "@/lib/types";
 import type { MySubjectsSection } from "@/modules/server-types";
 import { can } from "@/modules/registry";
@@ -38,10 +40,14 @@ async function TeacherSection({ user }: { user: User }) {
   );
 }
 
-/** Student: semináře, na které je zapsaný. */
+/** Student: semináře, na které je zapsaný – jen ze zápisů, které smí vidět (viditelné, ne koncept, je v publiku). */
 async function StudentSection({ user }: { user: User }) {
+  const ctx = await getViewerContext(user);
+  const enrollmentWindow: Prisma.EnrollmentWindowWhereInput = ctx
+    ? { visibleToStudents: true, status: { not: "DRAFT" }, ...windowsForViewerWhere(ctx) }
+    : {};
   const enrollments = await prisma.studentEnrollment.findMany({
-    where: { studentId: user.id, deletedAt: null, subjectOccurrence: { deletedAt: null, block: { deletedAt: null } } },
+    where: { studentId: user.id, deletedAt: null, subjectOccurrence: { deletedAt: null, block: { deletedAt: null, enrollmentWindow } } },
     include: {
       subjectOccurrence: {
         include: {
