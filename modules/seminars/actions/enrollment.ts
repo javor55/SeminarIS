@@ -66,8 +66,9 @@ async function enrollInTx(tx: TxClient, user: User, studentId: string, subjectOc
   // 1. Okno musí být otevřené (admin smí zapisovat kdykoli)
   if (!can(user.role, "seminars.enroll.anytime")) await assertWindowOpen(ew);
 
-  // 2. Okno i výskyt musí být určeny tomuto studentovi (učitel/admin může zapsat kohokoliv)
+  // 2. Okno musí být pro studenty zveřejněné a okno i výskyt určeny tomuto studentovi (učitel/admin může zapsat kohokoliv)
   if (!privileged) {
+    if (!ew.visibleToStudents) throw new Error("Tento zápis není pro studenty zveřejněn.");
     if (!(await isStudentInWindowAudience(ew.id, studentId, tx))) throw new Error("Tento zápis pro vás není určen.");
     if (!isInOccurrenceAudience(occ, await getStudentAudienceInfo(studentId, tx))) {
       throw new Error("Tento předmět není určen pro váš ročník nebo třídu.");
@@ -137,7 +138,9 @@ async function unenrollInTx(tx: TxClient, user: User, enrollmentId: string) {
   const occ = enrollment.subjectOccurrence;
   const ew = occ.block.enrollmentWindow;
   if (!canManageOthers) {
-    // Okno musí být otevřené, student se smí odepsat a nesmí uplynout termín změn
+    // Okno musí být zveřejněné a určené studentovi, otevřené, student se smí odepsat a nesmí uplynout termín změn
+    if (!ew.visibleToStudents) throw new Error("Tento zápis není pro studenty zveřejněn.");
+    if (!(await isStudentInWindowAudience(ew.id, enrollment.studentId, tx))) throw new Error("Tento zápis pro vás není určen.");
     const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
     await syncEnrollmentWindowStatus(ew);
     if (computed.is === "closed") throw new Error("Zápis je uzavřen – odepsání již není možné.");
