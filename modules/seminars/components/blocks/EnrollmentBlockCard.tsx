@@ -29,10 +29,13 @@ import {
 
 import { EditSubjectOccurrenceDialog } from "@/modules/seminars/components/occurrences/EditSubjectOccurrenceDialog";
 
-import { enrollStudent, unenrollStudent } from "@/modules/seminars/actions/enrollment";
+import { enrollStudent, switchEnrollment, unenrollStudent } from "@/modules/seminars/actions/enrollment";
+import { ParticipantsDialog } from "@/modules/seminars/components/occurrences/ParticipantsDialog";
+import { checkStudentCanChange } from "@/modules/seminars/window-rules";
+import { classLabel, compareClasses } from "@/lib/school";
 import { updateSubjectOccurrence, deleteSubjectOccurrence } from "@/modules/seminars/actions/windows";
 
-type BlockWithOccurrences = Block & { occurrences: (SubjectOccurrence & { subject: Subject, teacher?: User | null, enrollments: StudentEnrollment[] })[] };
+type BlockWithOccurrences = Block & { occurrences: (SubjectOccurrence & { subject: Subject, teacher?: User | null, enrollments: StudentEnrollment[], enrolledCount?: number })[] };
 
 export function EnrollmentBlockCard({
   block,
@@ -41,6 +44,7 @@ export function EnrollmentBlockCard({
   total,
   currentUser,
   isWindowOpen = true,
+  rules,
 }: {
   block: BlockWithOccurrences;
   allBlocks: BlockWithOccurrences[];
@@ -48,6 +52,8 @@ export function EnrollmentBlockCard({
   total: number;
   currentUser: User;
   isWindowOpen?: boolean;
+  // Pravidla okna: smí se student odepsat / přepsat, do kdy, vidí jména zapsaných
+  rules?: { allowSelfUnenroll: boolean; changesUntil: string | Date | null; endsAt: string | Date; namesVisible: boolean };
 }) {
   const router = useRouter();
   const isAdmin = currentUser.role === "ADMIN"; 
@@ -56,6 +62,7 @@ export function EnrollmentBlockCard({
   const [editOccurrence, setEditOccurrence] = useState<OccurrenceRow | null>(null);
   const [studentsOccurrenceId, setStudentsOccurrenceId] = useState<string | null>(null);
   const [deleteOccurrence, setDeleteOccurrence] = useState<OccurrenceRow | null>(null);
+  const [namesOccurrence, setNamesOccurrence] = useState<{ id: string; title: string } | null>(null);
   const [unenrollConfirm, setUnenrollConfirm] = useState<{ occId: string; subjectName: string } | null>(null);
 
   const [sameSubjectAlert, setSameSubjectAlert] = useState<{
@@ -83,6 +90,15 @@ export function EnrollmentBlockCard({
     }
     return null;
   }, [block.occurrences, currentUser.id]);
+
+  const myCountInBlock = block.occurrences.filter((occ) => occ.enrollments?.some((e) => e.studentId === currentUser.id && !e.deletedAt)).length;
+  const minEnrollments = block.minEnrollments ?? 1;
+  const maxEnrollments = block.maxEnrollments ?? 1;
+  // Pravidla změn zápisu pro studenta (stejná funkce jako na serveru, server je ale rozhodující)
+  const change = React.useMemo(
+    () => (rules ? checkStudentCanChange({ allowSelfUnenroll: rules.allowSelfUnenroll, changesUntil: rules.changesUntil, endsAt: rules.endsAt }) : { ok: true, reason: undefined as string | undefined }),
+    [rules]
+  );
 
   const findSameSubjectInOtherBlocks = React.useCallback((targetOccurrenceId: string) => {
     const target = block.occurrences.find((o) => o.id === targetOccurrenceId);
@@ -122,7 +138,11 @@ export function EnrollmentBlockCard({
     }
 
     const my = findMyOccurrenceInThisBlock();
-    if (my && my.occurrenceId !== occId) {
+    if (my && my.occurrenceId !== occId && maxEnrollments === 1) {
+      if (!change.ok) {
+        toast.error(change.reason ?? "Zápis v tomto bloku už nelze změnit.");
+        return;
+      }
       setSwitchEnroll({
         fromOccurrenceId: my.occurrenceId,
         toOccurrenceId: occId,
@@ -142,7 +162,7 @@ export function EnrollmentBlockCard({
       const error = err as Error;
       toast.error(error.message || "Nepodařilo se provést zápis.");
     }
-  }, [currentUser.id, isStudent, router, findSameSubjectInOtherBlocks, findMyOccurrenceInThisBlock]);
+  }, [currentUser.id, isStudent, router, findSameSubjectInOtherBlocks, findMyOccurrenceInThisBlock, maxEnrollments, change]);
 
   const handleUnenroll = React.useCallback(async (occId: string) => {
     const occ = block.occurrences.find((o) => o.id === occId);
@@ -178,7 +198,7 @@ export function EnrollmentBlockCard({
     return block.occurrences.map((occ) => {
       const activeEnrollments =
         occ.enrollments?.filter((e) => !e.deletedAt) ?? [];
-      const enrolledCount = activeEnrollments.length;
+      const enrolledCount = occ.enrolledCount ?? activeEnrollments.length;
       const enrolledByMe =
         isStudent &&
         activeEnrollments.some((e) => e.studentId === currentUser.id);
@@ -222,9 +242,20 @@ export function EnrollmentBlockCard({
         isFull,
         enrolledByMe,
         isWindowOpen,
+        canUnenroll: change.ok,
+        unenrollBlockedReason: change.reason,
+        canSeeNames: !!rules?.namesVisible,
+        restrictionLabel: isStudent
+          ? ""
+          : [
+              occ.restrictGrades?.length ? `${occ.restrictGrades.map((g) => `${g}.`).join(", ")} ročník` : "",
+              occ.restrictClasses?.length ? [...occ.restrictClasses].sort(compareClasses).map(classLabel).join(", ") : "",
+            ]
+              .filter(Boolean)
+              .join(" + "),
       } as unknown as OccurrenceRow;
     });
-  }, [block, currentUser.id, isStudent]);
+  }, [block, currentUser.id, isStudent, isWindowOpen, change.ok, change.reason, rules?.namesVisible]);
 
   const columns = useMemo(
     () =>
@@ -235,6 +266,7 @@ export function EnrollmentBlockCard({
         onDelete: (row) => setDeleteOccurrence(row),
         onEnroll: (row) => handleEnroll(row.id),
         onUnenroll: (row) => handleUnenroll(row.id),
+        onNames: (row) => setNamesOccurrence({ id: row.id, title: `${row.subject?.name ?? "Předmět"}${row.subCode ? ` (${row.subCode})` : ""}` }),
         showEnrollmentName: false,
         showStatus: false,
         showBlockName: false,
@@ -264,6 +296,13 @@ export function EnrollmentBlockCard({
         isAdmin={isAdmin}
       />
 
+      {isStudent && (
+        <p className="px-4 pt-2 text-xs text-muted-foreground" data-testid="block-progress">
+          Zapsáno {myCountInBlock} z {minEnrollments === maxEnrollments ? maxEnrollments : `${minEnrollments}–${maxEnrollments}`}
+          {block.required === false ? " (nepovinný blok)" : ""}
+        </p>
+      )}
+
       <div className="p-2">
         <DataTable<OccurrenceRow>
           data={rows}
@@ -280,6 +319,8 @@ export function EnrollmentBlockCard({
           onOpenChange={(open) => !open && setStudentsOccurrenceId(null)}
         />
       )}
+
+      {namesOccurrence && <ParticipantsDialog occurrenceId={namesOccurrence.id} title={namesOccurrence.title} onClose={() => setNamesOccurrence(null)} />}
 
       {editOccurrence && (
         <EditSubjectOccurrenceDialog
@@ -381,16 +422,12 @@ export function EnrollmentBlockCard({
                   try {
                     const my = findMyOccurrenceInThisBlock();
                     if (my) {
-                      const unRes = await unenrollStudent(my.enrollmentId);
-                      if (unRes && unRes.error) {
-                         toast.error(unRes.error);
-                         return;
+                      // jedna transakce na serveru: když se nový zápis nepovede, původní zůstane
+                      const res = await switchEnrollment(my.enrollmentId, switchEnroll.toOccurrenceId);
+                      if (res && res.error) {
+                        toast.error(res.error);
+                        return;
                       }
-                    }
-                    const enRes = await enrollStudent(currentUser.id, switchEnroll.toOccurrenceId);
-                    if (enRes && enRes.error) {
-                       toast.error(enRes.error);
-                       return;
                     }
                     toast.success("Zápis byl úspěšně přepsán.");
                     router.refresh();

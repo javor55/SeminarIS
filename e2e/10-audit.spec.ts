@@ -101,10 +101,10 @@ test("historie: úprava uživatele, role a zápisového okna se zapíše česky 
   await pa.goto("/enrollments/enr_ls_2025");
   await pa.getByRole("button", { name: "Upravit zápis" }).click();
   await pa.fill("#name", "Zápis LS 2026");
-  await pa.locator('#targetGrades [data-grade="3"]').click();
+  await pa.locator('#audience-grades [data-grade="3"]').click();
   await pa.getByRole("button", { name: "Uložit", exact: true }).click();
   await pa.waitForTimeout(1500);
   const summary = sql(`select summary from "AuditLog" where action='seminars.window.update'`);
-  check("window update summary", summary.startsWith("Upraveno zápisové okno „Zápis LS 2025“:") && summary.includes("název: Zápis LS 2025 → Zápis LS 2026") && summary.includes("ročníky: všechny ročníky → 3. ročník"), summary);
+  check("window update summary", summary.startsWith("Upraveno zápisové okno „Zápis LS 2025“:") && summary.includes("název: Zápis LS 2025 → Zápis LS 2026") && summary.includes("publikum: všichni studenti → 3. ročník"), summary);
   check("window update has before/after data", sql(`select data->'before'->>'name'||'>'||(data->'after'->>'name') from "AuditLog" where action='seminars.window.update'`) === "Zápis LS 2025>Zápis LS 2026");
 });

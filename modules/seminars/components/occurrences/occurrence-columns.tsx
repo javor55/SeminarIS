@@ -35,6 +35,13 @@ export type OccurrenceRow = SubjectOccurrence & {
   enrolledByMe?: boolean;
   enrollments?: StudentEnrollment[];
   isWindowOpen?: boolean;
+  /** student smí teď odepsat / přepsat zápis (pravidla okna) a důvod, proč ne */
+  canUnenroll?: boolean;
+  unenrollBlockedReason?: string;
+  /** okno ukazuje studentům jména zapsaných */
+  canSeeNames?: boolean;
+  /** omezení výskytu na ročníky / třídy jako text (jen pro učitele a adminy), nebo prázdné */
+  restrictionLabel?: string;
 };
 
 // props pro generování sloupců
@@ -45,6 +52,7 @@ export function getOccurrenceColumns(opts: {
   onDelete: (_: OccurrenceRow) => void;
   onEnroll?: (_: OccurrenceRow) => void;
   onUnenroll?: (_: OccurrenceRow) => void;
+  onNames?: (_: OccurrenceRow) => void;
   /** možnost skrýt některé sloupce podle kontextu */
   showSubjectName?: boolean;
   showEnrollmentName?: boolean;
@@ -58,6 +66,7 @@ export function getOccurrenceColumns(opts: {
     onDelete,
     onEnroll,
     onUnenroll,
+    onNames,
     showSubjectName = true,
     showEnrollmentName = true,
     showStatus = true,
@@ -123,9 +132,16 @@ export function getOccurrenceColumns(opts: {
     accessorKey: "fullCode",
     header: "Kód výskytu",
     cell: ({ row: _row }) => (
-      <span className="font-mono text-xs text-muted-foreground">
-        {_row.original.fullCode ?? ""}
-      </span>
+      <div>
+        <span className="font-mono text-xs text-muted-foreground">
+          {_row.original.fullCode ?? ""}
+        </span>
+        {_row.original.restrictionLabel && (
+          <div className="text-[11px] text-amber-700 dark:text-amber-400" data-testid="occurrence-restriction-label">
+            jen: {_row.original.restrictionLabel}
+          </div>
+        )}
+      </div>
     ),
   });
 
@@ -167,7 +183,9 @@ export function getOccurrenceColumns(opts: {
                   <Button
                     size="sm"
                     variant="destructive"
-                    disabled={occ.isWindowOpen === false}
+                    disabled={occ.isWindowOpen === false || occ.canUnenroll === false}
+                    title={occ.canUnenroll === false ? occ.unenrollBlockedReason : undefined}
+                    data-testid="unenroll-button"
                     onClick={() => onUnenroll(occ)}
                   >
                     Odepsat
@@ -179,11 +197,17 @@ export function getOccurrenceColumns(opts: {
                     size="sm"
                     variant="default"
                     disabled={isFull || occ.isWindowOpen === false}
+                    data-testid="enroll-button"
                     onClick={() => onEnroll(occ)}
                   >
                     Zapsat
                   </Button>
                 )
+              )}
+              {occ.canSeeNames && onNames && (
+                <Button size="sm" variant="outline" data-testid="participants-button" onClick={() => onNames(occ)}>
+                  Zapsaní
+                </Button>
               )}
             </>
           )}

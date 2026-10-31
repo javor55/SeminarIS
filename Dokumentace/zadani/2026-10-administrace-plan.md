@@ -16,7 +16,7 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F2 Administrace se sekcemi a přehled „co udělat“, jednotné nastavení
 - [x] F3 Detail uživatele a hromadné akce
 - [x] F4 Předměty napříč moduly
-- [ ] F5 Konfigurovatelné zápisy (publikum, pravidla bloků)
+- [x] F5 Konfigurovatelné zápisy (publikum, pravidla bloků)
 - [ ] F6 Importy s náhledem (uživatelé, úvazky)
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`

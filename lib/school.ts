@@ -68,14 +68,6 @@ export function subjectGradesLabel(grades: readonly number[]): string {
   return [...grades].sort((a, b) => a - b).map((g) => `${g}.`).join(", ");
 }
 
-/** Popis cílových ročníků zápisu: [] → "všechny ročníky", [3] → "3. ročník", [2,3] → "2. a 3. ročník". */
-export function targetGradesLabel(grades: readonly number[]): string {
-  if (!grades || grades.length === 0) return "všechny ročníky";
-  const sorted = [...grades].sort((a, b) => a - b).map((g) => `${g}.`);
-  if (sorted.length === 1) return `${sorted[0]} ročník`;
-  return `${sorted.slice(0, -1).join(", ")} a ${sorted[sorted.length - 1]} ročník`;
-}
-
 // === Stav studia ===
 
 export type StudyStatusValue = "ACTIVE" | "GRADUATED" | "LEFT";

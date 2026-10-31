@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 
 type EditBlockDialogProps = {
   open: boolean;
@@ -22,9 +23,12 @@ type EditBlockDialogProps = {
     id: string;
     name: string;
     description?: string | null;
+    required?: boolean;
+    minEnrollments?: number;
+    maxEnrollments?: number;
   };
   // eslint-disable-next-line no-unused-vars
-  onSubmit?: (_data: { id: string; name: string; description?: string | null }) => void;
+  onSubmit?: (_data: { id: string; name: string; description?: string | null; required: boolean; minEnrollments: number; maxEnrollments: number }) => void;
   // případně můžeš přidat isSaving?: boolean
 };
 
@@ -36,22 +40,38 @@ export function EditBlockDialog({
 }: EditBlockDialogProps) {
   const [name, setName] = useState(block?.name ?? "");
   const [description, setDescription] = useState(block?.description ?? "");
+  const [required, setRequired] = useState(block?.required ?? true);
+  const [minEnrollments, setMin] = useState(String(block?.minEnrollments ?? 1));
+  const [maxEnrollments, setMax] = useState(String(block?.maxEnrollments ?? 1));
 
   // když se otevře dialog s jiným blokem, přenačti hodnoty
   useEffect(() => {
     if (open && block) {
       setName(block.name ?? "");
       setDescription(block.description ?? "");
+      setRequired(block.required ?? true);
+      setMin(String(block.minEnrollments ?? 1));
+      setMax(String(block.maxEnrollments ?? 1));
     }
   }, [open, block]);
 
+  const rulesInvalid =
+    !Number.isInteger(Number(minEnrollments)) ||
+    !Number.isInteger(Number(maxEnrollments)) ||
+    Number(maxEnrollments) < 1 ||
+    Number(minEnrollments) < (required ? 1 : 0) ||
+    Number(minEnrollments) > Number(maxEnrollments);
+
   function handleSave() {
     // jednoduchá validace
-    if (!name.trim()) return;
+    if (!name.trim() || rulesInvalid) return;
     onSubmit?.({
       id: block.id,
       name: name.trim(),
       description: description.trim() || null,
+      required,
+      minEnrollments: Number(minEnrollments),
+      maxEnrollments: Number(maxEnrollments),
     });
     onOpenChange(false);
   }
@@ -91,13 +111,30 @@ export function EditBlockDialog({
               rows={4}
             />
           </div>
+
+          <div className="flex items-center gap-2">
+            <Switch id="block-required" checked={required} onCheckedChange={setRequired} />
+            <Label htmlFor="block-required">Povinný blok (nezapsaní studenti se počítají jen z povinných bloků)</Label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="block-min">Nejméně zápisů v bloku</Label>
+              <Input id="block-min" type="number" min={required ? 1 : 0} max={20} value={minEnrollments} onChange={(e) => setMin(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="block-max">Nejvíce zápisů v bloku</Label>
+              <Input id="block-max" type="number" min={1} max={20} value={maxEnrollments} onChange={(e) => setMax(e.target.value)} />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">Výchozí je 1 a 1: student si v bloku vybere právě jeden předmět.</p>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Zrušit
           </Button>
-          <Button onClick={handleSave} disabled={!name.trim()}>
+          <Button onClick={handleSave} disabled={!name.trim() || rulesInvalid}>
             Uložit
           </Button>
         </DialogFooter>

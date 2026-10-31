@@ -9,10 +9,11 @@ import { EditEnrollmentDialog } from "@/modules/seminars/components/enrollment/E
 import { User, EnrollmentWindowWithBlocks } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Calendar, Download, ChevronDown, Users } from "lucide-react";
-import { targetGradesLabel } from "@/lib/school";
 
 import { EditBlockDialog } from "@/modules/seminars/components/blocks/EditBlockDialog";
-import { createBlock, getEnrollmentMatrixData, getEnrollmentDetails } from "@/modules/seminars/actions/windows";
+import { createBlock, duplicateEnrollmentWindow, getEnrollmentMatrixData, getEnrollmentDetails } from "@/modules/seminars/actions/windows";
+import { getUnenrolledView } from "@/modules/seminars/actions/unenrolled";
+import { ConfirmAction } from "@/modules/core/components/users/ConfirmAction";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -210,42 +211,27 @@ export function EnrollmentHeader({
 
   const handleExportMissingEnrollments = async () => {
     try {
-      const { window, allStudents, classLabels } = await getEnrollmentDetails(ew.id);
-      const blockCount = window.blocks.length;
-
-      // Spočítat kolik má kdo zápisů v tomto okně
-      const studentCounts = new Map<string, number>();
-      window.blocks.forEach(b => {
-        b.subjectOccurrences.forEach(occ => {
-          occ.studentEnrollments.forEach(en => {
-            studentCounts.set(en.studentId, (studentCounts.get(en.studentId) || 0) + 1);
-          });
-        });
-      });
-
-      const headers = ["Příjmení", "Jméno", "Email", "Třída", "Počet zápisů", "Stav"];
-      const rows: string[][] = [];
-
-      allStudents.forEach(s => {
-        const count = studentCounts.get(s.id) || 0;
-        if (count < blockCount) {
-          rows.push([
-            s.lastName,
-            s.firstName,
-            s.email,
-            classLabels[s.id] || "",
-            count.toString(),
-            count === 0 ? "ABSENCE" : "NEÚPLNÉ"
-          ]);
-        }
-      });
-
+      // Stejné pravidlo jako záložka Nezapsaní: povinné bloky, minimum zápisů, výskyty určené studentovi
+      const view = await getUnenrolledView(ew.id);
+      const headers = ["Příjmení", "Jméno", "Email", "Třída", "Chybějící bloky"];
+      const rows = view.students.map((s) => [s.lastName, s.firstName, s.email, s.classLabel ?? "", s.missingBlocks.join(", ")]);
       const csv = [headers.map(h => `"${h}"`), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`))].map(e => e.join(";")).join("\n");
       downloadCSV(csv, `chybejici_zapisy_${ew.name.replace(/\s+/g, "_")}.csv`);
       toast.success("Report nezapsaných exportován.");
     } catch (err: unknown) {
       const error = err as Error;
       toast.error(error.message || "Export se nezdařil.");
+    }
+  };
+
+  const handleDuplicate = async () => {
+    try {
+      const copy = unwrap(await duplicateEnrollmentWindow(ew.id));
+      toast.success(`Vytvořena kopie „${copy.name}“ (koncept).`);
+      router.push(`/enrollments/${copy.id}`);
+      router.refresh();
+    } catch (err: unknown) {
+      toast.error((err as Error).message || "Zápis se nepodařilo zduplikovat.");
     }
   };
 
@@ -284,9 +270,16 @@ export function EnrollmentHeader({
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <span>Konec: {formatDateTime(ew.endsAt)}</span>
               </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="window-rules-summary">
+                <span>
+                  {ew.allowSelfUnenroll === false ? "Odepsání studentem: ne" : ew.changesUntil ? `Změny studenty do ${formatDateTime(ew.changesUntil)}` : "Změny studenty do konce zápisu"}
+                  {" · "}
+                  {ew.resultsVisibility === "NAMES" ? "studenti vidí jména zapsaných" : "studenti vidí jen počty"}
+                </span>
+              </div>
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-muted-foreground" />
-                <span>Pro: {targetGradesLabel(ew.targetGrades ?? [])}</span>
+                <span data-testid="window-audience">Pro: {ew.audienceView?.summary ?? "vybraní studenti"}</span>
               </div>
             </div>
 
@@ -385,6 +378,13 @@ export function EnrollmentHeader({
             </DropdownMenuContent>
           </DropdownMenu>
 
+          <ConfirmAction
+            title="Duplikovat zápis?"
+            description="Vznikne nový zápis jako koncept: zkopírují se bloky, předměty, publikum a pravidla. Zápisy studentů se nekopírují."
+            actionLabel="Duplikovat"
+            onConfirm={handleDuplicate}
+            trigger={<Button variant="outline" data-testid="duplicate-window">Duplikovat</Button>}
+          />
           <Button variant="outline" onClick={() => setEditEnrollment(ew)}>
             Upravit zápis
           </Button>
@@ -411,14 +411,14 @@ export function EnrollmentHeader({
         block={emptyBlockData}
         onSubmit={async (data) => {
           try {
-            unwrap(await createBlock(ew.id, data.name, data.description));
+            unwrap(await createBlock(ew.id, data.name, data.description, data));
             router.refresh();
             setIsCreatingBlock(false);
 
           } catch (e: unknown) {
             // eslint-disable-next-line no-console
             console.error(e);
-            alert("Nepodařilo se vytvořit blok.");
+            toast.error((e as Error).message || "Nepodařilo se vytvořit blok.");
           }
         }}
       />

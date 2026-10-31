@@ -28,6 +28,12 @@ export function EnrollmentBlocks({
           total={enrollment.blocks.length}
           currentUser={currentUser}
           isWindowOpen={enrollment.status === "OPEN"}
+          rules={{
+            allowSelfUnenroll: enrollment.allowSelfUnenroll ?? true,
+            changesUntil: enrollment.changesUntil ?? null,
+            endsAt: enrollment.endsAt,
+            namesVisible: enrollment.resultsVisibility === "NAMES",
+          }}
         />
       ))}
     </div>

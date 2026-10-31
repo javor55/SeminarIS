@@ -6,7 +6,7 @@ import { isImpersonating } from "@/lib/session";
 import { computeEnrollmentStatus } from "@/lib/utils";
 import type { EmailEventId } from "@/lib/email/events";
 import type { DailyJobStep } from "@/modules/server-types";
-import { eligibleStudentsWhere } from "@/modules/seminars/eligibility";
+import { audienceWhereForWindow } from "@/modules/seminars/eligibility";
 import { computeUnenrolled, sendUnenrolledReminder } from "@/modules/seminars/unenrolled";
 
 // E-maily modulu Semináře: „zápis otevřen“ a připomínky nezapsaným.
@@ -31,7 +31,7 @@ export async function notifyWindowOpened(windowId: string) {
     const ew = await prisma.enrollmentWindow.findUnique({ where: { id: windowId } });
     if (!ew) return;
     const students = await prisma.user.findMany({
-      where: eligibleStudentsWhere(ew.targetGrades),
+      where: await audienceWhereForWindow(ew.id),
       select: { id: true, email: true, firstName: true },
     });
     await sendEventEmail(
@@ -66,7 +66,7 @@ export async function getSeminarsEmailEstimates(now = new Date()): Promise<Parti
   let reminder = 0;
   const today = schoolDayKey(now);
   for (const ew of windows) {
-    if (!ew.openedNotifiedAt) opened += await prisma.user.count({ where: eligibleStudentsWhere(ew.targetGrades) });
+    if (!ew.openedNotifiedAt) opened += await prisma.user.count({ where: await audienceWhereForWindow(ew.id) });
     if (ew.reminderDaysBefore != null && !ew.reminderSentOn && computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt, now).is !== "closed") {
       const dueFrom = addDaysToDayKey(schoolDayKey(ew.endsAt), -ew.reminderDaysBefore);
       // odhad jen pro okna, kterým připomínka brzy přijde (nejpozději zítra)
