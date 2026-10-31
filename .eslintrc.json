@@ -42,7 +42,7 @@
     },
     {
       // Moduly se navzájem neimportují (jen přes jádro a body rozšíření).
-      "files": ["modules/seminars/**/*.{ts,tsx}", "app/enrollments/**/*.{ts,tsx}"],
+      "files": ["modules/seminars/**/*.{ts,tsx}", "app/enrollments/**/*.{ts,tsx}", "app/zapisy/**/*.{ts,tsx}"],
       "rules": {
         "no-restricted-imports": ["error", {
           "patterns": [
