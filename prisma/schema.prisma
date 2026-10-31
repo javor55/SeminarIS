@@ -37,13 +37,6 @@ enum ClassChangeReason {
   MOVED // přeřazení během roku
 }
 
-enum Status {
-  DRAFT
-  SCHEDULED
-  OPEN
-  CLOSED
-}
-
 // Z čeho se skládá publikum zápisového okna (EnrollmentWindowAudience)
 enum AudienceType {
   GRADE // ročník (hodnota v `grade`)
@@ -134,10 +127,13 @@ model EnrollmentWindow {
   id                String   @id @default(cuid())
   name              String
   description       String?
-  status            Status   @default(DRAFT)
   startsAt          DateTime
   endsAt            DateTime
-  visibleToStudents Boolean  @default(false)
+  // Zveřejněno studentům (false = koncept, studenti okno nevidí). Otevření a zavření řídí data `startsAt` a `endsAt`;
+  // stav „plánováno / otevřeno / uzavřeno“ se z nich vždy odvozuje (modules/seminars/window-phase.ts), neukládá se.
+  published         Boolean  @default(false)
+  // Předčasně uzavřeno správcem (kdy); null = běží podle dat. „Znovu otevřít“ ho smaže (dokud neuplynul konec).
+  closedEarlyAt     DateTime?
 
   // Publikum: sjednocení ročníků, tříd a konkrétních studentů minus vynechaní; prázdné = všichni aktivní studenti
   audience EnrollmentWindowAudience[]

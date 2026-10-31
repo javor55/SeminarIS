@@ -98,10 +98,9 @@ async function main() {
       id: enrollmentId,
       name: "Zápis LS 2025",
       description: "Zápis na semináře pro letní semestr 2025",
-      status: "OPEN",
       startsAt: new Date(Date.now() - 1000 * 60 * 60), // hodinu zpět
       endsAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // za týden
-      visibleToStudents: true,
+      published: true,
       createdById: adminId,
     },
   });

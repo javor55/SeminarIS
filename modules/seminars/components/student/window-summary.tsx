@@ -20,14 +20,21 @@ export function WindowStatusBadge({ status }: { status: StudentWindowStatus }) {
 }
 
 /** „Otevřeno do …“, „Otevře se …“, „Uzavřeno …“ */
-export function windowDeadlineText(w: Pick<StudentWindow, "status" | "startsAt" | "endsAt">): string {
+export function windowDeadlineText(w: Pick<StudentWindow, "status" | "startsAt" | "endsAt" | "closedEarly">): string {
   if (w.status === "OPEN") return `Zápis běží do ${formatDateTime(w.endsAt)}`;
   if (w.status === "SCHEDULED") return `Zápis se otevře ${formatDateTime(w.startsAt)} (do ${formatDateTime(w.endsAt)})`;
+  if (w.closedEarly) return "Zápis byl uzavřen před plánovaným koncem";
   return `Zápis skončil ${formatDateTime(w.endsAt)}`;
 }
 
 /** Co student ve svém zápisu ještě nemá hotové (jen pro ty, kdo se mohou zapisovat). */
 export function WindowProgress({ window: w }: { window: StudentWindow }) {
+  // Po uzavření už nic "nechybí": jen neutrálně, na co je student zapsaný (seznam zapsaných ukazuje volající)
+  if (w.status === "CLOSED") {
+    return w.enrollments.length === 0 ? (
+      <p className="text-sm text-muted-foreground" data-testid="window-progress" data-complete="closed">Nezapsáno.</p>
+    ) : null;
+  }
   if (w.requiredBlockCount === 0) return <p className="text-sm text-muted-foreground">Zápis nemá povinné bloky.</p>;
   if (w.missingBlocks.length === 0) {
     return (

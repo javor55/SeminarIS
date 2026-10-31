@@ -40,7 +40,7 @@ export default async function EnrollmentsPage() {
       enrollments={enrollments}
       currentUser={currentUser}
       newWindowDefaults={{
-        visibleToStudents: defaults["seminars.defaultVisibleToStudents"] === true,
+        published: defaults["seminars.defaultVisibleToStudents"] === true,
         reminderDaysBefore: reminder > 0 ? reminder : null,
       }}
     />

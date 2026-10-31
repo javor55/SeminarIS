@@ -10,24 +10,23 @@ import {
   getEnrollmentColumns,
   EnrollmentRow,
 } from "@/modules/seminars/components/enrollment/enrollment-columns";
-import { EnrollmentWindow, EnrollmentStatus, User, EnrollmentWindowWithBlocks } from "@/lib/types";
+import { EnrollmentWindow, User, EnrollmentWindowWithBlocks } from "@/lib/types";
 import { PageHeader } from "@/components/page-header";
 
 const newEnrollmentMock: Partial<EnrollmentWindow> = {
   id: "", 
   name: "Nový zápis",
   description: "",
-  status: "DRAFT",
   startsAt: new Date().toISOString(),
   endsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-  visibleToStudents: false,
+  published: false,
 };
 
 interface EnrollmentsClientViewProps {
   enrollments: EnrollmentWindowWithBlocks[];
   currentUser: User;
   // Výchozí hodnoty nového okna z nastavení modulu
-  newWindowDefaults?: { visibleToStudents: boolean; reminderDaysBefore: number | null };
+  newWindowDefaults?: { published: boolean; reminderDaysBefore: number | null };
 }
 
 export function EnrollmentsClientView({ enrollments, currentUser, newWindowDefaults }: EnrollmentsClientViewProps) {
@@ -76,7 +75,6 @@ export function EnrollmentsClientView({ enrollments, currentUser, newWindowDefau
 
       return {
         ...(ew as EnrollmentWindow),
-        status: ew.status as EnrollmentStatus,
         uniqueStudentCount,
         fullyEnrolledCount,
         blocksWithCounts,
@@ -133,21 +131,13 @@ export function EnrollmentsClientView({ enrollments, currentUser, newWindowDefau
             searchPlaceholder="Hledat podle názvu..."
             selectFilters={[
               {
-                columnId: "status",
+                columnId: "phase",
                 label: "Stav",
                 options: [
-                  { label: "Koncept", value: "DRAFT" },
-                  { label: "Naplánováno", value: "SCHEDULED" },
+                  { label: "Koncept (studenti nevidí)", value: "DRAFT" },
+                  { label: "Naplánováno", value: "PLANNED" },
                   { label: "Otevřeno", value: "OPEN" },
                   { label: "Uzavřeno", value: "CLOSED" },
-                ],
-              },
-              {
-                columnId: "visibleToStudents",
-                label: "Viditelnost",
-                options: [
-                  { label: "Viditelné studentům", value: "yes" },
-                  { label: "Skryté studentům", value: "no" },
                 ],
               },
             ]}

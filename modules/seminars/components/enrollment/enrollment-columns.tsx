@@ -3,7 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { User, EnrollmentWindow } from "@/lib/types";
-import { computeEnrollmentStatus } from "@/lib/utils";
+import { windowPhase } from "@/modules/seminars/window-phase";
 import Link from "next/link"; // Pro proklik z názvu
 import { Badge } from "@/components/ui/badge"; // Pro badge stavu
 import { formatDateTime } from "@/lib/datetime";
@@ -21,8 +21,6 @@ export type EnrollmentRow = EnrollmentWindow & {
   }[];
   fullData: unknown;
 };
-
-// Odstraněno: getStatusBadgeVariant se logikou přesunul do computeEnrollmentStatus a renderování do buňky
 
 // Funkce pro generování sloupců
 export function getEnrollmentColumns(opts: {
@@ -54,19 +52,14 @@ export function getEnrollmentColumns(opts: {
         );
       },
     },
-    { // Sloupec 2 (Stav)
-      accessorKey: "status",
+    { // Sloupec 2 (Stav): koncept / naplánováno / otevřeno / uzavřeno, odvozeno z dat okna; koncept = studenti okno nevidí
+      id: "phase",
+      accessorFn: (ew) => windowPhase(ew).phase,
       header: "Stav",
       cell: ({ row }) => {
-        const ew = row.original;
-        const statusMeta = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
-        // Vybereme variantu badge podle interního 'is' klíče z utilits
-        let variant: "outline" | "secondary" | "successSolid" | "infoSolid" = "outline";
-        if (statusMeta.is === "open" && ew.status !== "DRAFT") variant = "successSolid";
-        if (statusMeta.is === "planned" && ew.status !== "DRAFT") variant = "infoSolid";
-        if (ew.status === "DRAFT") variant = "secondary";
-
-        return <Badge variant={variant}>{statusMeta.label}</Badge>;
+        const info = windowPhase(row.original);
+        const variant = { DRAFT: "secondary", PLANNED: "infoSolid", OPEN: "successSolid", CLOSED: "outline" }[info.phase] as "outline" | "secondary" | "successSolid" | "infoSolid";
+        return <Badge variant={variant}>{info.label}</Badge>;
       },
       filterFn: (row, id, value) => {
         if (!value || value.length === 0) return true;
@@ -74,26 +67,6 @@ export function getEnrollmentColumns(opts: {
       },
     },
 
-    // 🔥 ZMĚNA: Sloupec přesunut sem a upraven
-    { 
-      accessorKey: "visibleToStudents",
-      header: "Viditelné pro studenty", // Přejmenováno
-      cell: ({ row }) => {
-        const isVisible = row.original.visibleToStudents;
-        if (isVisible) {
-          // Používáme stejný styl jako "Otevřeno"
-          return <Badge variant="successSolid">Ano</Badge>;
-        }
-        // Používáme neutrální styl
-        return <Badge variant="outline">Ne</Badge>;
-      },
-      filterFn: (row, id, value) => {
-        if (!value || value.length === 0) return true;
-        const rowValue = row.getValue(id) ? "yes" : "no";
-        return value.includes(rowValue);
-      },
-    },
-    
     {
       id: "audience",
       header: "Publikum",

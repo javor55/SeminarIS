@@ -27,7 +27,7 @@ export function EnrollmentBlocks({
           index={index}
           total={enrollment.blocks.length}
           currentUser={currentUser}
-          isWindowOpen={enrollment.status === "OPEN"}
+          isWindowOpen={enrollment.phase === "OPEN"}
           rules={{
             allowSelfUnenroll: enrollment.allowSelfUnenroll ?? true,
             changesUntil: enrollment.changesUntil ?? null,

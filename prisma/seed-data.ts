@@ -106,10 +106,9 @@ async function main() {
     data: {
       name: "Zápis do seminářů 2024/2025 (Zimní semestr)",
       description: "Aktivní okno pro zápis. Můžete si vybrat max 2 semináře.",
-      status: "OPEN",
       startsAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // Přesně před 2 dny
       endsAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),   // Za týden
-      visibleToStudents: true,
+      published: true,
       createdById: admin.id
     }
   });
@@ -118,10 +117,9 @@ async function main() {
     data: {
       name: "Zápis do povinně volitelných předmětů (Letní semestr)",
       description: "Zatím pouze naplánováno, okno pro letní volby.",
-      status: "SCHEDULED",
       startsAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
       endsAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 40),
-      visibleToStudents: true,
+      published: true,
       createdById: admin.id
     }
   });

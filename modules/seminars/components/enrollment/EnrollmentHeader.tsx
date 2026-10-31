@@ -1,6 +1,6 @@
 "use client";
 
-import { unwrap } from "@/lib/action-result";
+import { unwrap, type ActionResult } from "@/lib/action-result";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { Calendar, Download, ChevronDown, Users } from "lucide-react";
 
 import { EditBlockDialog } from "@/modules/seminars/components/blocks/EditBlockDialog";
-import { createBlock, duplicateEnrollmentWindow, getEnrollmentMatrixData, getEnrollmentDetails } from "@/modules/seminars/actions/windows";
+import { closeEnrollmentWindowEarly, createBlock, duplicateEnrollmentWindow, reopenEnrollmentWindow, setEnrollmentWindowPublished, getEnrollmentMatrixData, getEnrollmentDetails } from "@/modules/seminars/actions/windows";
 import { getUnenrolledView } from "@/modules/seminars/actions/unenrolled";
 import { ConfirmAction } from "@/modules/core/components/users/ConfirmAction";
 import { toast } from "sonner";
@@ -24,8 +24,8 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 
-import { computeEnrollmentStatus } from "@/lib/utils";
-import { formatDateTime } from "@/lib/datetime";
+import { windowPhase } from "@/modules/seminars/window-phase";
+import { formatDateTime, formatRemaining } from "@/lib/datetime";
 
 
 type EnrollmentHeaderProps = {
@@ -45,20 +45,15 @@ export function EnrollmentHeader({
   const [editEnrollment, setEditEnrollment] = useState<EnrollmentWindowWithBlocks | null>(null);
   const [isCreatingBlock, setIsCreatingBlock] = useState(false);
 
-  // 1) Časovač
+  // 1) Odpočet (po minutách, sekundy se nezobrazují)
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    const timer = setInterval(() => setNow(new Date()), 15000);
     return () => clearInterval(timer);
   }, []);
 
-  // 2) Stav zápisu (status)
-  const { absoluteStatus } = useMemo(() => {
-    const absStatus = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt, now);
-    
-    return {
-      absoluteStatus: absStatus,
-    };
-  }, [ew, now]);
+  // 2) Stav zápisu se odvozuje z dat okna (koncept / naplánováno / otevřeno / uzavřeno)
+  const info = useMemo(() => windowPhase(ew, now), [ew, now]);
+  const statusClass = { DRAFT: "text-muted-foreground", PLANNED: "text-info", OPEN: "text-success", CLOSED: "text-muted-foreground" }[info.phase];
 
   const isAdmin = user.role === "ADMIN";
 
@@ -215,6 +210,16 @@ export function EnrollmentHeader({
     }
   };
 
+  const runWindowAction = async (action: () => Promise<ActionResult<unknown>>, success: string) => {
+    try {
+      unwrap(await action());
+      toast.success(success);
+      router.refresh();
+    } catch (err: unknown) {
+      toast.error((err as Error).message || "Akce se nepodařila.");
+    }
+  };
+
   const handleDuplicate = async () => {
     try {
       const copy = unwrap(await duplicateEnrollmentWindow(ew.id));
@@ -263,7 +268,7 @@ export function EnrollmentHeader({
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="window-rules-summary">
                 <span>
-                  {ew.allowSelfUnenroll === false ? "Odepsání studentem: ne" : ew.changesUntil ? `Změny studenty do ${formatDateTime(ew.changesUntil)}` : "Změny studenty do konce zápisu"}
+                  {ew.allowSelfUnenroll === false ? "Student se nemůže sám odepsat" : ew.changesUntil ? `Studenti mohou měnit zápis do ${formatDateTime(ew.changesUntil)}` : "Studenti mohou měnit zápis do konce zápisu"}
                   {" · "}
                   {ew.resultsVisibility === "NAMES" ? "studenti vidí jména zapsaných" : "studenti vidí jen počty"}
                 </span>
@@ -277,42 +282,29 @@ export function EnrollmentHeader({
             <div className="space-y-2 pl-6 border-l border-border">
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Stav</div>
-                <div
-                  className={cn(
-                    "text-2xl font-bold",
-                    absoluteStatus.className
-                  )}
-                >
-                  {absoluteStatus.label}
+                <div className={cn("text-2xl font-bold", statusClass)} data-testid="window-phase" data-phase={info.phase}>
+                  {info.label}
                 </div>
               </div>
 
-              {absoluteStatus.is === "planned" && (() => {
-                const diff = new Date(ew.startsAt).getTime() - now.getTime();
-                if (diff <= 0) return null;
-                const d = Math.floor(diff / 86400000);
-                const h = Math.floor((diff % 86400000) / 3600000);
-                const m = Math.floor((diff % 3600000) / 60000);
-                const s = Math.floor((diff % 60000) / 1000);
-                return (
-                  <div className="text-xs text-info font-medium animate-pulse">
-                    Otevře se za {d > 0 ? `${d}d ` : ""}{h}h {m}m {s}s
-                  </div>
-                );
-              })()}
-              {absoluteStatus.is === "open" && (() => {
-                const diff = new Date(ew.endsAt).getTime() - now.getTime();
-                if (diff <= 0) return null;
-                const d = Math.floor(diff / 86400000);
-                const h = Math.floor((diff % 86400000) / 3600000);
-                const m = Math.floor((diff % 3600000) / 60000);
-                const s = Math.floor((diff % 60000) / 1000);
-                return (
-                  <div className="text-xs text-success font-medium">
-                    Uzavře se za {d > 0 ? `${d}d ` : ""}{h}h {m}m {s}s
-                  </div>
-                );
-              })()}
+              {info.phase === "DRAFT" && (
+                <div className="text-xs text-muted-foreground">Studenti zápis nevidí.</div>
+              )}
+              {info.phase === "PLANNED" && (
+                <div className="text-xs text-info font-medium" data-testid="window-countdown">
+                  Otevře se za {formatRemaining(new Date(ew.startsAt).getTime() - now.getTime())}
+                </div>
+              )}
+              {info.phase === "OPEN" && (
+                <div className="text-xs text-success font-medium" data-testid="window-countdown">
+                  Zavře se za {formatRemaining(new Date(ew.endsAt).getTime() - now.getTime())}
+                </div>
+              )}
+              {info.closedEarly && ew.closedEarlyAt && (
+                <div className="text-xs text-muted-foreground" data-testid="window-closed-early">
+                  Uzavřeno {formatDateTime(ew.closedEarlyAt)} (podle plánu do {formatDateTime(ew.endsAt)})
+                </div>
+              )}
             </div>
 
           </div>
@@ -376,6 +368,33 @@ export function EnrollmentHeader({
             onConfirm={handleDuplicate}
             trigger={<Button variant="outline" data-testid="duplicate-window">Duplikovat</Button>}
           />
+          {info.phase === "DRAFT" && (
+            <ConfirmAction
+              title="Zveřejnit zápis?"
+              description="Studenti z publika zápis uvidí a zapisovat se budou moct od začátku do konce zápisu. Pokud už zápis běží, dostanou upozornění."
+              actionLabel="Zveřejnit"
+              onConfirm={() => runWindowAction(() => setEnrollmentWindowPublished(ew.id, true), "Zápis je zveřejněný.")}
+              trigger={<Button data-testid="publish-window">Zveřejnit</Button>}
+            />
+          )}
+          {info.canCloseEarly && (
+            <ConfirmAction
+              title="Předčasně uzavřít zápis?"
+              description="Studenti se přestanou moct zapisovat i odepisovat. Zápis půjde znovu otevřít, dokud neuplyne jeho plánovaný konec."
+              actionLabel="Uzavřít zápis"
+              onConfirm={() => runWindowAction(() => closeEnrollmentWindowEarly(ew.id), "Zápis je uzavřený.")}
+              trigger={<Button variant="outline" data-testid="close-window-early">Předčasně uzavřít</Button>}
+            />
+          )}
+          {info.canReopen && (
+            <ConfirmAction
+              title="Znovu otevřít zápis?"
+              description={`Studenti se budou moct zase zapisovat až do ${formatDateTime(ew.endsAt)}.`}
+              actionLabel="Znovu otevřít"
+              onConfirm={() => runWindowAction(() => reopenEnrollmentWindow(ew.id), "Zápis je znovu otevřený.")}
+              trigger={<Button variant="outline" data-testid="reopen-window">Znovu otevřít</Button>}
+            />
+          )}
           <Button variant="outline" onClick={() => setEditEnrollment(ew)}>
             Upravit zápis
           </Button>

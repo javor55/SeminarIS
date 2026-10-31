@@ -3,11 +3,9 @@
 import { safeAction } from "@/lib/safe-action";
 import { prisma, type TxClient } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { computeEnrollmentStatus } from "@/lib/utils";
-import type { EnrollmentStatus } from "@/lib/types";
 import { requireAuth, requireModule, requirePermission } from "@/lib/session";
 import { can } from "@/modules/registry";
-import { syncEnrollmentWindowStatus } from "@/modules/seminars/window-status";
+import { windowPhase } from "@/modules/seminars/window-phase";
 import { audienceWhere, audienceWhereForWindow, getViewerContext, isWindowVisibleTo, loadAudienceEntries, occurrencesForViewerWhere, replaceAudience, windowsForViewerWhere, type ViewerContext } from "@/modules/seminars/eligibility";
 import { audienceInclude, buildAudienceView } from "@/modules/seminars/audience-view";
 import { audienceSummary, draftFromEntries, EMPTY_AUDIENCE, entriesFromDraft, type AudienceDraft } from "@/modules/seminars/audience";
@@ -54,6 +52,12 @@ function windowInclude(ctx: ViewerContext | undefined) {
 
 type WindowRow = Prisma.EnrollmentWindowGetPayload<{ include: ReturnType<typeof windowInclude> }>;
 
+/** Stav okna odvozený z dat (koncept / plánováno / otevřeno / uzavřeno) pro UI; rozhoduje server, klient jen zobrazuje. */
+function windowState(ew: Parameters<typeof windowPhase>[0]) {
+  const info = windowPhase(ew);
+  return { phase: info.phase, phaseLabel: info.label, closedEarly: info.closedEarly, canReopen: info.canReopen, canCloseEarly: info.canCloseEarly };
+}
+
 /**
  * Přidá k výskytům `enrollments` a `enrolledCount` a pro privilegované pohled na publikum.
  * Studentovi se v `enrollments` nechají jen jeho vlastní zápisy: cizí zápisy by prozradily, kdo je kde zapsaný
@@ -83,7 +87,7 @@ export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = fal
   const ctx = await getViewerContext(user);
 
   const whereFilter = {
-    ...(visibleOnly ? { visibleToStudents: true, status: { not: "DRAFT" as EnrollmentStatus } } : {}),
+    ...(visibleOnly ? { published: true } : {}),
     ...(ctx ? windowsForViewerWhere(ctx) : {}),
   };
 
@@ -93,20 +97,10 @@ export async function getEnrollmentWindowsWithDetails(visibleOnly: boolean = fal
     orderBy: { startsAt: "desc" },
   });
 
-  // Paralelní sync – všechna okna najednou
-  await Promise.all(
-    ews.map(ew => syncEnrollmentWindowStatus(ew))
-  );
+  // Okno se mohlo od posledního čtení otevřít: doběhne upozornění „zápis otevřen“ (jednou za okno)
+  await Promise.all(ews.map((ew) => notifyWindowOpenedIfOpen(ew)));
 
-  // Aplikujeme aktualizované stavy přímo v paměti místo refetche
-  const parsed = ews.map(ew => {
-    const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
-    const currentStatus = computed.is === "open" ? "OPEN"
-      : (computed.is === "closed" && ew.status !== "DRAFT") ? "CLOSED"
-      : ew.status;
-
-    return { ...shapeWindow(ew, user.id, !ctx), status: currentStatus };
-  });
+  const parsed = ews.map((ew) => ({ ...shapeWindow(ew, user.id, !ctx), ...windowState(ew) }));
 
   return JSON.parse(JSON.stringify(parsed));
 }
@@ -120,19 +114,12 @@ export async function getEnrollmentWindowByIdWithBlocks(id: string) {
 
   if (!ew) return undefined;
   if (ctx) {
-    if (!ew.visibleToStudents || ew.status === "DRAFT") return undefined;
+    if (!ew.published) return undefined;
     if (!(await isWindowVisibleTo(ctx, id))) return undefined;
   }
 
-  // Sync stavu – pouze pokud se stav změní, refetchneme
-  const newStatus = await syncEnrollmentWindowStatus(ew);
-  const statusChanged = newStatus !== ew.status;
-
-  // Refetch jen pokud se stav opravdu změnil, jinak použijeme stávající data
-  const source = statusChanged ? await prisma.enrollmentWindow.findUnique({ where: { id }, include }) : ew;
-  if (!source) return undefined;
-
-  return shapeWindow(source, user.id, !ctx);
+  await notifyWindowOpenedIfOpen(ew);
+  return { ...shapeWindow(ew, user.id, !ctx), ...windowState(ew) };
 }
 
 // === EXPORTY A PŘEHLEDY ===
@@ -271,10 +258,10 @@ export async function getEnrollmentDetails(windowId: string) {
 type WindowInput = {
   name: string;
   description?: string;
-  status: EnrollmentStatus;
   startsAt: string | Date;
   endsAt: string | Date;
-  visibleToStudents: boolean;
+  // Zveřejněno studentům (false = koncept). Otevření a zavření řídí data; předčasné uzavření má vlastní akci.
+  published: boolean;
   // Publikum: ročníky, třídy, studenti a vynechaní studenti; prázdné = všichni aktivní studenti
   audience?: AudienceDraft;
   // Automatická připomínka nezapsaným N dní před koncem (prázdné = ne)
@@ -287,17 +274,15 @@ type WindowInput = {
   resultsVisibility?: "COUNTS" | "NAMES";
 };
 
-const STATUS_LABELS: Record<string, string> = { DRAFT: "koncept", SCHEDULED: "naplánováno", OPEN: "otevřeno", CLOSED: "uzavřeno" };
-
 /** Údaje okna v podobě vhodné pro historii změn (čitelné texty). */
 function windowDisplay(
   w: {
     name: string;
     description: string | null;
-    status: string;
+    published: boolean;
+    closedEarlyAt: Date | null;
     startsAt: Date;
     endsAt: Date;
-    visibleToStudents: boolean;
     reminderDaysBefore: number | null;
     allowSelfUnenroll: boolean;
     changesUntil: Date | null;
@@ -308,10 +293,10 @@ function windowDisplay(
   return {
     name: w.name,
     description: w.description,
-    status: STATUS_LABELS[w.status] ?? w.status,
+    published: w.published ? "zveřejněno" : "koncept",
     startsAt: formatDateTime(w.startsAt),
     endsAt: formatDateTime(w.endsAt),
-    visibleToStudents: w.visibleToStudents,
+    closedEarlyAt: w.closedEarlyAt ? formatDateTime(w.closedEarlyAt) : "ne",
     audience,
     reminderDaysBefore: w.reminderDaysBefore == null ? "ne" : `${w.reminderDaysBefore} dní před koncem`,
     allowSelfUnenroll: w.allowSelfUnenroll ? "ano" : "ne",
@@ -323,10 +308,10 @@ function windowDisplay(
 const WINDOW_LABELS = {
   name: "název",
   description: "popis",
-  status: "stav",
+  published: "zveřejnění",
   startsAt: "začátek",
   endsAt: "konec",
-  visibleToStudents: "viditelné pro studenty",
+  closedEarlyAt: "předčasně uzavřeno",
   audience: "publikum",
   reminderDaysBefore: "připomínka nezapsaným",
   allowSelfUnenroll: "student se může sám odepsat",
@@ -525,8 +510,7 @@ export async function createEnrollmentWindow(data: WindowInput) {
         data: {
           name: data.name,
           description: data.description || null,
-          status: data.status,
-          visibleToStudents: data.visibleToStudents,
+          published: data.published,
           reminderDaysBefore,
           createdById: admin.id,
           ...rules,
@@ -539,7 +523,7 @@ export async function createEnrollmentWindow(data: WindowInput) {
         action: "seminars.window.create",
         entityType: "enrollmentWindow",
         entityId: row.id,
-        summary: `Vytvořeno zápisové okno „${row.name}“ (${d.status}, ${d.startsAt} – ${d.endsAt}, ${d.audience})`,
+        summary: `Vytvořeno zápisové okno „${row.name}“ (${d.published}, ${d.startsAt} – ${d.endsAt}, ${d.audience})`,
         data: { after: d, audience: aud.draft },
       });
       return row;
@@ -566,8 +550,7 @@ export async function updateEnrollmentWindow(windowId: string, data: WindowInput
         data: {
           name: data.name,
           description: data.description || null,
-          status: data.status,
-          visibleToStudents: data.visibleToStudents,
+          published: data.published,
           reminderDaysBefore,
           ...rules,
           // Změna konce nebo nastavení připomínky = připomínka se může poslat znovu
@@ -596,6 +579,80 @@ export async function updateEnrollmentWindow(windowId: string, data: WindowInput
   });
 }
 
+
+/** Zveřejní okno studentům, nebo ho vrátí do konceptu (zápisy studentů zůstávají). */
+export async function setEnrollmentWindowPublished(windowId: string, published: boolean) {
+  return safeAction(async () => {
+    const admin = await requirePermission("seminars.windows.manage");
+    const row = await prisma.$transaction(async (tx) => {
+      const before = await tx.enrollmentWindow.findUnique({ where: { id: windowId } });
+      if (!before) throw new Error("Zápisové okno nenalezeno.");
+      if (before.published === published) return before;
+      const row = await tx.enrollmentWindow.update({ where: { id: windowId }, data: { published, updatedById: admin.id } });
+      await audit(tx, admin, {
+        action: published ? "seminars.window.publish" : "seminars.window.unpublish",
+        entityType: "enrollmentWindow",
+        entityId: windowId,
+        summary: `Zápisové okno „${before.name}“ ${published ? "zveřejněno studentům" : "vráceno do konceptu"}`,
+        data: { published },
+      });
+      return row;
+    });
+    await notifyWindowOpenedIfOpen(row);
+    revalidatePath("/", "layout");
+    return JSON.parse(JSON.stringify(row));
+  });
+}
+
+/**
+ * Předčasně uzavře otevřené okno (studenti se přestanou moct zapisovat a odepisovat; správci zapisují dál).
+ * Jen zveřejněné a právě otevřené okno; okno jde znovu otevřít, dokud neuplyne jeho konec.
+ */
+export async function closeEnrollmentWindowEarly(windowId: string) {
+  return safeAction(async () => {
+    const admin = await requirePermission("seminars.windows.manage");
+    const row = await prisma.$transaction(async (tx) => {
+      const before = await tx.enrollmentWindow.findUnique({ where: { id: windowId } });
+      if (!before) throw new Error("Zápisové okno nenalezeno.");
+      if (!windowPhase(before).canCloseEarly) throw new Error("Předčasně uzavřít lze jen právě otevřené okno.");
+      const row = await tx.enrollmentWindow.update({ where: { id: windowId }, data: { closedEarlyAt: new Date(), updatedById: admin.id } });
+      await audit(tx, admin, {
+        action: "seminars.window.close",
+        entityType: "enrollmentWindow",
+        entityId: windowId,
+        summary: `Zápisové okno „${before.name}“ předčasně uzavřeno (podle plánu končilo ${formatDateTime(before.endsAt)})`,
+        data: { endsAt: formatDateTime(before.endsAt) },
+      });
+      return row;
+    });
+    revalidatePath("/", "layout");
+    return JSON.parse(JSON.stringify(row));
+  });
+}
+
+/** Znovu otevře předčasně uzavřené okno, pokud ještě neuplynul jeho konec. */
+export async function reopenEnrollmentWindow(windowId: string) {
+  return safeAction(async () => {
+    const admin = await requirePermission("seminars.windows.manage");
+    const row = await prisma.$transaction(async (tx) => {
+      const before = await tx.enrollmentWindow.findUnique({ where: { id: windowId } });
+      if (!before) throw new Error("Zápisové okno nenalezeno.");
+      if (!windowPhase(before).canReopen) throw new Error("Znovu otevřít lze jen předčasně uzavřené okno, jehož konec ještě neuplynul. Jinak upravte konec zápisu.");
+      const row = await tx.enrollmentWindow.update({ where: { id: windowId }, data: { closedEarlyAt: null, updatedById: admin.id } });
+      await audit(tx, admin, {
+        action: "seminars.window.reopen",
+        entityType: "enrollmentWindow",
+        entityId: windowId,
+        summary: `Zápisové okno „${before.name}“ znovu otevřeno (končí ${formatDateTime(before.endsAt)})`,
+        data: { endsAt: formatDateTime(before.endsAt) },
+      });
+      return row;
+    });
+    await notifyWindowOpenedIfOpen(row);
+    revalidatePath("/", "layout");
+    return JSON.parse(JSON.stringify(row));
+  });
+}
 
 export async function deleteEnrollmentWindow(windowId: string) {
   return safeAction(async () => {
@@ -646,10 +703,9 @@ export async function duplicateEnrollmentWindow(windowId: string) {
         data: {
           name: `${src.name} (kopie)`.slice(0, 200),
           description: src.description,
-          status: "DRAFT",
+          published: false,
           startsAt: src.startsAt,
           endsAt: src.endsAt,
-          visibleToStudents: false,
           reminderDaysBefore: src.reminderDaysBefore,
           allowSelfUnenroll: src.allowSelfUnenroll,
           changesUntil: src.changesUntil,

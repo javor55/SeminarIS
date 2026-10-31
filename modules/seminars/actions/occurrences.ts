@@ -1,7 +1,6 @@
 "use server";
 
 import { requirePermission } from "@/lib/session";
-import { computeEnrollmentStatus } from "@/lib/utils";
 import type { Block, EnrollmentWindowWithBlocks, StudentEnrollment, Subject, SubjectOccurrence, User } from "@/lib/types";
 import { getEnrollmentWindowsWithDetails } from "@/modules/seminars/actions/windows";
 import type { OccurrenceRow } from "@/modules/seminars/components/occurrences/occurrence-columns";
@@ -26,15 +25,14 @@ export async function getSubjectOccurrences(subjectId: string): Promise<Occurren
             ? `${occ.subject.code}${occ.subCode ? "/" + occ.subCode : ""}`
             : occ.subCode ?? "—";
           const teacherName = occ.teacher ? `${occ.teacher.firstName} ${occ.teacher.lastName}` : "—";
-          const status = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
-
+          
           return {
             ...(occ as SubjectOccurrence),
             blockName: block.name,
             block: block as unknown as OccurrenceRow["block"],
             enrollmentWindow: ew,
             enrollmentName: ew.name,
-            statusLabel: status.label,
+            statusLabel: ew.phaseLabel,
             capacityText,
             hasStudents: enrolledCount > 0,
             fullCode,
@@ -42,7 +40,7 @@ export async function getSubjectOccurrences(subjectId: string): Promise<Occurren
             searchText: [ew.name, block.name, fullCode, teacherName].filter(Boolean).join(" "),
             isFull: occ.capacity != null && enrolledCount >= occ.capacity,
             enrolledByMe: false,
-            isWindowOpen: ew.status === "OPEN",
+            isWindowOpen: ew.phase === "OPEN",
           } as unknown as OccurrenceRow;
         })
     )

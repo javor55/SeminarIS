@@ -98,12 +98,11 @@ export const seminarsDemoData: ModuleDemoData = {
     };
     const fourth = core.students.filter((s) => s.grade === 4);
 
-    const windows: { id: string; name: string; description: string; status: "OPEN" | "CLOSED"; startsAt: Date; endsAt: Date; resultsVisibility: "COUNTS" | "NAMES"; reminderDaysBefore: number | null; blocks: BlockSpec[]; enrollShare: number }[] = [
+    const windows: { id: string; name: string; description: string; startsAt: Date; endsAt: Date; resultsVisibility: "COUNTS" | "NAMES"; reminderDaysBefore: number | null; blocks: BlockSpec[]; enrollShare: number }[] = [
       {
         id: "demo-win-open",
         name: "Zápis volitelných seminářů – 4. ročník",
         description: "Vyberte si semináře pro závěrečný ročník: jeden z bloku A, jeden z bloku B a podle zájmu jeden z bloku C.",
-        status: "OPEN",
         startsAt: new Date(now.getTime() - 3 * DAY),
         endsAt: new Date(now.getTime() + 9 * DAY),
         resultsVisibility: "COUNTS",
@@ -115,7 +114,6 @@ export const seminarsDemoData: ModuleDemoData = {
         id: "demo-win-closed",
         name: "Zápis seminářů – 1. kolo (uzavřeno)",
         description: "První kolo zápisu na jazykové a společenskovědní semináře.",
-        status: "CLOSED",
         startsAt: new Date(now.getTime() - 40 * DAY),
         endsAt: new Date(now.getTime() - 26 * DAY),
         resultsVisibility: "NAMES",
@@ -130,10 +128,9 @@ export const seminarsDemoData: ModuleDemoData = {
         id: w.id,
         name: w.name,
         description: w.description,
-        status: w.status,
         startsAt: w.startsAt,
         endsAt: w.endsAt,
-        visibleToStudents: true,
+        published: true,
         resultsVisibility: w.resultsVisibility,
         reminderDaysBefore: w.reminderDaysBefore,
         // Okno se otevřelo už dřív; upozornění „zápis otevřen“ se tak nikdy nepošle

@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { computeEnrollmentStatus } from "@/lib/utils";
 import type { User } from "@/lib/types";
 import { getViewerContext, occurrencesForViewerWhere, windowsForViewerWhere } from "@/modules/seminars/eligibility";
 import { missingBlocksFor, type MissingBlock } from "@/modules/seminars/unenrolled";
-import { syncEnrollmentWindowStatus } from "@/modules/seminars/window-status";
+import { notifyWindowOpenedIfOpen } from "@/modules/seminars/notifications";
+import { windowPhase } from "@/modules/seminars/window-phase";
 
 // Pohled studenta (a hosta) na zápisová okna: stránka Zápisy a karty dashboardu. JEDINÉ místo, které vybírá
 // okna pro studenta: jen okna zveřejněná studentům, ne koncept a určená právě jemu (publikum), výskyty
@@ -16,6 +16,8 @@ export type StudentWindow = {
   name: string;
   description: string | null;
   status: StudentWindowStatus;
+  // Správce zápis uzavřel před koncem
+  closedEarly: boolean;
   startsAt: Date;
   endsAt: Date;
   // Povinné bloky, kde studentovi ještě něco chybí (u hosta a absolventa prázdné)
@@ -38,7 +40,7 @@ export async function listStudentWindows(user: User): Promise<StudentWindow[]> {
   if (!ctx) return [];
   const occWhere = occurrencesForViewerWhere(ctx);
   const windows = await prisma.enrollmentWindow.findMany({
-    where: { visibleToStudents: true, status: { not: "DRAFT" }, ...windowsForViewerWhere(ctx) },
+    where: windowsForViewerWhere(ctx),
     include: {
       blocks: {
         where: { deletedAt: null },
@@ -59,12 +61,12 @@ export async function listStudentWindows(user: User): Promise<StudentWindow[]> {
     },
   });
 
-  // Lazy synchronizace stavu s časem (stejně jako ostatní čtení oken)
-  const statuses = await Promise.all(windows.map((w) => syncEnrollmentWindowStatus(w)));
+  // Okno se mohlo od posledního čtení otevřít: doběhne upozornění „zápis otevřen“ (jednou za okno)
+  await Promise.all(windows.map((w) => notifyWindowOpenedIfOpen(w)));
 
-  const rows = windows.map((w, i): StudentWindow => {
-    const computed = computeEnrollmentStatus(statuses[i], w.startsAt, w.endsAt);
-    const status: StudentWindowStatus = computed.is === "open" ? "OPEN" : computed.is === "planned" ? "SCHEDULED" : "CLOSED";
+  const rows = windows.map((w): StudentWindow => {
+    const info = windowPhase(w);
+    const status: StudentWindowStatus = info.phase === "OPEN" ? "OPEN" : info.phase === "PLANNED" ? "SCHEDULED" : "CLOSED";
     const enrolledByBlock = new Map<string, number>();
     const enrollments: StudentWindow["enrollments"] = [];
     for (const b of w.blocks) {
@@ -81,6 +83,7 @@ export async function listStudentWindows(user: User): Promise<StudentWindow[]> {
       name: w.name,
       description: w.description,
       status,
+      closedEarly: info.closedEarly,
       startsAt: w.startsAt,
       endsAt: w.endsAt,
       // Host a student mimo studium se do zápisu nezapisují, nic jim "nechybí"

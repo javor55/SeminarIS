@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/datetime";
-import { computeEnrollmentStatus } from "@/lib/utils";
+import { windowPhase } from "@/modules/seminars/window-phase";
 
 /** Záložka „Zápisy“ v detailu uživatele: zápisy studenta do seminářů po zápisových oknech (od nejnovějšího). */
 export async function UserEnrollmentsPanel({ userId, canOpenWindows }: { userId: string; canOpenWindows: boolean }) {
@@ -32,7 +32,7 @@ export async function UserEnrollmentsPanel({ userId, canOpenWindows }: { userId:
       <CardContent className="space-y-5">
         {sorted.length === 0 && <p className="text-sm text-muted-foreground">Uživatel zatím nemá žádné zápisy.</p>}
         {sorted.map(({ window: w, items }) => {
-          const status = computeEnrollmentStatus(w.status, w.startsAt, w.endsAt);
+          const status = windowPhase(w);
           return (
             <div key={w.id} className="space-y-2" data-testid="user-enrollment-window" data-window={w.name}>
               <div className="flex flex-wrap items-center gap-2">

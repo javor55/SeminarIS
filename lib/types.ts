@@ -17,16 +17,21 @@ export type User = {
   updatedAt: string | Date;
 };
 
-export type EnrollmentStatus = "DRAFT" | "SCHEDULED" | "OPEN" | "CLOSED";
-
 export type EnrollmentWindow = {
   id: string;
   name: string;
   description?: string;
-  status: EnrollmentStatus;
   startsAt: string | Date;
   endsAt: string | Date;
-  visibleToStudents: boolean;
+  // Zveřejněno studentům (false = koncept) a předčasné uzavření; stav plánováno / otevřeno / uzavřeno
+  // se odvozuje z dat (`phase` dodává server, viz modules/seminars/window-phase.ts)
+  published: boolean;
+  closedEarlyAt?: string | Date | null;
+  phase?: "DRAFT" | "PLANNED" | "OPEN" | "CLOSED";
+  phaseLabel?: string;
+  closedEarly?: boolean;
+  canReopen?: boolean;
+  canCloseEarly?: boolean;
   // Pravidla okna (modul Semináře): smí se student sám odepsat, do kdy smí měnit zápis (null = konec okna),
   // co o zapsaných vidí studenti
   allowSelfUnenroll?: boolean;
