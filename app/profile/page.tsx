@@ -93,10 +93,10 @@ export default function ProfilePage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* INFO KARTA */}
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-border">
           <CardHeader>
-            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-2">
-                <UserIcon className="w-6 h-6 text-slate-600" />
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-2">
+                <UserIcon className="w-6 h-6 text-muted-foreground" />
             </div>
             <CardTitle>{user.firstName} {user.lastName}</CardTitle>
             <CardDescription>{user.email}</CardDescription>
@@ -104,13 +104,13 @@ export default function ProfilePage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="text-muted-foreground">Role:</div>
-                <div className="font-medium text-slate-800">{user.role}</div>
+                <div className="font-medium text-foreground">{user.role}</div>
                 <div className="text-muted-foreground">ID systému:</div>
-                <div className="font-mono text-[10px] text-slate-400 truncate">{user.id}</div>
+                <div className="font-mono text-[10px] text-muted-foreground truncate">{user.id}</div>
             </div>
           </CardContent>
           <CardFooter className="pt-0">
-             <div className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full font-medium">
+             <div className="flex items-center gap-1.5 text-xs text-success bg-success/10 px-2.5 py-1 rounded-full font-medium">
                 <ShieldCheck className="w-3.5 h-3.5" /> Účet je aktivní
              </div>
           </CardFooter>
@@ -120,7 +120,7 @@ export default function ProfilePage() {
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <KeyRound className="w-5 h-5 text-blue-500" />
+              <KeyRound className="w-5 h-5 text-info" />
               Změna hesla
             </CardTitle>
             <CardDescription>

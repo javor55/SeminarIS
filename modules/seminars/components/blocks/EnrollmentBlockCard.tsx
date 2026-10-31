@@ -286,7 +286,7 @@ export function EnrollmentBlockCard({
     <div
       className={cn(
         "rounded-lg border bg-card text-card-foreground shadow-sm flex flex-col",
-        studentEnrolledInBlock && "border-emerald-500"
+        studentEnrolledInBlock && "border-success"
       )}
     >
       <BlockHeader

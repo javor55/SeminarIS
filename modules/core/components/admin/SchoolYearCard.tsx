@@ -44,32 +44,32 @@ export function SchoolYearCard({ info, canManage }: { info: SchoolYearInfo; canM
         </CardDescription>
       </CardHeader>
       {canManage && (
-      <CardContent className="space-y-3">
-        <Button asChild>
-          <Link href="/admin/close-year">Uzavřít školní rok {info.currentYear.label}…</Link>
-        </Button>
-        {info.canSetYearManually && (
-          <div className="space-y-1 pt-2 border-t">
-            <Label htmlFor="school-year">Počáteční nastavení roku</Label>
-            <p className="text-xs text-muted-foreground">
-              Jen dokud nejsou studenti zařazení do tříd; potom se rok mění uzavřením.
-            </p>
-            <div className="flex gap-2">
-              <NativeSelect id="school-year" className="w-[180px]" value={selected} onChange={(e) => setSelected(e.target.value)}>
-                {info.years.map((y) => (
-                  <option key={y.startYear} value={y.startYear}>
-                    {y.label}
-                    {y.isCurrent ? " (aktuální)" : ""}
-                  </option>
-                ))}
-              </NativeSelect>
-              <Button variant="outline" disabled={!changed || busy} onClick={save}>
-                Nastavit
-              </Button>
+        <CardContent className="space-y-3">
+          <Button asChild>
+            <Link href="/admin/close-year">Uzavřít školní rok {info.currentYear.label}…</Link>
+          </Button>
+          {info.canSetYearManually && (
+            <div className="space-y-1 pt-2 border-t">
+              <Label htmlFor="school-year">Počáteční nastavení roku</Label>
+              <p className="text-xs text-muted-foreground">
+                Jen dokud nejsou studenti zařazení do tříd; potom se rok mění uzavřením.
+              </p>
+              <div className="flex gap-2">
+                <NativeSelect id="school-year" className="w-[180px]" value={selected} onChange={(e) => setSelected(e.target.value)}>
+                  {info.years.map((y) => (
+                    <option key={y.startYear} value={y.startYear}>
+                      {y.label}
+                      {y.isCurrent ? " (aktuální)" : ""}
+                    </option>
+                  ))}
+                </NativeSelect>
+                <Button variant="outline" disabled={!changed || busy} onClick={save}>
+                  Nastavit
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
-      </CardContent>
+          )}
+        </CardContent>
       )}
     </Card>
   );

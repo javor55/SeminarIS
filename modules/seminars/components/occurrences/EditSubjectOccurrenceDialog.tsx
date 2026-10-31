@@ -11,13 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { getAllUsers } from "@/modules/core/actions/users";
 import { getSubjectOptions } from "@/modules/core/actions/subjects";
 import { getAudienceOptions } from "@/modules/seminars/actions/windows";
@@ -33,6 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Chip } from "@/components/ui/chip";
 
 
 export function EditSubjectOccurrenceDialog({
@@ -101,35 +96,27 @@ export function EditSubjectOccurrenceDialog({
 
         <div className="space-y-3 py-2">
           <div className="space-y-1">
-            <label className="text-sm font-medium">Předmět</label>
-            <Select value={subjectId} onValueChange={setSubjectId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Vyber předmět" />
-              </SelectTrigger>
-              <SelectContent>
-                {subjects.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name} {s.code ? `(${s.code})` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label htmlFor="occurrence-subject" className="text-sm font-medium">Předmět</label>
+            <NativeSelect id="occurrence-subject" value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+              <option value="" disabled>Vyber předmět</option>
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} {s.code ? `(${s.code})` : ""}
+                </option>
+              ))}
+            </NativeSelect>
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Učitel</label>
-            <Select value={teacherId} onValueChange={setTeacherId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Vyber učitele" />
-              </SelectTrigger>
-              <SelectContent>
-                {teachers.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.firstName} {t.lastName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label htmlFor="occurrence-teacher" className="text-sm font-medium">Učitel</label>
+            <NativeSelect id="occurrence-teacher" value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
+              <option value="">Vyber učitele</option>
+              {teachers.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.firstName} {t.lastName}
+                </option>
+              ))}
+            </NativeSelect>
           </div>
 
           <div className="flex gap-2">
@@ -162,16 +149,14 @@ export function EditSubjectOccurrenceDialog({
               {Array.from({ length: DEFAULT_STUDY_YEARS }, (_, i) => i + 1).map((g) => {
                 const active = restrictGrades.includes(g);
                 return (
-                  <button
+                  <Chip
                     key={g}
-                    type="button"
                     data-grade={g}
-                    aria-pressed={active}
+                    pressed={active}
                     onClick={() => setRestrictGrades((prev) => (active ? prev.filter((x) => x !== g) : [...prev, g].sort((a, b) => a - b)))}
-                    className={`rounded-md border px-3 py-1 text-sm ${active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
                   >
                     {g}. ročník
-                  </button>
+                  </Chip>
                 );
               })}
             </div>
@@ -179,16 +164,10 @@ export function EditSubjectOccurrenceDialog({
               {classOptions.map((c) => {
                 const active = restrictClassIds.includes(c.id);
                 return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    data-class={c.label}
-                    aria-pressed={active}
-                    onClick={() => setRestrictClassIds((prev) => (active ? prev.filter((x) => x !== c.id) : [...prev, c.id]))}
-                    className={`rounded-md border px-2.5 py-0.5 text-xs ${active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
-                  >
+                  <Chip key={c.id}
+                    data-class={c.label} pressed={active} size="sm" onClick={() => setRestrictClassIds((prev) => (active ? prev.filter((x) => x !== c.id) : [...prev, c.id]))}>
                     {c.label}
-                  </button>
+                  </Chip>
                 );
               })}
             </div>
@@ -245,13 +224,13 @@ export function EditSubjectOccurrenceDialog({
             <Button 
                 onClick={async () => {
                   if (!subjectId) {
-                    alert("Vyberte předmět.");
+                    toast.error("Vyberte předmět.");
                     return;
                   }
                   
                   const capNum = capacity ? Number(capacity) : 0;
                   if (capNum < 0) {
-                    alert("Kapacita nesmí být záporná.");
+                    toast.error("Kapacita nesmí být záporná.");
                     return;
                   }
 

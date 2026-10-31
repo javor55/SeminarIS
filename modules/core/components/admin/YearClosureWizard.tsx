@@ -309,7 +309,7 @@ export function YearClosureWizard({ preview }: { preview: YearClosurePreview }) 
       </div>
 
       {summary.warnings.length > 0 && (
-        <ul className="space-y-1 text-sm rounded-md border border-amber-500/30 bg-amber-500/10 p-3" data-testid="closure-warnings">
+        <ul className="space-y-1 text-sm rounded-md border border-warning/30 bg-warning/10 p-3" data-testid="closure-warnings">
           {summary.warnings.map((w) => (
             <li key={w}>{w}</li>
           ))}

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { subjectGradesLabel } from "@/lib/school";
+import { Chip } from "@/components/ui/chip";
 
 export type PickerSubject = { id: string; name: string; code: string | null; grades: number[] };
 
@@ -63,16 +64,9 @@ export function SubjectPicker({
             <div className="mb-1 text-xs font-semibold uppercase text-muted-foreground">{g.title}</div>
             <div className="flex flex-wrap gap-2">
               {g.subjects.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  data-subject={s.code ?? s.id}
-                  onClick={() => onToggle(s.id)}
-                  aria-pressed={selected.includes(s.id)}
-                  className={`rounded-md border px-3 py-1 text-sm ${selected.includes(s.id) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
-                >
+                <Chip key={s.id} data-subject={s.code ?? s.id} onClick={() => onToggle(s.id)} pressed={selected.includes(s.id)}>
                   {s.name}
-                </button>
+                </Chip>
               ))}
             </div>
           </div>

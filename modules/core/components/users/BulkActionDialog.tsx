@@ -115,7 +115,7 @@ export function BulkActionDialog({
         )}
 
         <div className="space-y-2 rounded-md border bg-muted/40 p-3 text-sm" data-testid="bulk-preview" aria-live="polite">
-          {error && <p className="text-destructive">{error}</p>}
+          {error && <p className="text-danger">{error}</p>}
           {!error && !preview && <p className="text-muted-foreground">Načítám náhled…</p>}
           {preview && (
             <>
@@ -136,7 +136,7 @@ export function BulkActionDialog({
                   {preview.eligible > preview.sample.length ? " …" : ""}
                 </p>
               )}
-              {preview.blocked && <p className="font-medium text-destructive" data-testid="bulk-blocked">{preview.blocked}</p>}
+              {preview.blocked && <p className="font-medium text-danger" data-testid="bulk-blocked">{preview.blocked}</p>}
             </>
           )}
         </div>

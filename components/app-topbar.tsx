@@ -70,12 +70,9 @@ export function AppTopbar({ user }: { user?: User }) {
           {user ? (
             <>
               <span className="text-sm text-muted-foreground">{user.email}</span>
-              <button
-                onClick={logout}
-                className="text-sm px-3 py-1 rounded-md bg-muted hover:bg-accent"
-              >
+              <Button variant="secondary" size="sm" onClick={logout}>
                 Odhlásit
-              </button>
+              </Button>
             </>
           ) : (
             <Link

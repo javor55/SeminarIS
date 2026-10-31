@@ -15,6 +15,7 @@ import { ConfirmAction } from "@/modules/core/components/users/ConfirmAction";
 import { createClasses, deleteClass, type ClassOverview, type ClassStudent } from "@/modules/core/actions/classes";
 import { setUsersClass } from "@/modules/core/actions/users";
 import { GRADES } from "@/lib/school";
+import { Chip } from "@/components/ui/chip";
 
 /** Záložka Třídy: seznam tříd, studenti třídy, přesun do jiné třídy, generátor a smazání prázdné třídy. */
 export function ClassesTab({
@@ -32,7 +33,7 @@ export function ClassesTab({
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // eslint-disable-next-line no-unused-vars
+   
   async function run<T>(action: () => Promise<T>, success: (result: T) => string) {
     setBusy(true);
     try {
@@ -63,16 +64,10 @@ export function ClassesTab({
               <Label>Ročníky</Label>
               <div className="flex gap-2" id="class-grades">
                 {GRADES.map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    data-grade={g}
-                    aria-pressed={grades.includes(g)}
-                    onClick={() => toggleGrade(g)}
-                    className={`rounded-md border px-3 py-1 text-sm ${grades.includes(g) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
-                  >
+                  <Chip key={g}
+                    data-grade={g} pressed={grades.includes(g)} onClick={() => toggleGrade(g)}>
                     {g}.
-                  </button>
+                  </Chip>
                 ))}
               </div>
             </div>
@@ -121,15 +116,16 @@ export function ClassesTab({
                     <Fragment key={c.id}>
                       <TableRow data-class={c.label}>
                         <TableCell>
-                          <button
+                          <Button
                             type="button"
-                            className="inline-flex items-center gap-1 font-medium hover:underline"
+                            variant="ghost"
+                            className="h-auto gap-1 p-0 hover:bg-transparent hover:underline"
                             aria-expanded={isOpen}
                             onClick={() => setOpen(isOpen ? null : c.id)}
                           >
                             {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                             {c.label}
-                          </button>
+                          </Button>
                         </TableCell>
                         <TableCell data-testid="class-count">{c.studentCount}</TableCell>
                         <TableCell className="text-right">
@@ -140,7 +136,7 @@ export function ClassesTab({
                               actionLabel="Smazat"
                               onConfirm={() => run(async () => unwrap(await deleteClass(c.id)), () => "Třída smazána.")}
                               trigger={
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" title="Smazat třídu">
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-danger" title="Smazat třídu">
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
                               }

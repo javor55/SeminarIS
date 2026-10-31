@@ -30,7 +30,7 @@ export function ProfileTab({ user, actions }: { user: UserDetail; actions?: Reac
           <Field label="E-mail">{user.email}</Field>
           <Field label="Role"><Badge variant="outline">{ROLE_LABELS[user.role]}</Badge></Field>
           <Field label="Účet">
-            {user.isActive ? <Badge className="bg-emerald-600 hover:bg-emerald-600">aktivní</Badge> : <Badge variant="secondary">neaktivní</Badge>}
+            {user.isActive ? <Badge variant="successSolid">aktivní</Badge> : <Badge variant="secondary">neaktivní</Badge>}
           </Field>
           {user.role === "STUDENT" && (
             <Field label="Stav studia" testId="user-study">

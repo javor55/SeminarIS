@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -33,15 +34,9 @@ export function SubjectDetailView({
         title={
           <span className="flex flex-wrap items-center gap-3">
             {subject.name}
-            <span
-              className={
-                subject.isActive
-                  ? "bg-emerald-500/15 text-emerald-600 px-2 py-1 rounded text-xs font-medium"
-                  : "bg-red-500/15 text-red-600 px-2 py-1 rounded text-xs font-medium"
-              }
-            >
+            <Badge variant={subject.isActive ? "success" : "danger"} className="rounded px-2 py-1 font-medium">
               {subject.isActive ? "Aktivní" : "Archivováno"}
-            </span>
+            </Badge>
             {subject.code && <span className="text-xs bg-muted px-2 py-1 rounded-md font-normal">{subject.code}</span>}
           </span>
         }

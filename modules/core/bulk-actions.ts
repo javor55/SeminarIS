@@ -25,7 +25,7 @@ export function plural(n: number, forms: [string, string, string]): string {
 const countOf = (n: number, forms: [string, string, string] = NOUN_USERS) => `${n} ${plural(n, forms)}`;
 
 /** Rozdělí uživatele na dotčené a přeskočené podle důvodu (první pravidlo, které sedí, vyhrává). */
-/* eslint-disable no-unused-vars -- názvy parametrů v typech funkcí */
+ 
 function triage(users: BulkUserInfo[], rules: { reason: string; skip: (u: BulkUserInfo) => boolean }[]) {
   const eligible: BulkUserInfo[] = [];
   const skipped = new Map<string, number>();

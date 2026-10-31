@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars -- názvy parametrů v typech funkcí */
+ 
 import type { User } from "@/lib/types";
 import { getEnabledModuleIds } from "@/lib/modules";
 import { MODULE_SERVERS } from "@/modules/server-registry";

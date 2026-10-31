@@ -111,13 +111,13 @@ export function StudentMakeupView({
                 toast.error((err as Error).message);
               }
             }}
-            trigger={<Button size="sm" variant="outline" className="text-destructive">Odhlásit</Button>}
+            trigger={<Button size="sm" variant="outline" className="text-danger">Odhlásit</Button>}
           />
         </div>
       );
     }
     if (isPastDeadline(s)) return <span className="text-xs text-muted-foreground">po uzávěrce</span>;
-    if (s.registeredCount >= s.capacity) return <span className="text-xs text-destructive">plno</span>;
+    if (s.registeredCount >= s.capacity) return <span className="text-xs text-danger">plno</span>;
     if (activeRegs.some((o) => overlaps(o.session, s))) return <span className="text-xs text-muted-foreground">kolize s jiným zápisem</span>;
     return (
       <RegisterDialog
@@ -190,7 +190,7 @@ export function StudentMakeupView({
                   const rowClass = s.cancelledAt
                     ? "bg-destructive/5"
                     : r
-                      ? "bg-emerald-500/10"
+                      ? "bg-success/10"
                       : "";
                   return (
                     <TableRow key={s.id} data-session={s.id} data-registered={r ? "true" : "false"} className={rowClass}>
@@ -199,7 +199,7 @@ export function StudentMakeupView({
                         {s.cancelledAt && <Badge variant="destructive" className="ml-2">termín zrušen</Badge>}
                         {r && !s.cancelledAt && <Badge variant="success" className="ml-2">Zapsáno</Badge>}
                         {s.cancelledAt && s.cancelReason && (
-                          <div className="text-xs font-normal text-destructive">Důvod: {s.cancelReason}</div>
+                          <div className="text-xs font-normal text-danger">Důvod: {s.cancelReason}</div>
                         )}
                         {s.note && <div className="text-xs text-muted-foreground font-normal">{s.note}</div>}
                         {!s.cancelledAt && (

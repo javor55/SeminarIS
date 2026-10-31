@@ -24,6 +24,7 @@ import {
 } from "@/modules/core/actions/assignments";
 import { subjectInGrade } from "@/lib/school";
 import type { UserListRow as UserRow } from "@/modules/core/users-query";
+import { Chip } from "@/components/ui/chip";
 
 /**
  * Uživatelé → učitel → Úvazky: předměty a třídy, které učitel učí v aktuálním školním roce.
@@ -135,16 +136,18 @@ function TeacherAssignmentsEditor({ user }: { user: UserRow }) {
                         <span key={a.id} className="inline-flex items-center gap-1 rounded border px-1.5 text-xs">
                           {a.classLabel}
                           {editable && (
-                            <button
+                            <Button
                               type="button"
+                              variant="ghost"
+                              size="icon"
                               title="Odebrat úvazek"
                               aria-label={`Odebrat ${g.name} ${a.classLabel}`}
-                              className="text-muted-foreground hover:text-destructive"
+                              className="h-5 w-5 text-muted-foreground hover:bg-transparent hover:text-danger"
                               disabled={busy}
                               onClick={() => mutate(async () => unwrap(await deleteTeachingAssignment(a.id)), "Úvazek odebrán.")}
                             >
                               ×
-                            </button>
+                            </Button>
                           )}
                         </span>
                       ))}
@@ -179,16 +182,10 @@ function TeacherAssignmentsEditor({ user }: { user: UserRow }) {
                       ) : (
                         <div className="flex flex-wrap gap-2" id="assign-classes">
                           {allowedClasses.map((c) => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              data-class={c.label}
-                              aria-pressed={classIds.includes(c.id)}
-                              onClick={() => toggleClass(c.id)}
-                              className={`rounded-md border px-3 py-1 text-sm ${classIds.includes(c.id) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
-                            >
+                            <Chip key={c.id}
+                              data-class={c.label} pressed={classIds.includes(c.id)} onClick={() => toggleClass(c.id)}>
                               {c.label}
-                            </button>
+                            </Chip>
                           ))}
                         </div>
                       )}

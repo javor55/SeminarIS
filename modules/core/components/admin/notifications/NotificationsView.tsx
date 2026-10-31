@@ -143,7 +143,7 @@ function SettingsCard({ data, onChange }: { data: NotificationsOverview; onChang
       </CardHeader>
       <CardContent className="space-y-5">
         {!status.configured && (
-          <p className="text-sm rounded-md border border-amber-500/30 bg-amber-500/10 p-3" data-testid="email-missing">
+          <p className="text-sm rounded-md border border-warning/30 bg-warning/10 p-3" data-testid="email-missing">
             E-maily se neodesílají, chybí nastavení:{" "}
             {status.missing.map((m, i) => (
               <span key={m}>{i > 0 && " a "}<code>{m}</code></span>
@@ -167,7 +167,7 @@ function SettingsCard({ data, onChange }: { data: NotificationsOverview; onChang
             {" · "}tento měsíc <strong>{nf.format(usage.month)} / {nf.format(usage.monthlyLimit)}</strong>
           </div>
           {(dailyReached || monthlyReached) && (
-            <p className="text-sm text-destructive" data-testid="limit-warning">
+            <p className="text-sm text-danger" data-testid="limit-warning">
               {monthlyReached ? "Měsíční" : "Denní"} limit je vyčerpán, další e-maily se neodesílají
               {usage.skippedToday > 0 ? ` (dnes přeskočeno ${nf.format(usage.skippedToday)})` : ""}.
             </p>

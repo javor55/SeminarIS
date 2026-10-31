@@ -34,6 +34,7 @@ import {
   type UserSort,
 } from "@/modules/core/users-filter";
 import type { UserListRow } from "@/modules/core/users-query";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const STUDY_LABELS: Record<(typeof USER_STUDY_STATUSES)[number], string> = { ACTIVE: "Studuje", GRADUATED: "Absolvent", LEFT: "Ukončil studium" };
 
@@ -229,8 +230,8 @@ function UsersList({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="user-counts">
         <Tile label="Všichni uživatelé" value={counts.total} href="/users" />
         <Tile label="Studujících" value={counts.studying} href="/users?role=STUDENT&study=ACTIVE&active=1" />
-        <Tile label="Bez třídy" value={counts.noClass} href="/users?noclass=1" tone="text-amber-600" />
-        <Tile label="Čeká na schválení" value={counts.pending} href={can(currentUser.role, "core.users.manage") ? "/users?tab=approvals" : "/users?pending=1"} tone="text-orange-600" />
+        <Tile label="Bez třídy" value={counts.noClass} href="/users?noclass=1" tone="text-warning" />
+        <Tile label="Čeká na schválení" value={counts.pending} href={can(currentUser.role, "core.users.manage") ? "/users?tab=approvals" : "/users?pending=1"} tone="text-warning" />
       </div>
 
       {counts.total <= 1 && !filtered ? (
@@ -291,14 +292,20 @@ function UsersList({
               <option value="1">Aktivní</option>
               <option value="0">Neaktivní</option>
             </FilterSelect>
-            <label className="flex h-9 items-center gap-2 text-sm">
-              <input type="checkbox" data-testid="filter-pending" checked={!!query.pending} onChange={(e) => setFilter({ pending: e.target.checked || undefined })} />
-              Ke schválení
-            </label>
-            <label className="flex h-9 items-center gap-2 text-sm">
-              <input type="checkbox" data-testid="filter-noclass" checked={!!query.noClass} onChange={(e) => setFilter({ noClass: e.target.checked || undefined })} />
-              Bez třídy
-            </label>
+            <Checkbox
+              data-testid="filter-pending"
+              labelClassName="h-9"
+              checked={!!query.pending}
+              onChange={(e) => setFilter({ pending: e.target.checked || undefined })}
+              label="Ke schválení"
+            />
+            <Checkbox
+              data-testid="filter-noclass"
+              labelClassName="h-9"
+              checked={!!query.noClass}
+              onChange={(e) => setFilter({ noClass: e.target.checked || undefined })}
+              label="Bez třídy"
+            />
             {filtered && (
               <Button variant="ghost" size="sm" onClick={() => go({})} data-testid="filter-reset">
                 Zrušit filtry
@@ -348,9 +355,10 @@ function UsersList({
           {showBanner && (
             <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm" data-testid="select-all-banner">
               Vybráno {selectedCount} na této stránce.{" "}
-              <button
+              <Button
                 type="button"
-                className="font-medium underline underline-offset-4"
+                variant="link"
+                className="h-auto p-0"
                 data-testid="select-all-matching"
                 onClick={() => {
                   setAllMatching(true);
@@ -358,7 +366,7 @@ function UsersList({
                 }}
               >
                 Vybrat všech {list.total} odpovídajících filtru
-              </button>
+              </Button>
               {list.total > BULK_MAX && <span className="text-muted-foreground"> (nejvýš {BULK_MAX} najednou, zúžte filtr)</span>}
             </div>
           )}
@@ -373,20 +381,20 @@ function UsersList({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[40px]">
-                    <input type="checkbox" aria-label="Vybrat stránku" data-testid="select-page" checked={pageAllChecked} onChange={togglePage} />
+                    <Checkbox aria-label="Vybrat stránku" data-testid="select-page" checked={pageAllChecked} onChange={togglePage} />
                   </TableHead>
                   <TableHead>
-                    <button type="button" onClick={() => sortBy("name")} className="font-medium">Jméno<SortIcon sort="name" /></button>
+                    <Button type="button" variant="ghost" onClick={() => sortBy("name")} className="h-auto gap-0 p-0 hover:bg-transparent">Jméno<SortIcon sort="name" /></Button>
                   </TableHead>
                   <TableHead>
-                    <button type="button" onClick={() => sortBy("email")} className="font-medium">E-mail<SortIcon sort="email" /></button>
+                    <Button type="button" variant="ghost" onClick={() => sortBy("email")} className="h-auto gap-0 p-0 hover:bg-transparent">E-mail<SortIcon sort="email" /></Button>
                   </TableHead>
                   <TableHead>Třída</TableHead>
                   <TableHead>
-                    <button type="button" onClick={() => sortBy("created")} className="font-medium">Registrace<SortIcon sort="created" /></button>
+                    <Button type="button" variant="ghost" onClick={() => sortBy("created")} className="h-auto gap-0 p-0 hover:bg-transparent">Registrace<SortIcon sort="created" /></Button>
                   </TableHead>
                   <TableHead>
-                    <button type="button" onClick={() => sortBy("login")} className="font-medium">Poslední přihlášení<SortIcon sort="login" /></button>
+                    <Button type="button" variant="ghost" onClick={() => sortBy("login")} className="h-auto gap-0 p-0 hover:bg-transparent">Poslední přihlášení<SortIcon sort="login" /></Button>
                   </TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Aktivní</TableHead>
@@ -407,7 +415,7 @@ function UsersList({
                   return (
                     <TableRow key={u.id} data-user={u.email} data-testid="user-row">
                       <TableCell>
-                        <input type="checkbox" aria-label={`Vybrat ${name}`} checked={isChecked(u.id)} onChange={() => toggle(u.id)} />
+                        <Checkbox aria-label={`Vybrat ${name}`} checked={isChecked(u.id)} onChange={() => toggle(u.id)} />
                       </TableCell>
                       <TableCell className="font-medium">
                         <Link href={`/users/${u.id}`} className="hover:underline" data-testid="user-link">{name}</Link>
@@ -429,7 +437,7 @@ function UsersList({
                         <div className="flex items-center gap-1">
                           <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0" title="Detail uživatele">
                             <Link href={`/users/${u.id}`} aria-label={`Detail – ${name}`} data-testid="user-detail-link">
-                              <Eye className="w-4 h-4 text-emerald-600" />
+                              <Eye className="w-4 h-4 text-success" />
                             </Link>
                           </Button>
                           {can(currentUser.role, "core.admin") && (
@@ -496,7 +504,7 @@ function Tile({ label, value, href, tone }: { label: string; value: number; href
   );
 }
 
-/* eslint-disable no-unused-vars -- název parametru v typu funkce */
+ 
 function FilterSelect({ label, id, value, onChange, children }: { label: string; id: string; value: string; onChange: (v: string) => void; children: React.ReactNode }) {
   return (
     <NativeSelect className="w-[170px]" aria-label={label} data-testid={`filter-${id}`} value={value} onChange={(e) => onChange(e.target.value)}>

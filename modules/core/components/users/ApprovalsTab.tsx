@@ -20,6 +20,7 @@ import { approveAsTeacher, approveUser, approveUsers, rejectUser } from "@/modul
 import type { ClassOption } from "@/modules/core/actions/classes";
 import { formatDateTime } from "@/lib/datetime";
 import type { UserListRow as UserRow } from "@/modules/core/users-query";
+import { Checkbox } from "@/components/ui/checkbox";
 
 /** Hosté čekající na schválení (aktivní účty s rolí GUEST). */
 export function pendingApprovals(users: UserRow[]) {
@@ -88,8 +89,7 @@ export function ApprovalsTab({ users, classes }: { users: UserRow[]; classes: Cl
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[40px]">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     aria-label="Vybrat všechny"
                     checked={allSelected}
                     onChange={() => setSelected(allSelected ? [] : pending.map((u) => u.id))}
@@ -106,8 +106,7 @@ export function ApprovalsTab({ users, classes }: { users: UserRow[]; classes: Cl
               {pending.map((u) => (
                 <TableRow key={u.id} data-user={u.email}>
                   <TableCell>
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       aria-label={`Vybrat ${nameOf(u)}`}
                       checked={selected.includes(u.id)}
                       onChange={() => toggle(u.id)}
@@ -151,7 +150,7 @@ export function ApprovalsTab({ users, classes }: { users: UserRow[]; classes: Cl
                         >
                           Schválit jako učitele
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onSelect={() => setReject(u)}>
+                        <DropdownMenuItem className="text-danger" onSelect={() => setReject(u)}>
                           Zamítnout
                         </DropdownMenuItem>
                       </DropdownMenuContent>

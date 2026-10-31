@@ -25,17 +25,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { computeEnrollmentStatus } from "@/lib/utils";
+import { formatDateTime } from "@/lib/datetime";
 
-// Pomocná funkce pro formátování data
-function formatDateTime(iso: string | Date) {
-  return new Date(iso).toLocaleString("cs-CZ", {
-    day: "numeric",
-    month: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 type EnrollmentHeaderProps = {
   enrollmentWindow: EnrollmentWindowWithBlocks;
@@ -96,7 +87,7 @@ export function EnrollmentHeader({
           ...data.blocks.map(b => {
              const ch = s.choices[b.id];
              if (!ch) return "—";
-             const timeStr = new Date(ch.at).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+             const timeStr = formatDateTime(ch.at);
              return `${ch.label} (${timeStr})`;
           })
         ];
@@ -130,7 +121,7 @@ export function EnrollmentHeader({
               occ.subject.name,
               occ.subCode || "",
               occ.teacher ? `${occ.teacher.firstName} ${occ.teacher.lastName}` : "—",
-              new Date(en.createdAt).toLocaleString("cs-CZ")
+              formatDateTime(en.createdAt)
             ]);
           });
         });
@@ -304,7 +295,7 @@ export function EnrollmentHeader({
                 const m = Math.floor((diff % 3600000) / 60000);
                 const s = Math.floor((diff % 60000) / 1000);
                 return (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 font-medium animate-pulse">
+                  <div className="text-xs text-info font-medium animate-pulse">
                     Otevře se za {d > 0 ? `${d}d ` : ""}{h}h {m}m {s}s
                   </div>
                 );
@@ -317,7 +308,7 @@ export function EnrollmentHeader({
                 const m = Math.floor((diff % 3600000) / 60000);
                 const s = Math.floor((diff % 60000) / 1000);
                 return (
-                  <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                  <div className="text-xs text-success font-medium">
                     Uzavře se za {d > 0 ? `${d}d ` : ""}{h}h {m}m {s}s
                   </div>
                 );
@@ -329,7 +320,7 @@ export function EnrollmentHeader({
       </div>
 
       {user.role === "GUEST" && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-md flex items-center gap-3">
+        <div className="bg-warning/10 border border-warning/30 text-warning p-4 rounded-md flex items-center gap-3">
           <div className="flex-shrink-0">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

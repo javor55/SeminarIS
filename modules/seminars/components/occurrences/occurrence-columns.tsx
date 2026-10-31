@@ -137,7 +137,7 @@ export function getOccurrenceColumns(opts: {
           {_row.original.fullCode ?? ""}
         </span>
         {_row.original.restrictionLabel && (
-          <div className="text-[11px] text-amber-700 dark:text-amber-400" data-testid="occurrence-restriction-label">
+          <div className="text-[11px] text-warning" data-testid="occurrence-restriction-label">
             jen: {_row.original.restrictionLabel}
           </div>
         )}

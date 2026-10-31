@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { can } from "@/modules/registry";
 import { PageHeader } from "@/components/page-header";
 import { GRADES } from "@/lib/school";
+import { Checkbox } from "@/components/ui/checkbox";
 
 function EditSubjectForm({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -134,10 +135,7 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
           <label className="text-sm font-medium">Ročníky</label>
           <div className="flex flex-wrap items-center gap-3" id="subject-grades">
             {GRADES.map((g) => (
-              <label key={g} className="flex items-center gap-1.5 text-sm">
-                <input type="checkbox" data-grade={g} checked={grades.includes(g)} onChange={() => toggleGrade(g)} />
-                {g}. ročník
-              </label>
+              <Checkbox key={g} data-grade={g} checked={grades.includes(g)} onChange={() => toggleGrade(g)} label={`${g}. ročník`} />
             ))}
           </div>
           <p className="text-xs text-muted-foreground">Ročníky, ve kterých se předmět vyučuje. Nic nezaškrtnuto = všechny.</p>
@@ -161,7 +159,7 @@ function EditSubjectForm({ params }: { params: { id: string } }) {
           <TiptapEditor value={syllabus} onChange={setSyllabus} />
         </div>
 
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
 
         <div className="flex gap-2">
           <Button onClick={handleSave} disabled={saving}>

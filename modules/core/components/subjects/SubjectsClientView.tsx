@@ -124,7 +124,7 @@ export function SubjectsClientView({ subjects, currentUser }: { subjects: Subjec
                   <CardTitle className="text-md">Aktivní</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-3xl font-bold text-emerald-600">{subjects.filter((s) => s.isActive).length}</p>
+                  <p className="text-3xl font-bold text-success">{subjects.filter((s) => s.isActive).length}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -132,7 +132,7 @@ export function SubjectsClientView({ subjects, currentUser }: { subjects: Subjec
                   <CardTitle className="text-md">Archivováno</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-3xl font-bold text-red-500">{subjects.filter((s) => !s.isActive).length}</p>
+                  <p className="text-3xl font-bold text-danger">{subjects.filter((s) => !s.isActive).length}</p>
                 </CardContent>
               </Card>
             </div>

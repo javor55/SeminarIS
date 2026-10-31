@@ -39,6 +39,7 @@ import { SessionFormDialog } from "./SessionFormDialog";
 import { MoveDialog } from "./RegistrationDialogs";
 import { PageHeader } from "@/components/page-header";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export function SessionDetailView({
   session,
@@ -92,7 +93,7 @@ export function SessionDetailView({
             </p>
             <SubjectBadges subjects={session.subjects} />
             {session.note && <p className="text-foreground">{session.note}</p>}
-            {cancelled && session.cancelReason && <p className="text-destructive">Důvod zrušení: {session.cancelReason}</p>}
+            {cancelled && session.cancelReason && <p className="text-danger">Důvod zrušení: {session.cancelReason}</p>}
           </div>
         }
         actions={
@@ -118,7 +119,7 @@ export function SessionDetailView({
                     toast.error((err as Error).message);
                   }
                 }}
-                trigger={<Button variant="outline" className="text-destructive">Smazat</Button>}
+                trigger={<Button variant="outline" className="text-danger">Smazat</Button>}
               />
             )}
           </>
@@ -189,7 +190,7 @@ export function SessionDetailView({
                         description="Student bude z termínu odepsán."
                         actionLabel="Odepsat"
                         onConfirm={() => run(() => unwrapAsync(removeRegistration(r.id)), "Student odepsán.")}
-                        trigger={<Button size="sm" variant="outline" className="text-destructive">Odepsat</Button>}
+                        trigger={<Button size="sm" variant="outline" className="text-danger">Odepsat</Button>}
                       />
                     </TableCell>
                   </TableRow>
@@ -225,7 +226,7 @@ function CancelSessionDialog({ session, onDone }: { session: MakeupSessionItem; 
 
   return (
     <>
-      <Button variant="outline" className="text-destructive" onClick={() => setOpen(true)}>Zrušit termín</Button>
+      <Button variant="outline" className="text-danger" onClick={() => setOpen(true)}>Zrušit termín</Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[440px]">
           <DialogHeader>
@@ -240,10 +241,11 @@ function CancelSessionDialog({ session, onDone }: { session: MakeupSessionItem; 
               <Input id="cancel-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="např. nemoc" />
             </div>
             {session.seriesId && (
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={wholeSeries} onChange={(e) => setWholeSeries(e.target.checked)} />
-                Zrušit i všechny další termíny této opakované řady
-              </label>
+              <Checkbox
+                checked={wholeSeries}
+                onChange={(e) => setWholeSeries(e.target.checked)}
+                label="Zrušit i všechny další termíny této opakované řady"
+              />
             )}
           </div>
           <DialogFooter>

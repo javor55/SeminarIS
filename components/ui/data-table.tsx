@@ -25,13 +25,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Filter, Settings2, X } from "lucide-react";
 // Importy pro DateTimePicker
 import { DateTimePicker } from "@/components/ui/datetime-picker";
@@ -252,26 +246,24 @@ export function DataTable<T>({
                           <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                             {sf.label}
                           </label>
-                          <Select
+                          <NativeSelect
+                            compact
+                            aria-label={sf.label}
                             value={currentVal}
-                            onValueChange={(v) => {
+                            onChange={(e) => {
+                              const v = e.target.value;
                               if (v === "ALL") col?.setFilterValue([]);
                               else col?.setFilterValue([v]);
                               setPageIndex(0);
                             }}
                           >
-                            <SelectTrigger className="h-8">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ALL">Vše</SelectItem>
-                              {sf.options.map((o) => (
-                                <SelectItem key={o.value} value={o.value}>
-                                  {o.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <option value="ALL">Vše</option>
+                            {sf.options.map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </NativeSelect>
                         </div>
                       );
                     })}
@@ -419,22 +411,20 @@ export function DataTable<T>({
               <span className="text-xs text-muted-foreground">
                 Řádků na stránku:
               </span>
-              <Select
+              <NativeSelect
+                compact
+                className="w-[90px]"
+                aria-label="Řádků na stránku"
                 value={String(pageSize)}
-                onValueChange={(v) => {
-                  setPageSize(Number(v));
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
                   setPageIndex(0);
                 }}
               >
-                <SelectTrigger className="h-8 w-[90px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                </SelectContent>
-              </Select>
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+              </NativeSelect>
             </div>
 
             <div className="text-xs text-muted-foreground">

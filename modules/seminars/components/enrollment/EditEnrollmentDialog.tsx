@@ -14,13 +14,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -145,7 +138,7 @@ export function EditEnrollmentDialog({
     } catch(err: unknown) {
       // eslint-disable-next-line no-console
       console.error(err);
-      alert("Tento záznam se nepodařilo smazat. Může obsahovat existující bloky, které musíte smazat nejdříve.");
+      toast.error("Tento záznam se nepodařilo smazat. Může obsahovat existující bloky, které musíte smazat nejdříve.");
     }
   }
 
@@ -190,18 +183,13 @@ export function EditEnrollmentDialog({
             <Label className="text-sm font-medium" htmlFor="status">
               Stav
             </Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as EnrollmentStatus)}>
-              <SelectTrigger id="status" className="w-full">
-                <SelectValue placeholder="Vyberte stav..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="DRAFT">Koncept (Draft)</SelectItem>
-                <SelectItem value="SCHEDULED">Naplánováno (Scheduled)</SelectItem>
-                <SelectItem value="OPEN">Otevřeno (Open)</SelectItem>
-                <SelectItem value="CLOSED">Uzavřeno (Closed)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-slate-400">
+            <NativeSelect id="status" value={status} onChange={(e) => setStatus(e.target.value as EnrollmentStatus)}>
+              <option value="DRAFT">Koncept (Draft)</option>
+              <option value="SCHEDULED">Naplánováno (Scheduled)</option>
+              <option value="OPEN">Otevřeno (Open)</option>
+              <option value="CLOSED">Uzavřeno (Closed)</option>
+            </NativeSelect>
+            <p className="text-xs text-muted-foreground">
               Tip: Stavy &quot;Otevřeno&quot; a &quot;Uzavřeno&quot; lze nastavit i ručně pro vynucení stavu bez ohledu na čas (např. předčasné uzavření).
             </p>
 

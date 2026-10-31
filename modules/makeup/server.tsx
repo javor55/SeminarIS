@@ -37,7 +37,7 @@ export const makeupServer: ModuleServer = {
           <CardContent>
             <ul className="space-y-2 text-sm">
               {regs.map((r) => (
-                <li key={r.id} className={r.session.cancelledAt ? "text-destructive" : ""}>
+                <li key={r.id} className={r.session.cancelledAt ? "text-danger" : ""}>
                   <strong>{formatTimeRange(r.session.startsAt, r.session.endsAt)}</strong>, učebna {r.session.room}
                   {" – "}
                   {r.subjects.map((x) => x.subject.name).join(", ")}

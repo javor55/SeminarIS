@@ -109,8 +109,8 @@ export function EnrollmentsClientView({ enrollments, currentUser, newWindowDefau
 
         {rows.length === 0 ? (
           <div className="rounded-lg border border-dashed bg-card p-12 flex flex-col items-center justify-center text-center space-y-4">
-            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
-              <Calendar className="w-6 h-6 text-slate-400" />
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-muted-foreground" />
             </div>
             <div className="max-w-[400px]">
               <h3 className="text-lg font-semibold">Žádná zápisová období</h3>

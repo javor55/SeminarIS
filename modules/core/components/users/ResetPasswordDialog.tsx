@@ -53,11 +53,11 @@ export function ResetPasswordDialog({ userId, userName, label }: ResetPasswordDi
       <DialogTrigger asChild>
         {label ? (
           <Button variant="outline" size="sm" className="gap-2" data-testid="user-reset-password">
-            <KeyRound className="w-4 h-4 text-orange-600" /> {label}
+            <KeyRound className="w-4 h-4 text-warning" /> {label}
           </Button>
         ) : (
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Reset hesla">
-            <KeyRound className="w-4 h-4 text-orange-600" />
+            <KeyRound className="w-4 h-4 text-warning" />
           </Button>
         )}
       </DialogTrigger>

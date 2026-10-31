@@ -19,17 +19,17 @@ export default async function SchoolYearPage() {
       <PageHeader title="Školní rok a třídy" description={canClose ? "Aktuální školní rok, jeho uzavření a správa tříd." : "Aktuální školní rok a třídy se studenty (jen pro čtení)."} />
       <SchoolYearCard info={info} canManage={canClose} />
       {canImport && (
-      <Card className="shadow-sm" data-testid="imports-card">
-        <CardHeader>
-          <CardTitle>Importy</CardTitle>
-          <CardDescription>Hromadné načtení dat z CSV s náhledem před potvrzením (vzorové soubory jsou v dialogu).</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <ImportButton kind="users" label="Import uživatelů" />
-          <ImportButton kind="assignments" label="Import úvazků" />
-          <ImportButton kind="subjects" label="Import předmětů" />
-        </CardContent>
-      </Card>
+        <Card className="shadow-sm" data-testid="imports-card">
+          <CardHeader>
+            <CardTitle>Importy</CardTitle>
+            <CardDescription>Hromadné načtení dat z CSV s náhledem před potvrzením (vzorové soubory jsou v dialogu).</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <ImportButton kind="users" label="Import uživatelů" />
+            <ImportButton kind="assignments" label="Import úvazků" />
+            <ImportButton kind="subjects" label="Import předmětů" />
+          </CardContent>
+        </Card>
       )}
       <ClassesTab classes={classes} users={students} canManage={canImport} />
     </div>

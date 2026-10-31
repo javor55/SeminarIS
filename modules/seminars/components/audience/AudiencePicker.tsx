@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { DEFAULT_STUDY_YEARS } from "@/lib/school";
 import { getAudienceOptions, previewAudience, searchAudienceStudents } from "@/modules/seminars/actions/windows";
 import type { AudienceDraft } from "@/modules/seminars/audience";
+import { Chip } from "@/components/ui/chip";
 
 const GRADES = Array.from({ length: DEFAULT_STUDY_YEARS }, (_, i) => i + 1);
 
@@ -34,7 +35,7 @@ function StudentSearch({
 }: {
   idPrefix: string;
   placeholder: string;
-  // eslint-disable-next-line no-unused-vars
+   
   onPick: (p: Person) => void;
   hidden: Set<string>;
 }) {
@@ -69,11 +70,12 @@ function StudentSearch({
         <ul className="max-h-40 overflow-auto rounded-md border text-sm" data-testid={`${idPrefix}-results`}>
           {visible.map((r) => (
             <li key={r.id}>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 data-testid={`${idPrefix}-result`}
                 data-email={r.email}
-                className="flex w-full items-baseline justify-between gap-2 px-3 py-1.5 text-left hover:bg-accent"
+                className="h-auto w-full items-baseline justify-between gap-2 whitespace-normal rounded-none px-3 py-1.5 text-left font-normal"
                 onClick={() => {
                   onPick({ id: r.id, name: r.name, email: r.email });
                   setQ("");
@@ -82,7 +84,7 @@ function StudentSearch({
               >
                 <span>{r.name}</span>
                 <span className="text-xs text-muted-foreground">{r.classLabel ?? "bez třídy"} · {r.email}</span>
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -91,7 +93,7 @@ function StudentSearch({
   );
 }
 
-// eslint-disable-next-line no-unused-vars
+ 
 function Chips({ items, testId, onRemove }: { items: { id: string; label: string }[]; testId: string; onRemove: (id: string) => void }) {
   if (items.length === 0) return null;
   return (
@@ -99,9 +101,16 @@ function Chips({ items, testId, onRemove }: { items: { id: string; label: string
       {items.map((i) => (
         <span key={i.id} data-testid={testId} className="inline-flex items-center gap-1 rounded-full border bg-muted px-2.5 py-0.5 text-xs">
           {i.label}
-          <button type="button" aria-label={`Odebrat ${i.label}`} onClick={() => onRemove(i.id)} className="rounded-full hover:text-destructive">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`Odebrat ${i.label}`}
+            onClick={() => onRemove(i.id)}
+            className="h-4 w-4 rounded-full hover:bg-transparent hover:text-danger"
+          >
             <X className="h-3 w-3" />
-          </button>
+          </Button>
         </span>
       ))}
     </div>
@@ -159,16 +168,10 @@ export function AudiencePicker({ value, onChange }: { value: AudienceState; onCh
           {GRADES.map((g) => {
             const active = draft.grades.includes(g);
             return (
-              <button
-                key={g}
-                type="button"
-                data-grade={g}
-                aria-pressed={active}
-                onClick={() => setDraft({ grades: toggle(draft.grades, g).sort((a, b) => a - b) })}
-                className={`rounded-md border px-3 py-1 text-sm ${active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
-              >
+              <Chip key={g}
+                data-grade={g} pressed={active} onClick={() => setDraft({ grades: toggle(draft.grades, g).sort((a, b) => a - b) })}>
                 {g}. ročník
-              </button>
+              </Chip>
             );
           })}
         </div>
@@ -183,16 +186,10 @@ export function AudiencePicker({ value, onChange }: { value: AudienceState; onCh
             {classes.map((c) => {
               const active = draft.classIds.includes(c.id);
               return (
-                <button
-                  key={c.id}
-                  type="button"
-                  data-class={c.label}
-                  aria-pressed={active}
-                  onClick={() => setDraft({ classIds: toggle(draft.classIds, c.id) })}
-                  className={`rounded-md border px-2.5 py-0.5 text-xs ${active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
-                >
+                <Chip key={c.id}
+                  data-class={c.label} pressed={active} size="sm" onClick={() => setDraft({ classIds: toggle(draft.classIds, c.id) })}>
                   {c.label}
-                </button>
+                </Chip>
               );
             })}
           </div>
@@ -247,7 +244,7 @@ export function AudiencePicker({ value, onChange }: { value: AudienceState; onCh
             </ul>
           </details>
         )}
-        {classById.size > 0 && draft.classIds.some((id) => !classById.has(id)) && <p className="text-xs text-destructive">Některá z vybraných tříd už neexistuje.</p>}
+        {classById.size > 0 && draft.classIds.some((id) => !classById.has(id)) && <p className="text-xs text-danger">Některá z vybraných tříd už neexistuje.</p>}
       </div>
       {(draft.grades.length > 0 || draft.classIds.length > 0 || draft.userIds.length > 0 || draft.excludeUserIds.length > 0) && (
         <Button type="button" variant="ghost" size="sm" onClick={() => onChange(emptyAudienceState())}>
