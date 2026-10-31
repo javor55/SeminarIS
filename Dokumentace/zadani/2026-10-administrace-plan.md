@@ -18,7 +18,7 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F4 Předměty napříč moduly (PR #9)
 - [x] F5 Konfigurovatelné zápisy (publikum, pravidla bloků) (PR #10)
 - [x] F6 Importy s náhledem (uživatelé, úvazky) (PR #11)
-- [ ] F7 Učitel v administraci, vypínač hromadného e-mailu, jednotné UI, úklid lintu
+- [x] F7 Učitel v administraci, vypínač hromadného e-mailu, jednotné UI, úklid lintu
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,

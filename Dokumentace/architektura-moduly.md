@@ -249,8 +249,9 @@ schválit hosty (třída podle žádosti nebo zvolená), ukončit / obnovit stud
 sebe přeskočí, úklid modulů přes `onUserDelete`).
 
 **Hromadný e-mail** jde přes e-mailovou vrstvu (`sendEventEmail("manual.bulk", …, { content })`): událost `manual.bulk`
-se posílá vždy (jako zkušební e-mail ignoruje vypínače upozornění), ale **počítá se do denního i měsíčního limitu**,
-co se nevejde, se zapíše jako `SKIPPED_LIMIT`. Odhad (kolik se odešle a kolik zablokuje limit) je v náhledu před
+**respektuje hlavní vypínač e-mailových upozornění**: při vypnutém se neodešle (příjemci se zapíšou jako
+`SKIPPED_DISABLED`), náhled to řekne a akci zablokuje. Přepínač jednotlivé události nemá (ruční událost). Navíc se
+**počítá do denního i měsíčního limitu**, co se nevejde, se zapíše jako `SKIPPED_LIMIT`. Odhad (kolik se odešle a kolik zablokuje limit) je v náhledu před
 odesláním, vyčerpaný limit akci zablokuje. Příjemci jsou aktivní uživatelé s platným e-mailem, text může obsahovat
 `{{jmeno}}`. Neběží v DB transakci (e-mail se nedá vrátit); souhrn do historie se zapíše po odeslání (bez textu zprávy).
 
@@ -339,7 +340,7 @@ Pravidla pro autory kódu:
 - **Seznam upozornění**: zapnuto/vypnuto, předmět a text šablony s proměnnými (`{{jmeno}}`,
   `{{termin}}`, `{{ucebna}}`, …; neznámá proměnná se při uložení odmítne), tlačítko „Obnovit výchozí“
   a u hromadných odhad počtu příjemců při příštím spuštění.
-- **Poslat zkušební e-mail sobě** (posílá se i při vypnutých upozorněních, počítá se do limitů).
+- **Poslat zkušební e-mail sobě** (jediný e-mail, který ignoruje hlavní vypínač; počítá se do limitů). Hromadný e-mail správce (`manual.bulk`) hlavní vypínač respektuje.
 - **Přehled odeslaných e-mailů** (`EmailLog`) s filtrem stavu, upozornění a hledáním.
 - Záznamy o e-mailech se mažou po nastavené době (výchozí 90 dní, nejméně 35 – podle záznamů se
   počítá měsíční limit).
@@ -511,7 +512,7 @@ klient i server:
 
 - `permissions`: oprávnění modulu (`"<modul>.<akce>"`) a role, které je mají,
 - `nav`: položky menu včetně oprávnění a pořadí,
-- `routes`: prefixy cest, které hlídá middleware,
+- `routes`: prefixy cest, které hlídá middleware (první odpovídající pravidlo vyhrává, konkrétnější dávejte dřív; `exact: true` = jen přesně tato cesta, ne podstránky),
 - `enabledByDefault` / `core`: výchozí stav; jádro nejde vypnout,
 - `adminSections` (volitelné): položky bočního menu administrace (`label`, `href`, `permission`, `order`;
   jádro 0–99, moduly 100+). Stránka sekce modulu leží ve složce cest modulu (např. `/makeup/settings`,
@@ -590,6 +591,16 @@ stačí upravit tam.
 Menu skládá `collectAdminSections(user)` z `adminSections` zapnutých modulů a nabízí jen sekce, na které má
 uživatel oprávnění. Stránky jsou serverové komponenty, klientské jsou jen formuláře.
 
+**Učitel v administraci (jen čtení).** Položka menu „Administrace“ (`core.admin.view`, TEACHER + ADMIN) se ukáže i učiteli.
+Učitel vidí jen **Přehled** (`core.admin.view`) a **Školní rok a třídy** (`core.classes.view`): aktuální rok a třídy se
+studenty, bez uzavření roku, ručního nastavení roku, importů, zakládání a mazání tříd a přesunů. Všechny ostatní
+sekce (`core.admin`) jsou jen pro admina. Oprávnění se vynucuje na třech místech: pravidla cest v manifestu
+(`/admin` s `exact: true` → `core.admin.view`, `/admin/school-year` → `core.classes.view`, vše ostatní pod `/admin`
+→ `core.admin`), **každá stránka sama** (`requirePagePermission(…)` z `lib/session.ts`) a každá server action
+(`requirePermission` – akce mutací vyžadují `core.admin` / `core.users.manage` / `core.school.manage`, nikdy
+`*.view`). Nová stránka pod `app/admin` musí volat `requirePagePermission`; kontraktový test to hlídá a porovnává
+oprávnění stránky, sekce a pravidla cesty.
+
 | Sekce | URL | Obsah |
 | --- | --- | --- |
 | Přehled | `/admin` | **Co udělat** + statistiky |
@@ -610,7 +621,12 @@ se nezobrazí, řadí se podle závažnosti. Jádro hlídá: čekající registr
 (chybí `CRON_SECRET`, neběžela, selhala), e-maily (nenastavené, čerpání denního/měsíčního limitu, neúspěšné
 za 24 h), Microsoft 365 nenastaveno (jen informativně), předměty bez ročníků a bez úvazku, třídy bez úvazků.
 Semináře přidávají nezapsané v každém otevřeném okně, Dopisování nadcházející termíny bez předmětů nebo
-s neaktivním dozorem. Nový modul přidá položku jedním voláním `getAdminTodos` (oprávnění si hlídá sám).
+s neaktivním dozorem. Nový modul přidá položku jedním voláním `getAdminTodos`.
+
+Každá položka nese **`permission`** (výchozí `core.admin`, tj. jen admin) a `collectAdminTodos` ji filtruje podle role
+uživatele, takže učitel vidí jen to, co smí řešit: nezapsané studenty v otevřených oknech (`seminars.windows.view`)
+a vlastní nadcházející termíny dopisování bez předmětů (`makeup.sessions.manage`; admin vidí všechny). Položky bez
+`permission` zůstávají adminovi.
 
 ### Jednotné nastavení (`lib/settings-registry.ts`)
 
@@ -754,8 +770,21 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
   Stránky si samy nenastavují šířku (`max-w-*`), aby všechny začínaly na stejné hraně.
 - **Hlavička:** vždy `PageHeader` (`components/page-header.tsx`). Nadpis, popis, akce vpravo
   a volitelný odkaz `back`.
-- **Rozbalovací seznamy:** `Select` (shadcn), nebo `NativeSelect`
-  (`components/ui/native-select.tsx`) se stejným vzhledem. Holý `<select>` ne.
+- **Sdílené komponenty (`components/ui`):** `Button`, `Chip` (přepínací čip s `aria-pressed`: ročník, třída, předmět),
+  `Input`, `Textarea`, `NativeSelect` (jediný rozbalovací seznam; Radix `Select` v projektu není), `Checkbox` a `Radio`
+  (`components/ui/checkbox.tsx`, uvnitř nativní `<input>`, s volitelným `label`), `Switch`, `Label`, `Badge`, `Card`,
+  `Table`, `DataTable`, `Dialog`, `AlertDialog` / `ConfirmAction` (potvrzení), `Alert`, `Skeleton`, `Progress`.
+  **Žádné holé prvky formuláře** (`<select>`, `<input type="checkbox|radio">`, `<button>`, `<table>`) mimo
+  `components/ui`.
+- **Oznámení a potvrzení:** chyby a úspěchy přes `toast` (sonner), potvrzení přes `ConfirmAction`. `alert()`,
+  `confirm()`, `prompt()` (i `window.*`) zakazuje ESLint (`no-restricted-globals`).
+- **Barvy:** žádné natvrdo zadané odstíny (`bg-emerald-600`, `text-red-500`, `border-slate-200`…). Používají se
+  sémantické tokeny z `app/globals.css` / `tailwind.config.ts`, které mají světlou i tmavou variantu:
+  `text-muted-foreground`, `bg-muted`, `border-border`, `text-foreground` a stavové `success`, `warning`, `info`,
+  `danger` (`text-success`, `bg-warning/10`, `border-danger/30`; průhlednost funguje) + `banner` pro výrazný pruh.
+  Pro text v červené použijte `text-danger` (`text-destructive` je v tmavém režimu příliš tmavé, `destructive`
+  patří jen plným výplním tlačítek). Štítky přes `Badge` (`success`, `warning`, `info`, `danger`, `muted`
+  jemné; `successSolid`, `infoSolid` plné; `default`, `secondary`, `outline`, `destructive`).
 - **Datum a čas:** jen přes `lib/datetime.ts` (`formatDateTime`, `formatTimeRange`, …). Pásmo
   je Europe/Prague a výstup stejný na serveru i v prohlížeči. `toLocaleString()` bez
   locale dává americký formát.
@@ -803,11 +832,19 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
       serveru a pro vypnutý modul), Moje předměty (učitel, student, admin bez stránky), seskupený výběr
       předmětů ve formuláři termínu.
 
+  15. konfigurovatelné zápisy (`15-enrollment-rules.spec.ts`), 16. importy s náhledem (`16-imports.spec.ts`),
+  17. učitel v administraci (`17-teacher-admin.spec.ts`): vidí jen Přehled (své položky) a Školní rok a třídy bez
+      ovládacích prvků, přímé adresy ostatních sekcí ho přesměrují; hlavní vypínač e-mailů blokuje hromadný
+      e-mail (`13-users.spec.ts`).
+
   Vypnutí modulu Semináře (test 1) ověřuje, že z detailu i seznamu předmětů zmizí jeho panel a štítek.
 - **Kontraktový test modulů** (`npm run test:contract`, `scripts/contract-test.ts`, bez DB a buildu, běží
   v CI v jobu „checks“): unikátní id, shoda `registry.ts` a `server-registry.ts`, oprávnění s prefixem modulu,
   cesty a menu chráněné oprávněním vlastního modulu, každý nejádrový modul má layout s `ensureModulePage`
-  a `force-dynamic` (vypnutý modul = 404), platné deklarace `adminSections` a `settings`.
+  a `force-dynamic` (vypnutý modul = 404), platné deklarace `adminSections` a `settings`, oprávnění pravidla cesty
+  shodné s oprávněním sekce administrace a `requirePagePermission` v každé stránce `app/admin/*`.
+- **Lint** (`npm run lint` = `eslint . --ext .js,.mjs,.ts,.tsx --report-unused-disable-directives`) pokrývá celý
+  repozitář včetně `e2e/` a `scripts/`; chyby i nepoužité direktivy `eslint-disable` shodí CI.
 - E-maily se v testech neposílají: `EMAIL_TRANSPORT=log` jen zapisuje `EmailLog`. Test cronu potřebuje
   `CRON_SECRET` (v CI je nastavený, lokálně např. `CRON_SECRET=test-cron`).
 - **Před každou sadou se databáze vyprázdní a naplní seedem.** Proto
