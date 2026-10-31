@@ -29,6 +29,7 @@ modules/
                         (každý „plán“ čte DB a vrací řádky + apply); lib/csv.ts čte CSV, lib/import-samples.ts vzory
     bulk-actions.ts     hromadné akce jádra (přesun, role, aktivita, schválení, studium, e-mail, smazání);
                         bulk-runner.ts společný běh (výběr, náhled, transakce, audit)
+    demo/               ukázková data pro prezentaci (F9): index.ts (stav, naplnění, smazání), seed-core.ts, catalog.ts, names.ts, random.ts
     components/         users/ (seznam, detail/, hromadné akce, záložka Ke schválení), subjects/, admin/ (AdminShell, AdminNav, SettingsForm,
                         ModulesForm, školní rok a třídy, uzavření roku, upozornění, historie)
   seminars/             zápisová okna a zápis studentů do předmětů (semináře)
@@ -45,9 +46,10 @@ modules/
                         participants.ts (jména zapsaných), unenrolled.ts, occurrences.ts
     unenrolled.ts       nezapsaní studenti okna a ruční/automatická připomínka
     notifications.ts    e-maily modulu (zápis otevřen, připomínka nezapsaným) a jeho denní úloha
+    demo-data.ts        ukázková data modulu (zápisová okna, bloky, výskyty, zápisy)
     subject-windows.ts  „v zápisu“: ve kterých oknech je předmět nabízen (podklad pro štítky předmětů)
   makeup/               dopisování písemek (termíny, zápisy, docházka)
-    manifest.ts, server.tsx, data.ts (interní dotazy), types.ts, notifications.ts (e-maily a denní úloha)
+    manifest.ts, server.tsx, data.ts (interní dotazy), types.ts, notifications.ts (e-maily a denní úloha), demo-data.ts (ukázková data)
     dashboard-cards.tsx karty dashboardu: student (moje zápisy, volné termíny), učitel (dozory, kdo u mě dopisuje), admin (dnes a zítra)
     actions/            sessions.ts (dozor), registrations.ts (student)
     components/
@@ -311,6 +313,8 @@ E-maily se posílají přes [Resend](https://resend.com) z ověřené domény (R
 Všechna odesílání jdou přes **jednu funkci** `sendEventEmail(událost, příjemci[])`
 (`lib/email/send.ts`), která postupně zkontroluje:
 
+0. adresy na TLD `.invalid` (ukázková data, RFC 2606) **nikdy neodejdou**: zapíšou se jako `SKIPPED_DISABLED`
+   s důvodem „Adresa na doméně .invalid“ (platí i pro zkušební a ruční e-maily),
 1. hlavní vypínač a zapnutí události (jinak záznam `SKIPPED_DISABLED`),
 2. odhlášení příjemce z nepovinných upozornění (`SKIPPED_DISABLED`),
 3. denní a měsíční limit (co se nevejde, je `SKIPPED_LIMIT`),
@@ -506,6 +510,36 @@ Semináří). Učitel a admin ji nemají (middleware je přesměruje na dashboar
 - Štítek „v zápisu“ u předmětů vede studentovi na `/zapisy/[id]`, e-maily „zápis otevřen“ a připomínka nezapsaným
   na detail okna ve `/zapisy`.
 
+## Ukázková data pro prezentaci (Administrace → Ukázková data, `/admin/demo`, F9)
+
+Jen admin (`core.admin`; akce v režimu „zobrazit jako“ odmítne `safeAction`). **Naplnit ukázkovými daty** vytvoří
+realistická data pro prezentaci, **Smazat ukázková data** smaže jen to, co vytvořila. Obě akce vyžadují opsání slova
+(„UKÁZKA“ / „SMAZAT“), zapisují do historie (`system.demo.seed` / `system.demo.clear`) a běží v **jedné transakci**
+(timeout 50 s; lokálně naplnění do ~1 s, smazání do ~1 s). Dokud ukázková data existují, nejdou naplnit znovu.
+
+- **Evidence** `DemoRecord { model, recordId }` (unikátní dvojice, bez relací; migrace `20261031000000_ukazkova_data`):
+  každý vytvořený záznam se zapíše ve stejné transakci (`ctx.track(model, ids)`). Mazání jde podle evidence,
+  moduly nejdřív (`demoData.clear`), jádro nakonec (`modules/core/demo/index.ts`).
+- **Bod rozšíření** `ModuleServer.demoData` (`ModuleDemoData`): `seed(tx, ctx)` dostane admina, čas, deterministický generátor
+  (`ctx.rng`, pevný seed `DEMO_SEED`, stejný seed = stejná data), referenční data jádra (`ctx.core`: třídy, učitelé, studenti,
+  hosté, předměty, úvazky) a `ctx.track`; `clear(tx, ctx)` dostane `ctx.ids(model)` z evidence. Jádro volá `seed` jen u zapnutých
+  modulů, `clear` u všech. Popisky modelů pro přehled dodává `labels`.
+- **Co vznikne** (pevné objemy): školní rok (jen když žádný není), třídy 1.A–4.C (existující se použijí a neeviduje se,
+  nové ano; 12 tříd), 240 studentů (20 na třídu, zařazení + historie `ClassMembership`), 15 učitelů, 4 hosté čekající na
+  schválení (se žádostí o třídu), 22 předmětů (13 povinných podle ročníků, 9 seminářů pro 4. ročník) a úvazky podle ročníků.
+  Semináře: otevřené okno „Zápis volitelných seminářů – 4. ročník“ (publikum ročník 4, 3 bloky, 10 výskytů s kapacitami a
+  vyučujícími; ~68 % zapsáno úplně, ~15 % jen napůl, zbytek nezapsaný; některé semináře plné) a uzavřené „1. kolo“.
+  Dopisování: 10 termínů na příští dva týdny (různí dozoři, učebny, předměty, kapacity; jeden plný) se zápisy a poznámkami
+  a jeden proběhlý termín s docházkou. Všechna data jsou relativní k „teď“ (Europe/Prague, víkendy se přeskakují).
+- **Bezpečnost**: e-maily `jmeno.prijmeni@ukazka.invalid` (e-mailová vrstva `.invalid` vždy přeskočí), při naplnění se nevolají
+  žádné e-mailové události, společné heslo účtů se při každém naplnění vygeneruje náhodně (uloženo v `SystemSetting` `demo.password`, účtům jako bcrypt), zobrazí se jen adminovi v sekci a při smazání se odstraní – v kódu žádné heslo není, aby se do produkce nedalo přihlásit podle zdrojového kódu.
+  Sekce nabízí „Zobrazit jako“ pro dva studenty 4. ročníku a učitele (a host jako účet k přihlášení).
+- **Mazání**: smaže se jen to, co je v evidenci, a co na tom závisí přes kaskádu (např. zápis skutečného studenta do ukázkového
+  výskytu, úvazek skutečného učitele na ukázkový předmět). Skutečné záznamy, které ukázkový uživatel jen vlastnil
+  (zápisové okno, termín dopisování), zůstanou a převezme je admin; zápisy ukázkových studentů do skutečných oken se smažou.
+  **Třída, ve které zůstal skutečný student (nebo jeho historie zařazení), se nemaže**: zůstane, evidence se jí zbaví a výsledek
+  (hláška i historie) ji uvede. Školní rok založený ukázkovými daty se smaže, jen pokud k němu nezůstala žádná historie.
+
 ## Historie změn (Administrace → Historie, `/admin/history`)
 
 `AuditLog`: kdo (`actorId`, `actorName`), případně `impersonatorId`, `action` (`oblast.entita.akce`,
@@ -576,7 +610,8 @@ klient i server:
 - `onUserDelete(tx, userId, replacementUserId)` uklidí data modulu v transakci před
   trvalým smazáním uživatele. Běží i u vypnutého modulu.
 - `runDailyJob(now)` je krok denní úlohy (cron, viz Plánované úlohy); vrací seznam kroků s výsledkem,
-- `getEmailEstimates()` vrací odhad počtu příjemců hromadných upozornění pro Administraci → Upozornění.
+- `getEmailEstimates()` vrací odhad počtu příjemců hromadných upozornění pro Administraci → Upozornění,
+- `demoData` ukázková data modulu pro prezentaci (viz Ukázková data): `{ labels, seed(tx, ctx), clear(tx, ctx) }`.
 
 ### Body rozšíření jádra
 
@@ -597,6 +632,7 @@ vynechají, stránka jádra se neshodí. Id záložek, štítků a položek jád
 | `bulkUserActions` | `collectBulkUserActions` | hromadné akce v seznamu uživatelů (parametry, náhled dopadu, jedna transakce, audit) |
 | `getAdminStats()` | `collectAdminStats` | krátké statistiky pod přehledem v administraci a na dashboardu admina |
 | `getDashboardCards(user)` | `collectDashboardCards` | karty dashboardu (`{ id, title, order, size?, content, href?, linkLabel? }`), id prefixované id modulu |
+| `demoData` | Administrace → Ukázková data | `{ labels, seed, clear }`: ukázková data modulu; jádro volá `seed` jen u zapnutých modulů, `clear` u všech |
 | `adminSections` (v manifestu) | `collectAdminSections` | boční menu administrace (jádro i moduly, podle oprávnění) |
 | `settings` (v manifestu) | registr nastavení | deklarace nastavení modulu |
 
@@ -659,6 +695,7 @@ oprávnění stránky, sekce a pravidla cesty.
 | Upozornění | `/admin/notifications` | e-maily: vypínač, limity, šablony, přehled odeslaných |
 | Historie | `/admin/history` | historie změn a doba uchování |
 | Diagnostika | `/admin/diagnostics` | databáze a migrace, denní úloha, e-mail, commit nasazení, benchmark |
+| Ukázková data | `/admin/demo` | naplnění a smazání ukázkových dat pro prezentaci (jen admin) |
 | Semináře | `/enrollments/settings` | výchozí hodnoty nového zápisového okna |
 | Dopisování | `/makeup/settings` | výchozí kapacita a uzávěrka nových termínů |
 
@@ -885,6 +922,11 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
   17. učitel v administraci (`17-teacher-admin.spec.ts`): vidí jen Přehled (své položky) a Školní rok a třídy bez
       ovládacích prvků, přímé adresy ostatních sekcí ho přesměrují; hlavní vypínač e-mailů blokuje hromadný
       e-mail (`13-users.spec.ts`).
+
+  18. dashboard a stránka Zápisy (`18-dashboard.spec.ts`),
+  19. ukázková data (`19-demo.spec.ts`): naplnit → počty a stránky studenta, učitele a admina → smazat (zůstanou jen původní
+      data a skutečné záznamy nezávislé na ukázkových) → znovu naplnit stejně, druhé naplnění zablokované, třída se skutečným
+      studentem se nesmaže, učitel sekci nevidí, e-mailová vrstva přeskočí adresy `.invalid`.
 
   Vypnutí modulu Semináře (test 1) ověřuje, že z detailu i seznamu předmětů zmizí jeho panel a štítek.
 - **Kontraktový test modulů** (`npm run test:contract`, `scripts/contract-test.ts`, bez DB a buildu, běží

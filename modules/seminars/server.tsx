@@ -12,7 +12,12 @@ import { UserEnrollmentsPanel } from "@/modules/seminars/user-enrollments";
 import { seminarsBulkActions } from "@/modules/seminars/bulk-audience";
 import { getSeminarsEmailEstimates, runSeminarsDailyJob } from "@/modules/seminars/notifications";
 
+import { seminarsDemoData } from "@/modules/seminars/demo-data";
+
 export const seminarsServer: ModuleServer = {
+  // Ukázková data pro prezentaci (Administrace → Ukázková data)
+  demoData: seminarsDemoData,
+
   runDailyJob: runSeminarsDailyJob,
   // Uživatelé → hromadné akce „Přidat do publika zápisu“ / „Odebrat z publika zápisu“
   bulkUserActions: seminarsBulkActions,

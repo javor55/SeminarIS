@@ -9,7 +9,12 @@ import type { SubjectBadge } from "@/modules/types";
 import { getMakeupDashboardCards } from "@/modules/makeup/dashboard-cards";
 import { getMakeupEmailEstimates, runMakeupDailyJob } from "@/modules/makeup/notifications";
 
+import { makeupDemoData } from "@/modules/makeup/demo-data";
+
 export const makeupServer: ModuleServer = {
+  // Ukázková data pro prezentaci (Administrace → Ukázková data)
+  demoData: makeupDemoData,
+
   runDailyJob: runMakeupDailyJob,
   getEmailEstimates: () => getMakeupEmailEstimates(),
 

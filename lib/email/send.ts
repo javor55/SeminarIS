@@ -12,6 +12,7 @@ import { isImpersonating } from "@/lib/session";
 // pak odešle (po dávkách max. 100 přes batch API Resendu) a každý pokus zapíše do EmailLog.
 //
 // Chyba odeslání NIKDY nevyhodí výjimku: zaloguje se a akce, která e-mail vyvolala, proběhne.
+// Adresy na TLD `.invalid` (ukázková data) se nikdy neodešlou, jen se zapíšou jako SKIPPED_DISABLED.
 // Volejte až po commitu databázové transakce, ne uvnitř ní.
 
 export type EmailRecipient = {
@@ -30,6 +31,11 @@ export type SendSummary = {
   // První chyba (pro zkušební e-mail v administraci)
   firstError: string | null;
 };
+
+/** Adresy na TLD `.invalid` (RFC 2606) jsou ukázková data; e-mailová vrstva na ně nikdy nic neodešle. */
+export function isInvalidTldEmail(email: string): boolean {
+  return /\.invalid$/i.test(email.trim());
+}
 
 const EMPTY: SendSummary = { sent: 0, failed: 0, skippedLimit: 0, skippedDisabled: 0, firstError: null };
 
@@ -80,7 +86,7 @@ async function doSend(eventId: EmailEventId, input: EmailRecipient[], opts: Send
 
   // Každou adresu max. jednou za volání
   const seen = new Set<string>();
-  const recipients = input.filter((r) => {
+  let recipients = input.filter((r) => {
     const key = r.email.trim().toLowerCase();
     if (!key || seen.has(key)) return false;
     seen.add(key);
@@ -108,6 +114,15 @@ async function doSend(eventId: EmailEventId, input: EmailRecipient[], opts: Send
     providerId,
   });
 
+  // Ukázkové účty (`…@ukazka.invalid`): nic se neodešle, ale pokus se zapíše do logu
+  const demoRecipients = recipients.filter((r) => isInvalidTldEmail(r.email));
+  if (demoRecipients.length > 0) {
+    await writeLog(demoRecipients.map((r) => logRow(r, render(r), "SKIPPED_DISABLED", "Adresa na doméně .invalid (ukázková data), e-mail se neodesílá.")));
+    summary.skippedDisabled += demoRecipients.length;
+    recipients = recipients.filter((r) => !isInvalidTldEmail(r.email));
+    if (recipients.length === 0) return summary;
+  }
+
   // Zkušební e-mail se posílá i při vypnutých upozorněních (jinak by nešlo ověřit nastavení); ruční e-maily
   // (`manual.bulk`) ignorují jen přepínač jednotlivé události – hlavní vypínač, limity a odhlášení platí vždy
   const isTest = eventId === "test";
@@ -118,7 +133,7 @@ async function doSend(eventId: EmailEventId, input: EmailRecipient[], opts: Send
   if (!isTest && (!cfg.settings.enabled || (!isManual && !eventCfg?.enabled && !opts.ignoreEventSwitch))) {
     const reason = !cfg.settings.enabled ? "E-mailová upozornění jsou vypnutá." : "Toto upozornění je vypnuté.";
     for (const r of recipients) rows.push(logRow(r, render(r), "SKIPPED_DISABLED", reason));
-    summary.skippedDisabled = rows.length;
+    summary.skippedDisabled += rows.length;
     await writeLog(rows);
     return summary;
   }
