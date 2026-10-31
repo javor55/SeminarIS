@@ -13,16 +13,22 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
 
   // --- Student ---
   let p = await login(browser, 'jan.student@skola.cz');
-  check('student nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Předměty', 'Moje předměty', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(p)));
-  check('student dashboard shows window', (await p.content()).includes('Zápis LS 2025'));
+  check('student nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Moje předměty', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(p)));
+  check('student dashboard card shows window', (await p.locator('[data-card="seminars.windows"]').innerText()).includes('Zápis LS 2025'));
+  check('student dashboard does not enroll (no enroll buttons)', (await p.getByTestId('enroll-button').count()) === 0);
   await p.goto('/users'); check('student /users redirected', p.url().endsWith('/dashboard'), p.url());
   await p.goto('/enrollments'); check('student /enrollments redirected', p.url().endsWith('/dashboard'), p.url());
   const subjId = sql(`select "subjectId" from "SubjectOccurrence" limit 1`);
   await p.goto('/subjects/' + subjId);
   const html = await p.content();
   check('no password hash in student page', !html.includes('passwordHash') && !html.includes('$2a$') && !html.includes('$2b$'));
-  // zápis přes UI
+  // zápis přes UI na stránce Zápisy: karta na dashboardu vede na seznam a detail okna
   await p.goto('/dashboard'); await p.waitForLoadState('networkidle');
+  await p.locator('[data-card="seminars.windows"]').getByRole('link', { name: 'Upravit zápis' }).click();
+  await p.waitForURL('**/zapisy/*');
+  await p.goto('/zapisy'); await p.waitForLoadState('networkidle');
+  check('zapisy list shows the window', (await p.getByTestId('student-window').count()) === 1 && (await p.getByTestId('student-window').innerText()).includes('Zápis LS 2025'));
+  await p.getByTestId('student-window').getByRole('link', { name: 'Upravit zápis' }).click(); await p.waitForURL('**/zapisy/*'); await p.waitForLoadState('networkidle');
   const btn = p.getByRole('button', { name: /Zapsat/ }).first();
   if (await btn.count()) {
     await btn.click(); await p.waitForTimeout(2500);
@@ -32,7 +38,7 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   // role změna platí hned (bez nového přihlášení)
   sql(`update "User" set role='GUEST' where email='jan.student@skola.cz'`);
   await p.goto('/dashboard'); await p.waitForLoadState('networkidle'); await p.reload(); await p.waitForLoadState('networkidle');
-  check('role change applied without relogin', JSON.stringify(await navLabels(p)) === '[]', JSON.stringify(await navLabels(p)));
+  check('role change applied without relogin', JSON.stringify(await navLabels(p)) === JSON.stringify(['Zápisy']), JSON.stringify(await navLabels(p)));
   sql(`update "User" set role='STUDENT' where email='jan.student@skola.cz'`);
   // deaktivace odhlásí
   sql(`update "User" set "isActive"=false where email='eva.studentova@skola.cz'`);
@@ -44,6 +50,8 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   p = await login(browser, 'teacher@skola.cz');
   check('teacher nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Moje předměty', 'Dopisování', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(p)));
   await p.goto('/admin/registration'); check('teacher /admin/registration redirected', p.url().endsWith('/dashboard'), p.url());
+  await p.goto('/zapisy'); check('teacher /zapisy redirected', p.url().endsWith('/dashboard'), p.url());
+  await p.goto('/zapisy/' + sql(`select id from "EnrollmentWindow" limit 1`)); check('teacher /zapisy/id redirected', p.url().endsWith('/dashboard'), p.url());
   await p.goto('/users'); await p.waitForLoadState('networkidle');
   check('teacher /users ok', p.url().endsWith('/users') && !(await p.content()).includes('$2'));
 
@@ -82,17 +90,21 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   check('subject list without "v zápisu" badge', !(await pa.locator('main').innerText()).includes('v zápisu'));
   const r = await pa.goto('/subjects'); check('/subjects stays when seminars disabled', r.status() === 200, String(r.status()));
   const r2 = await pa.goto('/enrollments'); check('/enrollments 404 when disabled', r2.status() === 404, String(r2.status()));
+  await pa.goto('/zapisy'); check('/zapisy leaves admin on dashboard', pa.url().endsWith('/dashboard'), pa.url());
   await pa.goto('/dashboard'); check('dashboard empty when disabled', (await pa.content()).includes('Vítejte'));
   // student: zápis přes action musí selhat → ověř přes dashboard a nav
   const ps = await login(browser, 'eva.studentova@skola.cz');
   check('student nav without seminars', JSON.stringify(await navLabels(ps)) === JSON.stringify(['Dashboard', 'Předměty', 'Moje předměty', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(ps)));
+  const rz = await ps.goto('/zapisy'); check('/zapisy 404 when disabled', rz.status() === 404, String(rz.status()));
+  await ps.goto('/dashboard'); check('student dashboard card gone when disabled', (await ps.locator('[data-card^="seminars."]').count()) === 0);
   // zapnout zpět
   await pa.goto('/admin/modules'); await pa.waitForSelector('#module-seminars'); await pa.waitForTimeout(800);
   await pa.click('#module-seminars'); await pa.waitForTimeout(2500);
   check('seminars re-enabled', JSON.stringify(await navLabels(pa)).includes('Zápisy'));
   await pa.goto('/subjects/' + subjId); await pa.waitForLoadState('networkidle');
   check('subject detail seminars tab back', (await pa.locator('[data-testid=subject-tabs] [data-tab="seminars.occurrences"]').count()) === 1);
-  await pa.goto('/dashboard'); check('dashboard back', (await pa.content()).includes('Zápis LS 2025'));
+  await pa.goto('/dashboard'); check('admin progress card back', (await pa.locator('[data-card="seminars.progress"]').count()) === 1 && (await pa.content()).includes('Zápis LS 2025'));
+  await ps.goto('/dashboard'); check('student card back', (await ps.locator('[data-card="seminars.windows"]').count()) === 1);
 
 
 });

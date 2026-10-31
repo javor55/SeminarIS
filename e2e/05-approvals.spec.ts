@@ -44,9 +44,10 @@ test("registrace se třídou a schválení hosta jedním klikem", async ({ brows
   sql(`update "User" set "requestedClassGroupId"=(select id from "ClassGroup" where grade=3 and letter='A') where id='g3'`);
 
   // dashboard admina: widget s počtem čekajících
-  await pa.goto('/dashboard'); await pa.waitForSelector('[data-testid=approvals-widget]');
-  check('admin widget shows pending count', (await pa.locator('[data-testid=approvals-widget]').innerText()).includes('5 účtů čeká na schválení'), await pa.locator('[data-testid=approvals-widget]').innerText());
-  await pa.locator('[data-testid=approvals-widget] a').click(); await pa.waitForURL('**/users?tab=approvals');
+  await pa.goto('/dashboard'); await pa.waitForSelector('[data-card="core.todos"]');
+  const pendingTodo = pa.locator('[data-card="core.todos"] [data-todo="core.pending-accounts"]');
+  check('admin card "Co udělat" shows pending count', (await pendingTodo.innerText()).includes('Účty čekající na schválení') && (await pendingTodo.innerText()).includes('5'), await pendingTodo.innerText());
+  await pendingTodo.getByRole('link').click(); await pa.waitForURL('**/users?tab=approvals');
   await pa.waitForSelector('[data-testid=approvals-table]');
   check('tab shows count', (await pa.locator('a[data-tab=approvals]').innerText()).includes('(5)'));
   check('class preselected from request', (await pa.locator('select[aria-label="Třída – Nová Žákyně"] option:checked').innerText()) === '3.A');

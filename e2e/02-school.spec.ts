@@ -84,8 +84,14 @@ test("třídy, předměty, import se třídou, přesun mezi třídami, cílení 
   // student 3.A vidí, student 1.A ne
   const pj = await login(b, 'jan.student@skola.cz');
   check('3rd grader sees window', (await pj.content()).includes('Zápis LS 2025'));
+  await pj.goto('/zapisy/' + wid); await pj.waitForLoadState('networkidle');
+  check('3rd grader opens the window on Zápisy', (await pj.locator('main').innerText()).includes('Zápis LS 2025'));
   const pe = await login(b, 'eva.studentova@skola.cz');
   check('1st grader does not see window', !(await pe.content()).includes('Zápis LS 2025') && (await pe.content()).includes('Vítejte'));
+  await pe.goto('/zapisy'); await pe.waitForLoadState('networkidle');
+  check('1st grader has an empty Zápisy list', (await pe.getByTestId('student-window').count()) === 0 && !(await pe.content()).includes('Zápis LS 2025'));
+  await pe.goto('/zapisy/' + wid); await pe.waitForLoadState('networkidle');
+  check('1st grader cannot open the window on Zápisy', (await pe.content()).includes('Zápis nenalezen') && !(await pe.content()).includes('Zápis LS 2025'));
   await pe.goto('/enrollments/' + wid); check('1st grader cannot open window', !(await pe.content()).includes('Zápis LS 2025'));
 
   // předměty: student vidí aktivní předměty svého ročníku a předměty nabízené v jemu viditelném zápisu
@@ -114,6 +120,8 @@ test("třídy, předměty, import se třídou, přesun mezi třídami, cílení 
   check('student moved to 4.A with reason MOVED', sql(`select c.grade||c.letter||'/'||m.reason from "User" u join "ClassGroup" c on c.id=u."classGroupId" join "ClassMembership" m on m."userId"=u.id where u.email='jan.student@skola.cz'`) === '4A/MOVED');
   await pj.goto('/dashboard'); await pj.waitForLoadState('networkidle');
   check('4th grader does not see window for 3rd grade', !(await pj.content()).includes('Zápis LS 2025'));
+  await pj.goto('/zapisy/' + wid); await pj.waitForLoadState('networkidle');
+  check('4th grader cannot open it on Zápisy either', (await pj.content()).includes('Zápis nenalezen'));
   await pa.locator('tr[data-class="4.A"] button[aria-expanded]').click();
   await pa.selectOption('select[aria-label="Přesunout do třídy – Student Jan"]', { label: '3.A' }); await pa.waitForTimeout(1500);
   check('moved back to 3.A', sql(`select c.grade||c.letter from "User" u join "ClassGroup" c on c.id=u."classGroupId" where u.email='jan.student@skola.cz'`) === '3A');

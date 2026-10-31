@@ -60,6 +60,15 @@ test("dopisování: termíny, řady, kolize, zápis, přepis, přesun, uzávěrk
   await pj.reload(); await pj.waitForLoadState('networkidle');
   check('Jan sees my registration highlighted in the table', (await pj.locator(`tr[data-session="${s1}"]`).innerText()).includes('test z derivací') && (await pj.locator(`tr[data-session="${s1}"]`).getAttribute('data-registered')) === 'true');
   check('Jan dashboard widget', await (async () => { await pj.goto('/dashboard'); return (await pj.locator('[data-testid=makeup-widget]').count()) === 1; })());
+  const janCard = (await pj.locator('[data-card="makeup.student"]').innerText());
+  check('Jan card: registration with room and change deadline, free terms', janCard.includes('učebna 204') && janCard.includes('změny do') && janCard.includes('Volných termínů: 4'), janCard);
+  // dashboard učitele: dozory a kdo u něj dopisuje; admina: dnešní a zítřejší termíny
+  await pt.goto('/dashboard'); await pt.waitForLoadState('networkidle');
+  check('teacher card: my supervisions with occupancy', (await pt.locator('[data-card="makeup.supervision"]').innerText()).includes('zapsáno 1/1'));
+  check('teacher card: who writes my subjects', (await pt.locator('[data-card="makeup.who-writes"]').innerText()).includes('Student Jan'));
+  const pa0 = await login(b, 'admin@skola.cz');
+  await pa0.goto('/dashboard'); await pa0.waitForLoadState('networkidle');
+  check('admin card: today and tomorrow terms', (await pa0.locator('[data-card="makeup.today"] [data-day="Zítra"]').innerText()).includes('2 termíny') && (await pa0.locator('[data-card="makeup.today"] [data-day="Dnes"]').innerText()).includes('0 termínů'));
 
   // 5) Eva vidí plno
   const pe = await login(b, 'eva.studentova@skola.cz');
