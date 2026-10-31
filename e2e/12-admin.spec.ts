@@ -57,9 +57,9 @@ test("administrace: boční menu s oddíly, staré adresy fungují, na mobilu je
   await pa.waitForURL("**/admin/modules");
   check("select follows the page", (await pa.getByTestId("admin-nav-select").inputValue()) === "/admin/modules");
 
-  // ne-admin do administrace nesmí
+  // učitel smí jen Přehled a Školní rok a třídy (podrobně 17-teacher-admin.spec.ts), zbytek ne
   const pt = await login(browser, "teacher@skola.cz");
-  for (const url of ["/admin", "/admin/diagnostics", "/enrollments/settings", "/makeup/settings"]) {
+  for (const url of ["/admin/diagnostics", "/enrollments/settings", "/makeup/settings"]) {
     await pt.goto(url);
     check(`teacher ${url} redirected`, pt.url().endsWith("/dashboard"), pt.url());
   }

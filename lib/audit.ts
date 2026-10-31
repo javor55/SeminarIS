@@ -68,7 +68,7 @@ export function describeChanges<T extends Record<string, unknown>>(
   before: T,
   after: T,
   labels: Record<keyof T & string, string>,
-  // eslint-disable-next-line no-unused-vars
+   
   format: (value: unknown) => string = (v) => (v === true ? "zapnuto" : v === false ? "vypnuto" : v == null || v === "" ? "—" : String(v))
 ): string {
   const parts: string[] = [];

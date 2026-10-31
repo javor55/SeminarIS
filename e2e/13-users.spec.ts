@@ -267,6 +267,43 @@ test("hromadný e-mail: odhad, limity, záznamy a audit", async ({ browser }) =>
   sql(`delete from "SystemSetting" where key='email.dailyLimit'`);
 });
 
+test("hromadný e-mail respektuje hlavní vypínač, zkušební e-mail ne", async ({ browser }) => {
+  const pa = await login(browser, "admin@skola.cz");
+  const manual = () => Number(sql(`select count(*) from "EmailLog" where event='manual.bulk'`));
+  const before = manual();
+  sql(`insert into "SystemSetting"(key,value) values ('email.enabled','false') on conflict (key) do update set value='false'`);
+
+  await openList(pa, "/users?role=STUDENT&class=3.B");
+  await pa.getByTestId("select-page").check();
+  await pa.getByTestId("bulk-action-select").selectOption({ label: "Poslat e-mail" });
+  await pa.waitForSelector("[data-testid=bulk-dialog]");
+  await pa.fill("#bulk-subject", "Vypnuto");
+  await pa.fill("#bulk-body", "Text");
+  await expect(pa.getByTestId("bulk-blocked")).toContainText("vypnutá");
+  check("confirm disabled when e-mails are off", await pa.getByTestId("bulk-confirm").isDisabled());
+  await pa.keyboard.press("Escape");
+  check("nothing was sent or logged", manual() === before, String(manual()));
+
+  // zkušební e-mail sobě vypínač ignoruje
+  if (process.env.EMAIL_FROM) {
+    await pa.goto("/admin/notifications");
+    await pa.getByTestId("email-send").click();
+    await expect.poll(() => sql(`select count(*) from "EmailLog" where event='test' and status='SENT'`)).not.toBe("0");
+  }
+
+  // po zapnutí je akce zase dostupná
+  sql(`delete from "SystemSetting" where key='email.enabled'`);
+  await openList(pa, "/users?role=STUDENT&class=3.B");
+  await pa.getByTestId("select-page").check();
+  await pa.getByTestId("bulk-action-select").selectOption({ label: "Poslat e-mail" });
+  await pa.waitForSelector("[data-testid=bulk-dialog]");
+  await pa.fill("#bulk-subject", "Zapnuto");
+  await pa.fill("#bulk-body", "Text");
+  await expect(pa.getByTestId("bulk-preview")).toContainText("odešle se");
+  check("confirm enabled again", await pa.getByTestId("bulk-confirm").isEnabled());
+  await pa.keyboard.press("Escape");
+});
+
 test("ostatní hromadné akce: role, deaktivace, schválení, studium, smazání s potvrzením, export CSV", async ({ browser }) => {
   const pa = await login(browser, "admin@skola.cz");
   const pick = async (...emails: string[]) => {

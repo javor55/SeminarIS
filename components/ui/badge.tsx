@@ -12,8 +12,15 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground",
         outline: "text-foreground",
         destructive: "border-transparent bg-destructive text-destructive-foreground",
-        success: "border-transparent bg-emerald-100 text-emerald-800",
-        warning: "border-transparent bg-amber-100 text-amber-800",
+        // Jemné (tónované) varianty: čitelné ve světlém i tmavém režimu
+        success: "border-transparent bg-success/15 text-success",
+        warning: "border-transparent bg-warning/15 text-warning",
+        info: "border-transparent bg-info/15 text-info",
+        danger: "border-transparent bg-danger/15 text-danger",
+        muted: "border-transparent bg-muted text-muted-foreground",
+        // Plné varianty (výrazný stav, např. „otevřeno“, „aktivní“)
+        successSolid: "border-transparent bg-success text-success-foreground",
+        infoSolid: "border-transparent bg-info text-info-foreground",
       },
     },
     defaultVariants: {

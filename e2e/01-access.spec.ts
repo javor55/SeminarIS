@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { sql, resetDb, seedSubjects, login, tryLogin, navLabels, toastText, tmpFile, currentSchoolYear, yearLabel } from "./helpers";
+import { sql, resetDb, login, tryLogin, navLabels } from "./helpers";
 
 // Převedeno z ručních scénářů; každá kontrola je samostatná „soft“ aserce.
 const check = (name: string, ok: boolean, extra = "") => expect.soft(ok, `${name} ${extra}`).toBe(true);
@@ -42,8 +42,8 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
 
   // --- Teacher ---
   p = await login(browser, 'teacher@skola.cz');
-  check('teacher nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Moje předměty', 'Dopisování', 'Uživatelé', 'Můj profil']), JSON.stringify(await navLabels(p)));
-  await p.goto('/admin'); check('teacher /admin redirected', p.url().endsWith('/dashboard'), p.url());
+  check('teacher nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Moje předměty', 'Dopisování', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(p)));
+  await p.goto('/admin/registration'); check('teacher /admin/registration redirected', p.url().endsWith('/dashboard'), p.url());
   await p.goto('/users'); await p.waitForLoadState('networkidle');
   check('teacher /users ok', p.url().endsWith('/users') && !(await p.content()).includes('$2'));
 

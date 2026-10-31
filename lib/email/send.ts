@@ -108,13 +108,14 @@ async function doSend(eventId: EmailEventId, input: EmailRecipient[], opts: Send
     providerId,
   });
 
-  // Zkušební a ruční e-maily se posílají i při vypnutých upozorněních (zkušební jinak by nešlo ověřit nastavení);
-  // limity a odhlášení platí vždy
-  const isTest = MANUAL_EMAIL_EVENTS.includes(eventId);
+  // Zkušební e-mail se posílá i při vypnutých upozorněních (jinak by nešlo ověřit nastavení); ruční e-maily
+  // (`manual.bulk`) ignorují jen přepínač jednotlivé události – hlavní vypínač, limity a odhlášení platí vždy
+  const isTest = eventId === "test";
+  const isManual = MANUAL_EMAIL_EVENTS.includes(eventId);
   const rows: LogRow[] = [];
   let candidates: { r: EmailRecipient; mail: OutgoingEmail }[] = [];
 
-  if (!isTest && (!cfg.settings.enabled || (!eventCfg?.enabled && !opts.ignoreEventSwitch))) {
+  if (!isTest && (!cfg.settings.enabled || (!isManual && !eventCfg?.enabled && !opts.ignoreEventSwitch))) {
     const reason = !cfg.settings.enabled ? "E-mailová upozornění jsou vypnutá." : "Toto upozornění je vypnuté.";
     for (const r of recipients) rows.push(logRow(r, render(r), "SKIPPED_DISABLED", reason));
     summary.skippedDisabled = rows.length;

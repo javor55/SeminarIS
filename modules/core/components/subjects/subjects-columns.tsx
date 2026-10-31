@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
 import { subjectGradesLabel } from "@/lib/school";
@@ -21,11 +22,11 @@ export const subjectsColumns: ColumnDef<SubjectRow>[] = [
       const s = row.original;
       return (
         <div className="flex items-center gap-2">
-          <Link href={`/subjects/${s.id}`} className="text-blue-600 hover:underline font-medium">
+          <Link href={`/subjects/${s.id}`} className="text-info hover:underline font-medium">
             {s.name}
           </Link>
           {!s.isActive && (
-            <span className="bg-red-100 text-red-800 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-sm">Archiv</span>
+            <Badge variant="danger" className="rounded-sm px-1.5 py-0.5 text-[10px] uppercase font-bold">Archiv</Badge>
           )}
         </div>
       );
@@ -95,9 +96,9 @@ export const subjectsColumns: ColumnDef<SubjectRow>[] = [
     accessorFn: (s) => (s.isActive ? "active" : "archived"),
     cell: ({ row }) =>
       row.original.isActive ? (
-        <span className="text-emerald-600 text-xs font-medium">Aktivní</span>
+        <span className="text-success text-xs font-medium">Aktivní</span>
       ) : (
-        <span className="text-red-600 text-xs font-medium">Archivováno</span>
+        <span className="text-danger text-xs font-medium">Archivováno</span>
       ),
     filterFn: includesFilter,
   },

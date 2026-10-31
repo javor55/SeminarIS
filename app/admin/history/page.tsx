@@ -1,14 +1,10 @@
-import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
-import { getCurrentUser } from "@/lib/session";
-import { can } from "@/modules/registry";
+import { requirePagePermission } from "@/lib/session";
 import { getHistoryUserName } from "@/modules/core/actions/history";
 import { HistoryView } from "@/modules/core/components/admin/HistoryView";
 
 export default async function HistoryPage({ searchParams }: { searchParams: Promise<{ user?: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/");
-  if (!can(user.role, "core.admin")) redirect("/dashboard");
+  await requirePagePermission("core.admin");
 
   const { user: userId } = await searchParams;
   const name = userId ? await getHistoryUserName(userId) : null;

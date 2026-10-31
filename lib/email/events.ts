@@ -257,7 +257,7 @@ export const EMAIL_EVENTS: readonly EmailEventDef[] = [
     group: "Ostatní",
     label: "Hromadný e-mail správce",
     description:
-      "Ruční e-mail vybraným uživatelům ze seznamu uživatelů (předmět a text zadává správce). Posílá se vždy, i když jsou upozornění vypnutá; počítá se do denního a měsíčního limitu.",
+      "Ruční e-mail vybraným uživatelům ze seznamu uživatelů (předmět a text zadává správce). Při vypnutém hlavním vypínači e-mailových upozornění se neodešle; počítá se do denního a měsíčního limitu.",
     defaultEnabled: true,
     mandatory: true,
     bulk: false,
@@ -272,7 +272,8 @@ export function getEmailEvent(id: string): EmailEventDef | undefined {
 }
 
 /**
- * Ruční události: posílají se vždy (nezávisle na vypínačích upozornění) a mají jen limity.
+ * Ruční události: nemají vlastní přepínač ani šablonu v administraci. Zkušební e-mail se posílá vždy,
+ * hromadný e-mail správce respektuje hlavní vypínač e-mailů; limity platí u obou.
  * Text zadává ten, kdo je posílá (u zkušebního e-mailu je pevný).
  */
 export const MANUAL_EMAIL_EVENTS: readonly EmailEventId[] = ["test", "manual.bulk"];

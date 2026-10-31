@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
 import type { User } from "@/lib/types";
+import { ConfirmAction } from "@/modules/core/components/users/ConfirmAction";
 import { OccurrenceForDialog, OccurrencesStudentsDialog } from "@/modules/seminars/components/occurrences/OccurrencesStudentsDialog";
 import { EditSubjectOccurrenceDialog } from "@/modules/seminars/components/occurrences/EditSubjectOccurrenceDialog";
 import { OccurrenceRow, getOccurrenceColumns } from "@/modules/seminars/components/occurrences/occurrence-columns";
@@ -16,6 +17,7 @@ export function SubjectOccurrencesPanel({ occurrences, currentUser }: { occurren
   const router = useRouter();
   const [selected, setSelected] = useState<OccurrenceRow | null>(null);
   const [edit, setEdit] = useState<OccurrenceRow | null>(null);
+  const [toDelete, setToDelete] = useState<OccurrenceRow | null>(null);
 
   const columns = useMemo(
     () =>
@@ -24,20 +26,21 @@ export function SubjectOccurrencesPanel({ occurrences, currentUser }: { occurren
         showSubjectName: false,
         onStudents: (occ) => setSelected(occ),
         onEdit: (occ) => setEdit(occ),
-        onDelete: async (occ) => {
-          if (window.confirm("Opravdu smazat tento výskyt?")) {
-            try {
-              unwrap(await deleteSubjectOccurrence(occ.id));
-              toast.success("Výskyt byl smazán.");
-              router.refresh();
-            } catch (err) {
-              toast.error((err as Error).message || "Nepodařilo se smazat výskyt.");
-            }
-          }
-        },
+        onDelete: (occ) => setToDelete(occ),
       }),
-    [currentUser, router]
+    [currentUser]
   );
+
+  async function confirmDelete() {
+    if (!toDelete) return;
+    try {
+      unwrap(await deleteSubjectOccurrence(toDelete.id));
+      toast.success("Výskyt byl smazán.");
+      router.refresh();
+    } catch (err) {
+      toast.error((err as Error).message || "Nepodařilo se smazat výskyt.");
+    }
+  }
 
   return (
     <div className="space-y-2" data-testid="subject-occurrences">
@@ -60,6 +63,15 @@ export function SubjectOccurrencesPanel({ occurrences, currentUser }: { occurren
           searchKeys={["searchText"]}
         />
       )}
+
+      <ConfirmAction
+        open={!!toDelete}
+        onOpenChange={(open) => !open && setToDelete(null)}
+        title="Smazat výskyt?"
+        description="Opravdu smazat tento výskyt předmětu ze zápisu?"
+        actionLabel="Smazat"
+        onConfirm={confirmDelete}
+      />
 
       {selected && (
         <OccurrencesStudentsDialog

@@ -36,7 +36,7 @@ export default async function SubjectDetailPage({
   if (!subject) {
     return (
       <div className="p-8 text-center">
-        <h1 className="text-xl font-semibold text-red-600">Předmět nenalezen</h1>
+        <h1 className="text-xl font-semibold text-danger">Předmět nenalezen</h1>
         <p className="mt-2 text-muted-foreground">Předmět s tímto ID neexistuje nebo k němu nemáte přístup.</p>
       </div>
     );

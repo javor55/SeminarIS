@@ -15,7 +15,7 @@ export function computeEnrollmentStatus(
   if (statusEnum === "DRAFT") {
     return {
       label: "Koncept (Uzavřeno)",
-      className: "text-slate-500",
+      className: "text-muted-foreground",
       is: "closed",
     };
   }
@@ -26,10 +26,10 @@ export function computeEnrollmentStatus(
   if (now < start)
     return {
       label: "Naplánováno",
-      className: "text-blue-600",
+      className: "text-info",
       is: "planned",
     };
   if (now >= start && now <= end)
-    return { label: "Otevřeno", className: "text-emerald-600", is: "open" };
-  return { label: "Uzavřeno", className: "text-slate-500", is: "closed" };
+    return { label: "Otevřeno", className: "text-success", is: "open" };
+  return { label: "Uzavřeno", className: "text-muted-foreground", is: "closed" };
 }

@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars -- názvy parametrů v typech funkcí */
+ 
 import { cache } from "react";
 import { prisma, type TxClient } from "@/lib/prisma";
 import { audit, type AuditEntry } from "@/lib/audit";
@@ -139,7 +139,7 @@ export function formatSettingValue(decl: SettingDeclaration, value: SettingValue
 // Čerstvost: výsledek se v rámci jednoho požadavku sdílí (React cache). Po zápisu se zvýší
 // `generation`, takže další čtení ve stejném požadavku načte nové hodnoty.
 let generation = 0;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 const loadRows = cache(async (_generation: number): Promise<Map<string, string>> => {
   const rows = await prisma.systemSetting.findMany();
   return new Map(rows.map((r) => [r.key, r.value]));

@@ -1,3 +1,4 @@
+import { requirePagePermission } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { getEnabledModuleIds } from "@/lib/modules";
 import { MODULES } from "@/modules/registry";
@@ -5,6 +6,7 @@ import { ModulesForm } from "@/modules/core/components/admin/ModulesForm";
 import type { AdminModuleInfo } from "@/modules/core/actions/admin";
 
 export default async function ModulesPage() {
+  await requirePagePermission("core.admin");
   const enabled = await getEnabledModuleIds();
   const modules: AdminModuleInfo[] = MODULES.map((m) => ({
     id: m.id,

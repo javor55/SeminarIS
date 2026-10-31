@@ -30,7 +30,7 @@ export function SubjectBadges({ subjects, highlight }: { subjects: { id: string;
 export function CapacityBadge({ s }: { s: MakeupSessionItem }) {
   const full = s.registeredCount >= s.capacity;
   return (
-    <span className={full ? "text-destructive font-medium" : ""} data-testid="capacity">
+    <span className={full ? "text-danger font-medium" : ""} data-testid="capacity">
       {s.registeredCount}/{s.capacity}
     </span>
   );
@@ -44,7 +44,7 @@ export function SessionsTable({
   empty = "Žádné termíny.",
 }: {
   sessions: MakeupSessionItem[];
-  // eslint-disable-next-line no-unused-vars
+   
   action?: (s: MakeupSessionItem) => ReactNode;
   highlightSubjects?: string[];
   empty?: string;

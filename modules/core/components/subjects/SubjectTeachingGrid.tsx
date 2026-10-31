@@ -90,16 +90,18 @@ export function SubjectTeachingGrid({ subjectId, teaching }: { subjectId: string
                               <span key={a.id} className="inline-flex items-center gap-1 rounded border px-1.5 text-xs" data-teacher={a.teacherName}>
                                 {a.teacherName}
                                 {editable && (
-                                  <button
+                                  <Button
                                     type="button"
+                                    variant="ghost"
+                                    size="icon"
                                     title="Odebrat úvazek"
                                     aria-label={`Odebrat ${a.teacherName} – ${cls.label}`}
-                                    className="text-muted-foreground hover:text-destructive"
+                                    className="h-5 w-5 text-muted-foreground hover:bg-transparent hover:text-danger"
                                     disabled={busy}
                                     onClick={() => mutate(async () => unwrap(await deleteTeachingAssignment(a.id)), "Úvazek odebrán.")}
                                   >
                                     ×
-                                  </button>
+                                  </Button>
                                 )}
                               </span>
                             ))}

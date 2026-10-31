@@ -16,7 +16,7 @@ type Manifest = {
   core?: boolean;
   permissions: Record<string, string[]>;
   nav: { label: string; href: string; permission: string; order: number }[];
-  routes: { prefix: string; permission: string }[];
+  routes: { prefix: string; permission: string; exact?: boolean }[];
   adminSections?: { label: string; href: string; permission: string; order: number }[];
   settings?: {
     key: string;
@@ -65,7 +65,9 @@ if (cores.length !== 1 || cores[0].id !== "core") fail("Právě jeden modul (id 
 const allPermissions = new Map<string, string>();
 const settingKeys = new Set<string>();
 const adminHrefs = new Set<string>();
-const covered = (m: Manifest, href: string) => m.routes.some((r) => href === r.prefix || href.startsWith(r.prefix + "/"));
+// Stejné pravidlo jako getRoutePermission v modules/registry.ts: první odpovídající pravidlo vyhrává
+const ruleFor = (m: Manifest, href: string) => m.routes.find((r) => href === r.prefix || (!r.exact && href.startsWith(r.prefix + "/")));
+const covered = (m: Manifest, href: string) => !!ruleFor(m, href);
 // stránky jádra, které chrání jen přihlášení, ne oprávnění cesty
 const CORE_OPEN_HREFS = ["/", "/dashboard", "/profile"];
 
@@ -103,6 +105,33 @@ for (const m of manifests) {
     else if (!covered(m, s.href)) fail(`${where}: sekce administrace „${s.label}“ vede na „${s.href}“, které nechrání žádné pravidlo cesty.`);
     if (adminHrefs.has(s.href)) fail(`${where}: sekce administrace „${s.label}“ má odkaz „${s.href}“ už použitý jinou sekcí.`);
     adminHrefs.add(s.href);
+    // pravidlo cesty nesmí být slabší než oprávnění sekce (jinak by ji přímým odkazem otevřel i ten, kdo ji v menu nemá)
+    const rule = ruleFor(m, s.href);
+    if (rule && rule.permission !== s.permission) {
+      fail(`${where}: sekce administrace „${s.label}“ vyžaduje „${s.permission}“, ale cestu „${s.href}“ chrání pravidlo s oprávněním „${rule.permission}“.`);
+    }
+  }
+
+  // stránky pod app/admin: každá si oprávnění ověřuje sama (requirePagePermission) a shodně s pravidlem cesty
+  if (m.core) {
+    const adminDir = path.join(root, "app", "admin");
+    for (const dir of fs.readdirSync(adminDir, { withFileTypes: true })) {
+      const rel = dir.isDirectory() ? path.join("app", "admin", dir.name, "page.tsx") : dir.name === "page.tsx" ? path.join("app", "admin", "page.tsx") : null;
+      if (!rel || !fs.existsSync(path.join(root, rel))) continue;
+      const href = dir.isDirectory() ? `/admin/${dir.name}` : "/admin";
+      const match = read(rel).match(/requirePagePermission\("([\w.]+)"\)/);
+      const rule = ruleFor(m, href);
+      if (!match) fail(`${rel}: stránka administrace nevolá requirePagePermission(…).`);
+      else if (!rule) fail(`${rel}: cestu „${href}“ nechrání žádné pravidlo cesty.`);
+      else {
+        // stránka smí být přísnější než pravidlo cesty (role jejího oprávnění ⊆ role pravidla), nikdy volnější
+        const pageRoles = m.permissions[match[1]] ?? [];
+        const ruleRoles = m.permissions[rule.permission] ?? [];
+        if (!m.permissions[match[1]] || pageRoles.some((r) => !ruleRoles.includes(r))) {
+          fail(`${rel}: stránka vyžaduje „${match[1]}“, což je volnější než pravidlo cesty „${href}“ („${rule.permission}“).`);
+        }
+      }
+    }
   }
 
   // nastavení: nové klíče mají prefix modulu (jádro má kvůli uloženým datům historické klíče),

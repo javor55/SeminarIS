@@ -23,7 +23,7 @@ export function ParticipantsDialog({ occurrenceId, title, onClose }: { occurrenc
           <DialogTitle>Zapsaní – {title}</DialogTitle>
           <DialogDescription>{people ? `Počet zapsaných: ${people.length}` : "Načítám…"}</DialogDescription>
         </DialogHeader>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
         <ul className="max-h-80 space-y-1 overflow-auto text-sm">
           {people?.length === 0 && <li className="text-muted-foreground">Nikdo zatím není zapsaný.</li>}
           {people?.map((p, i) => (

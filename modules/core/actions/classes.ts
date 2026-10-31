@@ -45,7 +45,7 @@ export async function getClassOptions(): Promise<ClassOption[]> {
 
 /** Přehled tříd s počty studujících (záložka Třídy). */
 export async function getClassesOverview(): Promise<ClassOverview[]> {
-  await requirePermission("core.users.view");
+  await requirePermission("core.classes.view");
   const classes = await prisma.classGroup.findMany({
     include: { _count: { select: { students: { where: { role: "STUDENT", studyStatus: "ACTIVE" } } } } },
   });
@@ -56,7 +56,7 @@ export async function getClassesOverview(): Promise<ClassOverview[]> {
 
 /** Studenti zařazení do tříd (včetně absolventů, kteří si třídu ponechali), seřazení podle jména. */
 export async function getClassStudents(): Promise<ClassStudent[]> {
-  await requirePermission("core.users.view");
+  await requirePermission("core.classes.view");
   const users = await prisma.user.findMany({
     where: { role: "STUDENT", classGroupId: { not: null } },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],

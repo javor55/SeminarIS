@@ -47,7 +47,7 @@ export function getNavItems(role: Role | null | undefined, enabledModuleIds: rea
 export function getRoutePermission(pathname: string): Permission | null {
   for (const m of MODULES) {
     for (const rule of m.routes) {
-      if (pathname === rule.prefix || pathname.startsWith(rule.prefix + "/")) {
+      if (pathname === rule.prefix || (!("exact" in rule && rule.exact) && pathname.startsWith(rule.prefix + "/"))) {
         return rule.permission as Permission;
       }
     }

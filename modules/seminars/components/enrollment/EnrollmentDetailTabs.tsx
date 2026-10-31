@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { UnenrolledTab } from "@/modules/seminars/components/enrollment/UnenrolledTab";
+import { Button } from "@/components/ui/button";
 
 type Tab = "enrollments" | "unenrolled";
 
@@ -29,17 +30,18 @@ export function EnrollmentDetailTabs({
             ["unenrolled", count == null ? "Nezapsaní" : `Nezapsaní (${count})`],
           ] as [Tab, string][]
         ).map(([id, label]) => (
-          <button
+          <Button
             key={id}
             type="button"
+            variant="ghost"
             role="tab"
             aria-selected={tab === id}
             data-tab={id}
             onClick={() => setTab(id)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${tab === id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            className={`-mb-px h-auto rounded-none border-b-2 px-4 py-2 hover:bg-transparent ${tab === id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
           >
             {label}
-          </button>
+          </Button>
         ))}
       </div>
       {tab === "enrollments" ? (

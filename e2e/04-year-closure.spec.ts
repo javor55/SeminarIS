@@ -97,7 +97,7 @@ test("uzavření školního roku: změna třídy, opakování, absolvování, od
   // (dialogy jsou v detailu uživatele, ne v seznamu)
   await pa.goto('/users/usr_stud2'); await pa.waitForSelector('[data-testid=study-open]');
   await pa.click('[data-testid=study-open]');
-  await pa.click('#study-reason'); await pa.getByRole('option', { name: 'zanechání studia' }).click();
+  await pa.selectOption('#study-reason', { label: 'zanechání studia' });
   await pa.fill('#study-note', 'na vlastní žádost');
   await pa.click('[data-testid=study-submit]'); await pa.waitForTimeout(2000);
   check('mid-year end study', userRow('eva.studentova@skola.cz').startsWith('4A|LEFT|false|WITHDRAWAL'), userRow('eva.studentova@skola.cz'));

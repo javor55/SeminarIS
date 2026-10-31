@@ -18,6 +18,7 @@ import {
   Gauge
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatTime } from "@/lib/datetime";
 
 interface DiagnosticData {
   dbLatency: number;
@@ -55,9 +56,9 @@ export function PerformanceBenchmarks() {
   }
 
   function getLatencyColor(ms: number) {
-    if (ms < 100) return "text-emerald-500";
-    if (ms < 300) return "text-orange-500";
-    return "text-destructive";
+    if (ms < 100) return "text-success";
+    if (ms < 300) return "text-warning";
+    return "text-danger";
   }
 
   function getLatencyProgress(ms: number) {
@@ -66,11 +67,11 @@ export function PerformanceBenchmarks() {
 
   return (
     <Card className="shadow-sm border-border overflow-hidden">
-      <CardHeader className="bg-slate-50/50 border-b">
+      <CardHeader className="bg-muted/50 border-b">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2">
-              <Gauge className="w-5 h-5 text-indigo-500" />
+              <Gauge className="w-5 h-5 text-info" />
               Benchmark a Diagnostika
             </CardTitle>
             <CardDescription>
@@ -96,8 +97,8 @@ export function PerformanceBenchmarks() {
       <CardContent className="pt-6 space-y-6">
         {!data && !isLoading ? (
           <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
-            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
-              <Zap className="w-6 h-6 text-slate-400" />
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+              <Zap className="w-6 h-6 text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground w-64">
               Spusťte benchmark pro získání aktuálních metrik o stavu systému.
@@ -112,7 +113,7 @@ export function PerformanceBenchmarks() {
               <div className="space-y-3">
                 <div className="flex justify-between items-end">
                   <div className="flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-blue-500" />
+                    <Activity className="w-4 h-4 text-info" />
                     <span className="text-sm font-medium">Odezva serveru (Ping)</span>
                   </div>
                   <span className={`text-xl font-bold font-mono ${lastPing ? getLatencyColor(lastPing) : ""}`}>
@@ -125,7 +126,7 @@ export function PerformanceBenchmarks() {
               <div className="space-y-3">
                 <div className="flex justify-between items-end">
                   <div className="flex items-center gap-2">
-                    <Database className="w-4 h-4 text-emerald-500" />
+                    <Database className="w-4 h-4 text-success" />
                     <span className="text-sm font-medium">Latence databáze</span>
                   </div>
                   <span className={`text-xl font-bold font-mono ${data ? getLatencyColor(data.dbLatency) : ""}`}>
@@ -138,7 +139,7 @@ export function PerformanceBenchmarks() {
               <div className="space-y-3">
                 <div className="flex justify-between items-end">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-amber-500" />
+                    <ShieldCheck className="w-4 h-4 text-warning" />
                     <span className="text-sm font-medium">Ověření relace (Session)</span>
                   </div>
                   <span className={`text-xl font-bold font-mono ${data ? getLatencyColor(data.sessionCheckLatency) : ""}`}>
@@ -153,7 +154,7 @@ export function PerformanceBenchmarks() {
             <div className="space-y-4">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Stav systému</h4>
               
-              <div className="rounded-lg border bg-slate-50/50 p-4 space-y-3">
+              <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Konfigurace proměnných</span>
                   <div className="flex gap-1">
@@ -178,18 +179,18 @@ export function PerformanceBenchmarks() {
                   <span className="text-muted-foreground">Čas serveru</span>
                   <div className="flex items-center gap-1.5 font-mono text-xs">
                     <Clock className="w-3 h-3" />
-                    {data ? new Date(data.serverTime).toLocaleTimeString() : "--:--:--"}
+                    {data ? formatTime(data.serverTime) : "--:--:--"}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-200 mt-1">
+                <div className="flex items-center justify-between text-sm pt-2 border-t border-border mt-1">
                   <span className="text-muted-foreground">Vercel Speed Insights</span>
                   {data?.envHealth.VERCEL_SPEED_INSIGHTS ? (
-                    <span className="flex items-center gap-1 text-emerald-600 text-[11px] font-medium">
+                    <span className="flex items-center gap-1 text-success text-[11px] font-medium">
                       <CheckCircle2 className="w-3 h-3" /> Aktivní
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1 text-slate-400 text-[11px] font-medium">
+                    <span className="flex items-center gap-1 text-muted-foreground text-[11px] font-medium">
                       <AlertCircle className="w-3 h-3" /> Nenalezeno
                     </span>
                   )}

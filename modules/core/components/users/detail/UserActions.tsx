@@ -51,7 +51,7 @@ export function UserActions({ user, isSelf }: { user: UserListRow; isSelf: boole
           <Button
             variant="outline"
             size="sm"
-            className="gap-2 text-destructive hover:text-destructive"
+            className="gap-2 text-danger hover:text-danger"
             data-testid="user-delete"
             onClick={() => setShowDelete(true)}
           >

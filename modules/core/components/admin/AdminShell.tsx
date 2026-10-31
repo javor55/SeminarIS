@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
-import { can } from "@/modules/registry";
 import { collectAdminSections } from "@/modules/core/extensions";
 import { AdminNav } from "@/modules/core/components/admin/AdminNav";
 
@@ -14,7 +13,7 @@ export async function AdminShell({ children }: { children: ReactNode }) {
   if (!user) redirect("/");
   const sections = await collectAdminSections(user);
   // Do administrace patří jen ten, kdo smí otevřít aspoň jednu sekci
-  if (sections.length === 0 && !can(user.role, "core.admin")) redirect("/dashboard");
+  if (sections.length === 0) redirect("/dashboard");
 
   return (
     <div className="flex flex-col gap-6 md:flex-row md:items-start" data-testid="admin-shell">

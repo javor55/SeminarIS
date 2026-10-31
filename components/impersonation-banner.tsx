@@ -29,7 +29,7 @@ export function ImpersonationBanner({ user }: { user: User }) {
     <div
       role="status"
       data-testid="impersonation-banner"
-      className="print:hidden sticky top-0 z-50 border-b border-amber-600 bg-amber-400 text-amber-950"
+      className="print:hidden sticky top-0 z-50 border-b border-banner-border bg-banner text-banner-foreground"
     >
       <div className="container mx-auto flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
         <div className="flex items-center gap-2">

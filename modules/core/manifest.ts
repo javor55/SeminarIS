@@ -13,8 +13,12 @@ export const coreModule = {
     "core.users.view": ["TEACHER", "ADMIN"],
     // Úpravy, import, role, mazání uživatelů
     "core.users.manage": ["ADMIN"],
-    // Administrační centrum a globální nastavení
+    // Administrační centrum a globální nastavení (zápis; sekce administrace jen pro admina)
     "core.admin": ["ADMIN"],
+    // Administrace pro čtení: položka menu, přehled „co udělat“ (učitel vidí jen své položky)
+    "core.admin.view": ["TEACHER", "ADMIN"],
+    // Školní rok a seznam tříd se studenty (jen čtení; úpravy vyžadují core.users.manage / core.school.manage)
+    "core.classes.view": ["TEACHER", "ADMIN"],
     // Zobrazit aplikaci jako jiný uživatel (jen pro čtení)
     "core.impersonate": ["ADMIN"],
     // Školní rok (uzavření roku) a úvazky učitelů
@@ -31,20 +35,23 @@ export const coreModule = {
     { label: "Předměty", href: "/subjects", permission: "core.subjects.view", order: 20 },
     { label: "Moje předměty", href: "/subjects/mine", permission: "core.subjects.mine", order: 25 },
     { label: "Uživatelé", href: "/users", permission: "core.users.view", order: 80 },
-    { label: "Administrace", href: "/admin", permission: "core.admin", order: 90 },
+    { label: "Administrace", href: "/admin", permission: "core.admin.view", order: 90 },
     { label: "Můj profil", href: "/profile", permission: "core.profile", order: 100 },
   ],
   routes: [
     { prefix: "/users", permission: "core.users.view" },
+    // Přehled a Školní rok a třídy vidí i učitel (jen čtení); vše ostatní pod /admin jen admin
+    { prefix: "/admin", permission: "core.admin.view", exact: true },
+    { prefix: "/admin/school-year", permission: "core.classes.view" },
     { prefix: "/admin", permission: "core.admin" },
     { prefix: "/subjects/mine", permission: "core.subjects.mine" },
     { prefix: "/subjects", permission: "core.subjects.view" },
   ],
   // Boční menu administrace (moduly přidávají vlastní přes `adminSections`)
   adminSections: [
-    { label: "Přehled", href: "/admin", permission: "core.admin", order: 0 },
+    { label: "Přehled", href: "/admin", permission: "core.admin.view", order: 0 },
     { label: "Registrace a přihlášení", href: "/admin/registration", permission: "core.admin", order: 10 },
-    { label: "Školní rok a třídy", href: "/admin/school-year", permission: "core.admin", order: 20, match: ["/admin/close-year"] },
+    { label: "Školní rok a třídy", href: "/admin/school-year", permission: "core.classes.view", order: 20, match: ["/admin/close-year"] },
     { label: "Moduly", href: "/admin/modules", permission: "core.admin", order: 30 },
     { label: "Upozornění", href: "/admin/notifications", permission: "core.admin", order: 40 },
     { label: "Historie", href: "/admin/history", permission: "core.admin", order: 50 },

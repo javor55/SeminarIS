@@ -37,7 +37,7 @@ export const makeupServer: ModuleServer = {
           <CardContent>
             <ul className="space-y-2 text-sm">
               {regs.map((r) => (
-                <li key={r.id} className={r.session.cancelledAt ? "text-destructive" : ""}>
+                <li key={r.id} className={r.session.cancelledAt ? "text-danger" : ""}>
                   <strong>{formatTimeRange(r.session.startsAt, r.session.endsAt)}</strong>, učebna {r.session.room}
                   {" – "}
                   {r.subjects.map((x) => x.subject.name).join(", ")}
@@ -142,15 +142,32 @@ export const makeupServer: ModuleServer = {
 
   // Přehled „co udělat“: nadcházející termíny, které nejdou použít
   async getAdminTodos(user) {
-    if (!can(user.role, "makeup.sessions.manageAll")) return [];
+    if (!can(user.role, "makeup.sessions.manage")) return [];
     const upcoming = { endsAt: { gte: new Date() }, cancelledAt: null };
+    const all = can(user.role, "makeup.sessions.manageAll");
+    // Učitel řeší jen termíny, které sám dozoruje; admin všechny
+    const mine = all ? {} : { teacherId: user.id };
     const [withoutSubjects, withoutSupervisor] = await Promise.all([
-      prisma.makeupSession.count({ where: { ...upcoming, subjects: { none: {} } } }),
-      prisma.makeupSession.count({ where: { ...upcoming, teacher: { isActive: false } } }),
+      prisma.makeupSession.count({ where: { ...upcoming, ...mine, subjects: { none: {} } } }),
+      all ? prisma.makeupSession.count({ where: { ...upcoming, teacher: { isActive: false } } }) : 0,
     ]);
     return [
-      { id: "without-subjects", label: "Nadcházející termíny dopisování bez předmětů", count: withoutSubjects, severity: "warning" as const, href: "/makeup" },
-      { id: "without-supervisor", label: "Nadcházející termíny dopisování s neaktivním dozorem", count: withoutSupervisor, severity: "warning" as const, href: "/makeup" },
+      {
+        id: "without-subjects",
+        label: all ? "Nadcházející termíny dopisování bez předmětů" : "Vaše nadcházející termíny dopisování bez předmětů",
+        count: withoutSubjects,
+        severity: "warning" as const,
+        href: "/makeup",
+        permission: "makeup.sessions.manage",
+      },
+      {
+        id: "without-supervisor",
+        label: "Nadcházející termíny dopisování s neaktivním dozorem",
+        count: withoutSupervisor,
+        severity: "warning" as const,
+        href: "/makeup",
+        permission: "makeup.sessions.manageAll",
+      },
     ];
   },
 

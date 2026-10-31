@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { endStudy, restoreStudy } from "@/modules/core/actions/users";
 import { STUDY_END_REASON_LABELS, type StudyEndReasonValue } from "@/lib/school";
 import type { UserListRow as UserRow } from "@/modules/core/users-query";
@@ -86,16 +86,11 @@ export function StudyStatusDialog({ user, label }: { user: UserRow; label?: bool
             <div className="space-y-3">
               <div className="space-y-1">
                 <Label htmlFor="study-reason">Důvod</Label>
-                <Select value={reason} onValueChange={(v) => setReason(v as StudyEndReasonValue)}>
-                  <SelectTrigger id="study-reason">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MID_YEAR_REASONS.map((r) => (
-                      <SelectItem key={r} value={r}>{STUDY_END_REASON_LABELS[r]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <NativeSelect id="study-reason" value={reason} onChange={(e) => setReason(e.target.value as StudyEndReasonValue)}>
+                  {MID_YEAR_REASONS.map((r) => (
+                    <option key={r} value={r}>{STUDY_END_REASON_LABELS[r]}</option>
+                  ))}
+                </NativeSelect>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="study-date">Datum ukončení</Label>

@@ -21,6 +21,7 @@ import { DEADLINE_OPTIONS, type MakeupSessionItem } from "@/modules/makeup/types
 import { SubjectPicker } from "./SubjectPicker";
 import { deadlineText } from "./common";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Options = Awaited<ReturnType<typeof getSessionFormOptions>>;
 
@@ -161,10 +162,7 @@ export function SessionFormDialog({ session, trigger }: { session?: MakeupSessio
             </div>
             {!isEdit && (
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <label className="flex items-center gap-2">
-                  <input id="ms-repeat" type="checkbox" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} />
-                  Opakovat každý týden do
-                </label>
+                <Checkbox id="ms-repeat" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} label="Opakovat každý týden do" />
                 <Input
                   id="ms-until"
                   type="date"

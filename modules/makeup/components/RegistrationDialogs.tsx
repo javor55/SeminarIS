@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTimeRange } from "@/lib/datetime";
 import type { MakeupSessionItem } from "@/modules/makeup/types";
+import { Checkbox, Radio } from "@/components/ui/checkbox";
 
 /**
  * Výběr předmětů (z povolených na termínu) a poznámky – pro nový zápis i úpravu.
@@ -37,7 +38,7 @@ export function RegisterDialog({
   initialNote?: string | null;
   title: string;
   submitLabel: string;
-  // eslint-disable-next-line no-unused-vars
+   
   onSubmit: (subjectIds: string[], note: string) => Promise<unknown>;
   trigger: ReactNode;
 }) {
@@ -86,11 +87,19 @@ export function RegisterDialog({
               <Label>Co chcete dopisovat</Label>
               <div className="space-y-1" id="reg-subjects">
                 {session.subjects.map((s) => (
-                  <label key={s.id} className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" data-subject={s.code} checked={selected.includes(s.id)} onChange={() => toggle(s.id)} />
-                    {s.name}
-                    {mySubjectIds.includes(s.id) && <span className="text-xs text-muted-foreground">(váš předmět)</span>}
-                  </label>
+                  <div key={s.id}>
+                    <Checkbox
+                      data-subject={s.code}
+                      checked={selected.includes(s.id)}
+                      onChange={() => toggle(s.id)}
+                      label={
+                        <>
+                          {s.name}
+                          {mySubjectIds.includes(s.id) && <span className="ml-2 text-xs text-muted-foreground">(váš předmět)</span>}
+                        </>
+                      }
+                    />
+                  </div>
                 ))}
               </div>
             </div>
@@ -126,7 +135,7 @@ export function MoveDialog({
   title: string;
   description: string;
   candidates: MakeupSessionItem[];
-  // eslint-disable-next-line no-unused-vars
+   
   onMove: (targetSessionId: string) => Promise<unknown>;
   trigger: ReactNode;
 }) {
@@ -164,7 +173,7 @@ export function MoveDialog({
             <div className="space-y-1" id="move-candidates">
               {candidates.map((s) => (
                 <label key={s.id} className="flex items-start gap-2 rounded-md border p-2 text-sm hover:bg-accent">
-                  <input type="radio" name="move-target" value={s.id} checked={target === s.id} onChange={() => setTarget(s.id)} />
+                  <Radio name="move-target" className="mt-0.5" value={s.id} checked={target === s.id} onChange={() => setTarget(s.id)} />
                   <span>
                     <strong>{formatTimeRange(s.startsAt, s.endsAt)}</strong>, učebna {s.room}, dozor {s.teacherName}
                     <span className="block text-xs text-muted-foreground">

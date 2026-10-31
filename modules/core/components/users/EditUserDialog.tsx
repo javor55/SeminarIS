@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateUserProfile } from "@/modules/core/actions/users";
 import { getClassOptions, type ClassOption } from "@/modules/core/actions/classes";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 
 const NO_CLASS = "__none";
 import { toast } from "sonner";
@@ -145,21 +145,16 @@ export function EditUserDialog({ user, onSuccess, label }: EditUserDialogProps) 
 
             <div className="space-y-1">
               <Label htmlFor="edit-class">Třída</Label>
-              <Select value={classGroupId} onValueChange={setClassGroupId}>
-                <SelectTrigger id="edit-class">
-                  <SelectValue placeholder="Bez třídy" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_CLASS}>Bez třídy</SelectItem>
-                  {classOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <NativeSelect id="edit-class" value={classGroupId} onChange={(e) => setClassGroupId(e.target.value)}>
+                <option value={NO_CLASS}>Bez třídy</option>
+                {classOptions.map((c) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+              </NativeSelect>
             </div>
 
             {error && (
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-sm text-danger">{error}</p>
             )}
           </div>
 

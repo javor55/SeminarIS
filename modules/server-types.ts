@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars -- názvy parametrů v typech funkcí */
+ 
 import type { ReactNode } from "react";
 import type { TxClient } from "@/lib/prisma";
 import type { User } from "@/lib/types";

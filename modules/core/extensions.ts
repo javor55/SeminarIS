@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars -- názvy parametrů v typech funkcí */
+ 
 import type { User } from "@/lib/types";
 import { getEnabledModuleIds } from "@/lib/modules";
 import { MODULE_SERVERS } from "@/modules/server-registry";
@@ -97,12 +97,15 @@ export async function collectUserTabs(userId: string, viewer: User): Promise<Mod
 
 const SEVERITY_RANK = { critical: 0, warning: 1, info: 2 } as const;
 
-/** Položky přehledu „co udělat“ ze zapnutých modulů (jen s nenulovým počtem), nejzávažnější první. */
+/**
+ * Položky přehledu „co udělat“ ze zapnutých modulů (jen s nenulovým počtem), nejzávažnější první.
+ * Uživatel dostane jen položky, na jejichž `permission` má právo (bez ní jen admin).
+ */
 export async function collectAdminTodos(user: User): Promise<AdminTodo[]> {
   const parts = await collect((s) => s.getAdminTodos?.(user));
   return parts
     .flatMap((p) => p.value.map((t) => ({ ...t, id: `${p.id}.${t.id}` })))
-    .filter((t) => t.count > 0)
+    .filter((t) => t.count > 0 && can(user.role, (t.permission ?? "core.admin") as Permission))
     .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
 }
 

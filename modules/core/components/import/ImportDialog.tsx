@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { unwrap, type ActionResult } from "@/lib/action-result";
 import type { ImportPreview, ImportResult, ImportRowStatus } from "@/modules/core/imports/types";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export type ImportOption = { key: string; label: string; description?: string; default: boolean };
 
@@ -21,19 +24,19 @@ type Props = {
   description: React.ReactNode;
   sample: { filename: string; content: string };
   options?: ImportOption[];
-  // eslint-disable-next-line no-unused-vars
+   
   preview: (content: string, options: Record<string, boolean>) => Promise<ActionResult<ImportPreview>>;
-  // eslint-disable-next-line no-unused-vars
+   
   confirm: (content: string, options: Record<string, boolean>) => Promise<ActionResult<ImportResult>>;
   onDone?: () => void;
 };
 
 const STATUS_LABEL: Record<ImportRowStatus, string> = { new: "Nový", change: "Změna", unchanged: "Beze změny", error: "Chyba" };
-const STATUS_CLASS: Record<ImportRowStatus, string> = {
-  new: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  change: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  unchanged: "bg-muted text-muted-foreground",
-  error: "bg-red-500/15 text-red-700 dark:text-red-300",
+const STATUS_VARIANT: Record<ImportRowStatus, "success" | "info" | "muted" | "danger"> = {
+  new: "success",
+  change: "info",
+  unchanged: "muted",
+  error: "danger",
 };
 
 /** Společný dialog importů: soubor → náhled (nový / změna / beze změny / chyba) → potvrzení. */
@@ -137,7 +140,7 @@ export function ImportDialog({ open, onOpenChange, kind, title, description, sam
       <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto" data-testid={`import-dialog-${kind}`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Upload className="w-5 h-5 text-emerald-600" />
+            <Upload className="w-5 h-5 text-success" />
             {title}
           </DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -161,19 +164,20 @@ export function ImportDialog({ open, onOpenChange, kind, title, description, sam
           {options.length > 0 && (
             <div className="space-y-2 rounded-lg border p-3">
               {options.map((o) => (
-                <label key={o.key} className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    data-testid={`import-option-${o.key}`}
-                    checked={!!opts[o.key]}
-                    onChange={(e) => toggle(o.key, e.target.checked)}
-                  />
-                  <span>
-                    {o.label}
-                    {o.description && <span className="block text-xs text-muted-foreground">{o.description}</span>}
-                  </span>
-                </label>
+                <Checkbox
+                  key={o.key}
+                  className="mt-1"
+                  labelClassName="items-start"
+                  data-testid={`import-option-${o.key}`}
+                  checked={!!opts[o.key]}
+                  onChange={(e) => toggle(o.key, e.target.checked)}
+                  label={
+                    <>
+                      {o.label}
+                      {o.description && <span className="block text-xs text-muted-foreground">{o.description}</span>}
+                    </>
+                  }
+                />
               ))}
             </div>
           )}
@@ -199,43 +203,43 @@ export function ImportDialog({ open, onOpenChange, kind, title, description, sam
               <h4 className="text-sm font-medium">3. Náhled {fileName && <span className="font-normal text-muted-foreground">({fileName})</span>}</h4>
               <p className="flex flex-wrap gap-2 text-xs" data-testid="import-counts">
                 {(["new", "change", "unchanged", "error"] as const).map((s) => (
-                  <span key={s} data-count={s} className={`rounded px-2 py-1 font-medium ${STATUS_CLASS[s]}`}>
+                  <Badge key={s} variant={STATUS_VARIANT[s]} data-count={s} className="rounded px-2 py-1">
                     {STATUS_LABEL[s]}: {data.counts[s]}
-                  </span>
+                  </Badge>
                 ))}
               </p>
               <div className="max-h-72 overflow-auto rounded-md border">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-muted text-left text-xs">
-                    <tr>
-                      <th className="px-2 py-1.5">Řádek</th>
-                      <th className="px-2 py-1.5">Stav</th>
-                      <th className="px-2 py-1.5">Záznam</th>
-                      <th className="px-2 py-1.5">Co se stane / důvod</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table>
+                  <TableHeader className="sticky top-0 bg-muted">
+                    <TableRow>
+                      <TableHead className="h-8 px-2">Řádek</TableHead>
+                      <TableHead className="h-8 px-2">Stav</TableHead>
+                      <TableHead className="h-8 px-2">Záznam</TableHead>
+                      <TableHead className="h-8 px-2">Co se stane / důvod</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {data.rows.map((r) => (
-                      <tr key={r.line} data-status={r.status} data-line={r.line} className="border-t align-top">
-                        <td className="px-2 py-1.5 text-muted-foreground">{r.line}</td>
-                        <td className="px-2 py-1.5">
-                          <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${STATUS_CLASS[r.status]}`}>{STATUS_LABEL[r.status]}</span>
-                        </td>
-                        <td className="px-2 py-1.5 break-all">{r.title}</td>
-                        <td className="px-2 py-1.5 text-xs">{r.status === "error" ? <span className="text-red-600">{r.error}</span> : r.changes.join("; ")}</td>
-                      </tr>
+                      <TableRow key={r.line} data-status={r.status} data-line={r.line} className="align-top">
+                        <TableCell className="px-2 py-1.5 text-muted-foreground">{r.line}</TableCell>
+                        <TableCell className="px-2 py-1.5">
+                          <Badge variant={STATUS_VARIANT[r.status]} className="rounded px-1.5 py-0.5">{STATUS_LABEL[r.status]}</Badge>
+                        </TableCell>
+                        <TableCell className="px-2 py-1.5 break-all">{r.title}</TableCell>
+                        <TableCell className="px-2 py-1.5 text-xs">{r.status === "error" ? <span className="text-danger">{r.error}</span> : r.changes.join("; ")}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
               {data.counts.error > 0 && <p className="text-xs text-muted-foreground">Řádky s chybou se při potvrzení přeskočí, ostatní se provedou.</p>}
             </div>
           )}
 
           {result && (
-            <Alert className={result.counts.error > 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-emerald-500/10 border-emerald-500/20"} data-testid="import-result">
+            <Alert className={result.counts.error > 0 ? "bg-warning/10 border-warning/30" : "bg-success/10 border-success/30"} data-testid="import-result">
               <div className="mb-1 flex items-center gap-2">
-                {result.counts.error > 0 ? <AlertCircle className="h-4 w-4 text-amber-600" /> : <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                {result.counts.error > 0 ? <AlertCircle className="h-4 w-4 text-warning" /> : <CheckCircle2 className="h-4 w-4 text-success" />}
                 <AlertTitle className="mb-0">Import dokončen</AlertTitle>
               </div>
               <AlertDescription className="text-sm">{result.summary}</AlertDescription>
@@ -250,7 +254,7 @@ export function ImportDialog({ open, onOpenChange, kind, title, description, sam
           <Button
             onClick={run}
             disabled={!data || !!data.fileError || applicable === 0 || busy || !!result}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="bg-success text-success-foreground hover:bg-success/90"
             data-testid="import-confirm"
           >
             {applicable > 0 ? `Potvrdit import (${applicable})` : "Potvrdit import"}

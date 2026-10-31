@@ -3,7 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { User, EnrollmentWindow } from "@/lib/types";
-import { cn, computeEnrollmentStatus } from "@/lib/utils";
+import { computeEnrollmentStatus } from "@/lib/utils";
 import Link from "next/link"; // Pro proklik z názvu
 import { Badge } from "@/components/ui/badge"; // Pro badge stavu
 import { formatDateTime } from "@/lib/datetime";
@@ -41,7 +41,7 @@ export function getEnrollmentColumns(opts: {
           <div className="max-w-xs">
             <Link
               href={`/enrollments/${id}`}
-              className="font-medium text-blue-600 hover:underline"
+              className="font-medium text-info hover:underline"
             >
               {name}
             </Link>
@@ -61,13 +61,12 @@ export function getEnrollmentColumns(opts: {
         const ew = row.original;
         const statusMeta = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
         // Vybereme variantu badge podle interního 'is' klíče z utilits
-        let variant: "default" | "secondary" | "outline" | "destructive" = "outline";
-        let xtraClass = "";
-        if (statusMeta.is === "open" && ew.status !== "DRAFT") { variant = "default"; xtraClass = "bg-emerald-600 hover:bg-emerald-600 text-white"; }
-        if (statusMeta.is === "planned" && ew.status !== "DRAFT") { variant = "default"; xtraClass = "bg-blue-600 hover:bg-blue-600 text-white"; }
-        if (ew.status === "DRAFT") { variant = "secondary"; }
+        let variant: "outline" | "secondary" | "successSolid" | "infoSolid" = "outline";
+        if (statusMeta.is === "open" && ew.status !== "DRAFT") variant = "successSolid";
+        if (statusMeta.is === "planned" && ew.status !== "DRAFT") variant = "infoSolid";
+        if (ew.status === "DRAFT") variant = "secondary";
 
-        return <Badge variant={variant} className={cn(xtraClass)}>{statusMeta.label}</Badge>;
+        return <Badge variant={variant}>{statusMeta.label}</Badge>;
       },
       filterFn: (row, id, value) => {
         if (!value || value.length === 0) return true;
@@ -83,7 +82,7 @@ export function getEnrollmentColumns(opts: {
         const isVisible = row.original.visibleToStudents;
         if (isVisible) {
           // Používáme stejný styl jako "Otevřeno"
-          return <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600 text-white">Ano</Badge>;
+          return <Badge variant="successSolid">Ano</Badge>;
         }
         // Používáme neutrální styl
         return <Badge variant="outline">Ne</Badge>;

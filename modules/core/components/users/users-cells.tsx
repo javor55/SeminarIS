@@ -91,8 +91,8 @@ export function ActiveCell({ user: u, canEdit, isSelf }: { user: UserListRow; ca
             disabled={loading || !canEdit}
             aria-label={`Aktivní – ${u.firstName} ${u.lastName}`}
             className={cn(
-              "border border-slate-300 shadow-inner",
-              "data-[state=checked]:bg-emerald-600 data-[state=unchecked]:bg-slate-200",
+              "border border-border shadow-inner",
+              "data-[state=checked]:bg-success data-[state=unchecked]:bg-muted",
               isSelf && "opacity-40 grayscale-[0.5]"
             )}
           />

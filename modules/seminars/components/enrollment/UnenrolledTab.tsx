@@ -20,7 +20,7 @@ export function UnenrolledTab({
   windowId: string;
   windowName: string;
   canRemind: boolean;
-  // eslint-disable-next-line no-unused-vars
+   
   onCount?: (count: number) => void;
 }) {
   const [view, setView] = useState<UnenrolledView | null>(null);

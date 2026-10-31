@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 
 type EditBlockDialogProps = {
   open: boolean;
-  // eslint-disable-next-line no-unused-vars
+   
   onOpenChange: (_open: boolean) => void;
   block: {
     id: string;
@@ -27,7 +27,7 @@ type EditBlockDialogProps = {
     minEnrollments?: number;
     maxEnrollments?: number;
   };
-  // eslint-disable-next-line no-unused-vars
+   
   onSubmit?: (_data: { id: string; name: string; description?: string | null; required: boolean; minEnrollments: number; maxEnrollments: number }) => void;
   // případně můžeš přidat isSaving?: boolean
 };
