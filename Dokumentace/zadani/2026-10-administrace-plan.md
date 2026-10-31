@@ -20,7 +20,7 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F6 Importy s náhledem (uživatelé, úvazky) (PR #11)
 - [x] F7 Učitel v administraci, vypínač hromadného e-mailu, jednotné UI, úklid lintu (PR #12)
 - [x] F8 Dashboard jako přehled (karty z modulů) a stránka Zápisy pro studenty
-- [ ] F9 Ukázková data (naplnit / smazat) pro prezentaci
+- [x] F9 Ukázková data (naplnit / smazat) pro prezentaci
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,
