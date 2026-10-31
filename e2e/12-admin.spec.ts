@@ -7,7 +7,7 @@ import { sql, resetDb, seedSubjects, login, toastText } from "./helpers";
 const check = (name: string, ok: boolean, extra = "") => expect.soft(ok, `${name} ${extra}`).toBe(true);
 const auditCount = (where: string) => Number(sql(`select count(*) from "AuditLog" where ${where}`));
 
-const NAV = ["Přehled", "Registrace a přihlášení", "Školní rok a třídy", "Moduly", "Upozornění", "Historie", "Diagnostika", "Semináře", "Dopisování"];
+const NAV = ["Přehled", "Registrace a přihlášení", "Školní rok a třídy", "Moduly", "Upozornění", "Historie", "Diagnostika", "Ukázková data", "Semináře", "Dopisování"];
 
 test("administrace: boční menu s oddíly, staré adresy fungují, na mobilu je výběr", async ({ browser }) => {
   resetDb();
@@ -26,6 +26,7 @@ test("administrace: boční menu s oddíly, staré adresy fungují, na mobilu je
     ["Upozornění", "/admin/notifications", /Upozornění/],
     ["Historie", "/admin/history", /Historie změn|Změny v systému/],
     ["Diagnostika", "/admin/diagnostics", /Diagnostika/],
+    ["Ukázková data", "/admin/demo", /Ukázková data/],
     ["Semináře", "/enrollments/settings", /Semináře/],
     ["Dopisování", "/makeup/settings", /Dopisování/],
   ];
