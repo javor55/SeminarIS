@@ -24,6 +24,8 @@ modules/
                         assignments.ts (úvazky), school.ts (školní rok, uzavření roku), admin.ts, profile.ts
     users-filter.ts     filtr seznamu uživatelů (čistá data, parametry URL); users-query.ts dotazy (stránka, počty)
     user-detail.ts      data detailu uživatele (profil, třídy, úvazky, historie, e-maily)
+    imports/            importy s náhledem: types.ts (řádek náhledu, počty), users.ts, assignments.ts, subjects.ts
+                        (každý „plán“ čte DB a vrací řádky + apply); lib/csv.ts čte CSV, lib/import-samples.ts vzory
     bulk-actions.ts     hromadné akce jádra (přesun, role, aktivita, schválení, studium, e-mail, smazání);
                         bulk-runner.ts společný běh (výběr, náhled, transakce, audit)
     components/         users/ (seznam, detail/, hromadné akce, záložka Ke schválení), subjects/, admin/ (AdminShell, AdminNav, SettingsForm,
@@ -140,7 +142,7 @@ Jeden model `Subject` pro všechno (dřív zvlášť `Seminar` a `Subject`). Ž�
   třídy (ročníky × písmena, např. 1–4 × A, B, C; existující se přeskočí) a smaže prázdnou třídu
   (bez studentů a bez historie zařazení).
 - V seznamu uživatelů je sloupec a filtr třídy a hromadná akce **Přesunout do třídy**.
-- Import uživatelů: sloupec `class` („3.A“) třídu při chybějící založí.
+- Import uživatelů: sloupec `class` („3.A“) třídu při chybějící založí (viz Importy s náhledem).
 
 ### Registrace se třídou a schvalování (Uživatelé → Ke schválení)
 
@@ -894,3 +896,29 @@ před přepnutím na nový kód.
 - Role při změně role a importu uživatelů se validuje.
 - Pomocné autorizační funkce už nejsou v `"use server"` souboru, takže nejsou
   zavolatelné z klienta.
+
+
+## Importy s náhledem (uživatelé, úvazky, předměty)
+
+Jeden mechanismus pro všechny importy (`modules/core/imports/*`, akce `modules/core/actions/imports.ts`,
+dialog `components/import/ImportDialog.tsx`):
+
+- **Dva kroky.** Klient pošle obsah CSV; `preview…` ho na serveru přečte (`lib/csv.ts`: oddělovač `;`, `,` nebo
+  tabulátor se pozná z hlavičky, BOM, uvozovky, české i anglické názvy sloupců bez ohledu na diakritiku) a každý
+  řádek zařadí: **nový / změna** (přesný výpis polí „před → po“) **/ beze změny / chyba** (důvod). Nic nezapisuje.
+- **Potvrzení nevěří náhledu z klienta.** `confirm…` pošle stejný obsah znovu, na serveru se v jedné transakci
+  znovu přečte a zvaliduje (stejná funkce plánu s `tx`), zapíšou se jen platné řádky (chybné se přeskočí) a vznikne
+  **jeden** záznam historie se souhrnem a počty (`users.import`, `subjects.assignment.import`,
+  `subjects.subject.import`; u uživatelů `data.userIds`, takže se import objeví i v historii uživatele).
+  Soubor je omezen na 2 MB a 2000 řádků. Akce jsou `safeAction`, tedy v náhledu „jako uživatel“ zakázané.
+- **Uživatelé** (`core.users.manage`; Uživatelé → Import i Administrace → Školní rok a třídy): klíč e-mail
+  (bez ohledu na velikost písmen), volba „Aktualizovat existující“ (jméno, příjmení, role, aktivita, třída).
+  Hesla existujících uživatelů se nikdy nemění; nový uživatel má heslo ze sloupce `password`, jinak náhodné
+  (přihlášení přes M365 / reset). Třída jde jen přes `setStudentClass` (historie `ClassMembership`), chybějící
+  třída se založí. Prázdná buňka u existujícího uživatele hodnotu nemění. Nelze měnit vlastní roli ani se deaktivovat.
+- **Úvazky** (`core.school.manage`; Administrace → Školní rok a třídy, Předměty): `email_ucitele;kod_predmetu;trida`
+  pro aktuální školní rok; chyba při neznámém učiteli / předmětu / třídě, uživateli, který není učitel, archivovaném
+  předmětu nebo ročníku, ve kterém se předmět nevyučuje. Jen přidává chybějící úvazky (třídy nezakládá).
+- **Předměty** (`core.subjects.edit`; Předměty): `nazev;kod;rocniky` (`1,2,3`, `2-4`, prázdné = všechny), klíč
+  zkratka, jinak název; volba „Aktualizovat existující“ (název, ročníky).
+- Vzorové soubory (`lib/import-samples.ts`) se stahují z dialogu. E2E: `e2e/16-imports.spec.ts`.
