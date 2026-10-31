@@ -1,7 +1,11 @@
 // Konstanty ukázkových dat bez závislostí na serveru (použije je i klientská komponenta).
 
-/** Společné heslo ukázkových účtů (zobrazuje se v administraci; účty existují jen s ukázkovými daty). */
-export const DEMO_PASSWORD = "Ukazka2026";
+/**
+ * Klíč SystemSetting se společným heslem ukázkových účtů. Heslo se generuje náhodně při každém naplnění
+ * (nesmí být v kódu – kdo zná kód, nesmí se přihlásit do produkce), zobrazuje se jen adminovi a při
+ * smazání ukázkových dat se odstraní.
+ */
+export const DEMO_PASSWORD_SETTING = "demo.password";
 export const DEMO_SEED_CONFIRM_WORD = "UKÁZKA";
 export const DEMO_CLEAR_CONFIRM_WORD = "SMAZAT";
 

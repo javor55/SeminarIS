@@ -6,7 +6,6 @@ import { sql, resetDb, seedSubjects, login, toastText } from "./helpers";
 // učitel sekci nevidí; e-mailová vrstva přeskakuje adresy na .invalid.
 const check = (name: string, ok: boolean, extra = "") => expect.soft(ok, `${name} ${extra}`).toBe(true);
 
-const PASSWORD = "Ukazka2026";
 const TABLES = ["User", "ClassGroup", "ClassMembership", "Subject", "TeachingAssignment", "EnrollmentWindow", "Block", "SubjectOccurrence", "StudentEnrollment", "MakeupSession", "MakeupRegistration", "SchoolYear", "DemoRecord"];
 const snapshot = () => Object.fromEntries(TABLES.map((t) => [t, Number(sql(`select count(*) from "${t}"`))]));
 const demoUsers = (role: string) => Number(sql(`select count(*) from "User" where role='${role}' and email like '%@ukazka.invalid'`));
@@ -31,7 +30,7 @@ test("ukázková data: naplnit, stránky rolí, smazat jen vlastní, znovu napln
   await openDemo(pa);
   check("initially no demo data", (await pa.locator('[data-testid="demo-state"]').innerText()).includes("nejsou"));
   check("clear disabled without data", await pa.locator('[data-testid="demo-clear-open"]').isDisabled());
-  check("password is shown", (await pa.locator('[data-testid="demo-password"]').innerText()) === PASSWORD);
+  check("no password before seeding", (await pa.locator('[data-testid="demo-password"]').count()) === 0);
 
   // potvrzení vyžaduje slovo
   await pa.click('[data-testid="demo-seed-open"]');
@@ -75,6 +74,11 @@ test("ukázková data: naplnit, stránky rolí, smazat jen vlastní, znovu napln
   // druhé naplnění je zablokované (tlačítko i server)
   check("seed button disabled while data exist", await pa.locator('[data-testid="demo-seed-open"]').isDisabled());
   const emailsFirst = sql(`select string_agg(email, ',' order by id) from "User" where email like '%@ukazka.invalid'`);
+
+  // náhodné heslo: zobrazené adminovi, uložené jen v nastavení, není v kódu
+  const PASSWORD = (await pa.locator('[data-testid="demo-password"]').innerText()).trim();
+  check("random password shown", /^Ukazka-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(PASSWORD), PASSWORD);
+  check("password stored in settings", sql(`select value from "SystemSetting" where key='demo.password'`) === PASSWORD);
 
   // účty pro „Zobrazit jako“
   const studentEmail = (await pa.locator('[data-testid="demo-account"][data-role="STUDENT"]').first().getAttribute("data-email")) as string;
@@ -153,6 +157,7 @@ test("ukázková data: naplnit, stránky rolí, smazat jen vlastní, znovu napln
   check("real guest survived without requested class", sql(`select coalesce("requestedClassGroupId",'-') from "User" where id='real_guest'`) === "-");
   check("original seed users and classes intact", sql(`select count(*) from "User" where email in ('admin@skola.cz','teacher@skola.cz','jan.student@skola.cz','eva.studentova@skola.cz')`) === "4" && sql(`select count(*) from "ClassGroup"`) === "2");
   check("audit entry for clear", sql(`select count(*) from "AuditLog" where action='system.demo.clear'`) === "1");
+  check("demo password removed on clear", sql(`select count(*) from "SystemSetting" where key='demo.password'`) === "0");
 
   // znovu naplnit: stejná data (deterministický generátor)
   await openDemo(pa);

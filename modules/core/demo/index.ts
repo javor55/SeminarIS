@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { randomInt } from "crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma, type TxClient } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
@@ -7,7 +8,7 @@ import { getEnabledModuleIds } from "@/lib/modules";
 import type { User } from "@/lib/types";
 import { MODULE_SERVERS } from "@/modules/server-registry";
 import type { DemoClearContext, DemoSeedContext } from "@/modules/server-types";
-import { DEMO_PASSWORD, DEMO_SHOWCASE_TEACHER_ID } from "@/modules/core/demo/constants";
+import { DEMO_PASSWORD_SETTING, DEMO_SHOWCASE_TEACHER_ID } from "@/modules/core/demo/constants";
 import { createDemoRandom } from "@/modules/core/demo/random";
 import { seedCoreDemo } from "@/modules/core/demo/seed-core";
 
@@ -46,6 +47,8 @@ export type DemoCount = { key: string; label: string; count: number };
 export type DemoAccount = { id: string; name: string; email: string; role: "STUDENT" | "TEACHER" | "GUEST"; description: string };
 export type DemoStatus = {
   exists: boolean;
+  // Společné heslo ukázkových účtů (jen pro admina; null = ukázková data nejsou)
+  password: string | null;
   counts: DemoCount[];
   accounts: DemoAccount[];
 };
@@ -53,7 +56,7 @@ export type DemoStatus = {
 /** Stav ukázkových dat: jsou / nejsou, počty podle druhu, pár účtů pro „Zobrazit jako“. */
 export async function getDemoStatus(): Promise<DemoStatus> {
   const rows = await prisma.demoRecord.groupBy({ by: ["model"], _count: { _all: true } });
-  if (rows.length === 0) return { exists: false, counts: [], accounts: [] };
+  if (rows.length === 0) return { exists: false, password: null, counts: [], accounts: [] };
   const byModel = new Map(rows.map((r) => [r.model, r._count._all]));
 
   const labels: Record<string, string> = { ...CORE_LABELS };
@@ -85,7 +88,15 @@ export async function getDemoStatus(): Promise<DemoStatus> {
   }
   if (teacher) accounts.push({ id: teacher.id, name: `${teacher.firstName} ${teacher.lastName}`, email: teacher.email, role: "TEACHER", description: "Učitel" });
   if (guest) accounts.push({ id: guest.id, name: `${guest.firstName} ${guest.lastName}`, email: guest.email, role: "GUEST", description: "Host čekající na schválení" });
-  return { exists: true, counts, accounts };
+  const password = (await prisma.systemSetting.findUnique({ where: { key: DEMO_PASSWORD_SETTING } }))?.value ?? null;
+  return { exists: true, password, counts, accounts };
+}
+
+/** Náhodné heslo ukázkových účtů, např. „Ukazka-7KQ2-M9XA“ (bez snadno zaměnitelných znaků). */
+function generateDemoPassword(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const part = () => Array.from({ length: 4 }, () => alphabet[randomInt(alphabet.length)]).join("");
+  return `Ukazka-${part()}-${part()}`;
 }
 
 /** Naplní ukázková data (v dané transakci). Zapíše do evidence a do historie změn. */
@@ -96,7 +107,13 @@ export async function seedDemoData(tx: TxClient, actor: User): Promise<{ summary
   const now = new Date();
   const rng = createDemoRandom();
   const track = trackerFor(tx);
-  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  const password = generateDemoPassword();
+  const passwordHash = await bcrypt.hash(password, 10);
+  await tx.systemSetting.upsert({
+    where: { key: DEMO_PASSWORD_SETTING },
+    create: { key: DEMO_PASSWORD_SETTING, value: password },
+    update: { value: password },
+  });
 
   const core = await seedCoreDemo(tx, { actor, now, rng, track, passwordHash });
   const ctx: DemoSeedContext = { actor, now, rng, track, core, passwordHash };
@@ -159,6 +176,7 @@ export async function clearDemoData(tx: TxClient, actor: User): Promise<DemoClea
   }
 
   await tx.demoRecord.deleteMany({});
+  await tx.systemSetting.deleteMany({ where: { key: DEMO_PASSWORD_SETTING } });
   const summary =
     `Smazána ukázková data (${records.length} záznamů evidence)` +
     (keptClasses.length > 0 ? `; ${keptClasses.length === 1 ? "třída" : "třídy"} ${keptClasses.join(", ")} zůstala, jsou v ní skuteční studenti` : "");

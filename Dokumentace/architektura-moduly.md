@@ -532,7 +532,7 @@ realistická data pro prezentaci, **Smazat ukázková data** smaže jen to, co v
   Dopisování: 10 termínů na příští dva týdny (různí dozoři, učebny, předměty, kapacity; jeden plný) se zápisy a poznámkami
   a jeden proběhlý termín s docházkou. Všechna data jsou relativní k „teď“ (Europe/Prague, víkendy se přeskakují).
 - **Bezpečnost**: e-maily `jmeno.prijmeni@ukazka.invalid` (e-mailová vrstva `.invalid` vždy přeskočí), při naplnění se nevolají
-  žádné e-mailové události, společné heslo účtů (bcrypt, `DEMO_PASSWORD` v `modules/core/demo/constants.ts`) se zobrazuje v sekci.
+  žádné e-mailové události, společné heslo účtů se při každém naplnění vygeneruje náhodně (uloženo v `SystemSetting` `demo.password`, účtům jako bcrypt), zobrazí se jen adminovi v sekci a při smazání se odstraní – v kódu žádné heslo není, aby se do produkce nedalo přihlásit podle zdrojového kódu.
   Sekce nabízí „Zobrazit jako“ pro dva studenty 4. ročníku a učitele (a host jako účet k přihlášení).
 - **Mazání**: smaže se jen to, co je v evidenci, a co na tom závisí přes kaskádu (např. zápis skutečného studenta do ukázkového
   výskytu, úvazek skutečného učitele na ukázkový předmět). Skutečné záznamy, které ukázkový uživatel jen vlastnil

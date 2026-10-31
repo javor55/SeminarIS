@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { clearDemoDataAction, seedDemoDataAction } from "@/modules/core/actions/demo";
-import { DEMO_CLEAR_CONFIRM_WORD, DEMO_PASSWORD, DEMO_SEED_CONFIRM_WORD } from "@/modules/core/demo/constants";
+import { DEMO_CLEAR_CONFIRM_WORD, DEMO_SEED_CONFIRM_WORD } from "@/modules/core/demo/constants";
 import { ImpersonateButton } from "@/modules/core/components/users/ImpersonateButton";
 import type { DemoStatus } from "@/modules/core/demo";
 
@@ -93,7 +93,14 @@ export function DemoDataPanel({ status }: { status: DemoStatus }) {
         <CardHeader>
           <CardTitle>Přihlášení do ukázkových účtů</CardTitle>
           <CardDescription>
-            Všechny ukázkové účty mají společné heslo <code className="font-mono font-semibold" data-testid="demo-password">{DEMO_PASSWORD}</code>.
+            {status.password ? (
+              <>
+                Všechny ukázkové účty mají společné heslo <code className="font-mono font-semibold" data-testid="demo-password">{status.password}</code>{" "}
+                (vygenerované při naplnění, vidí ho jen admin).
+              </>
+            ) : (
+              <>Společné heslo ukázkových účtů se vygeneruje při naplnění a zobrazí se tady.</>
+            )}{" "}
             Bez přihlašování se na ně podíváte tlačítkem „Zobrazit jako“ (jen pro čtení).
           </CardDescription>
         </CardHeader>
