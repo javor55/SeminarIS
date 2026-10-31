@@ -4,11 +4,30 @@
     "next/typescript"
   ],
   "rules": {
-    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    // Základní pravidlo se plete na názvy parametrů v typech funkcí; hlídá ho TypeScriptová verze
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "caughtErrorsIgnorePattern": "^_" }],
     "no-console": "warn",
-    "react/prop-types": "off"
+    "react/prop-types": "off",
+    // Žádné alert/confirm/prompt: použijte toast (sonner) nebo ConfirmAction
+    "no-restricted-globals": ["error",
+      { "name": "alert", "message": "Použijte toast (sonner)." },
+      { "name": "confirm", "message": "Použijte ConfirmAction." },
+      { "name": "prompt", "message": "Použijte dialog s formulářem." }
+    ],
+    "no-restricted-properties": ["error",
+      { "object": "window", "property": "alert", "message": "Použijte toast (sonner)." },
+      { "object": "window", "property": "confirm", "message": "Použijte ConfirmAction." },
+      { "object": "window", "property": "prompt", "message": "Použijte dialog s formulářem." }
+    ]
   },
+  "ignorePatterns": ["node_modules/", ".next/", "test-results/", "playwright-report/", "next-env.d.ts", "prisma/migrations/"],
   "overrides": [
+    {
+      // Skripty, seed a E2E běží v terminálu: výpisy do konzole jsou tam v pořádku
+      "files": ["scripts/**", "prisma/**", "e2e/**", "playwright.config.ts", "*.config.*"],
+      "rules": { "no-console": "off" }
+    },
     {
       // Jádro (modules/core, lib, components, stránky jádra) o modulech nic neví – moduly do něj jen přispívají přes body rozšíření (modules/core/extensions.ts). Výjimka: modules/registry.ts a modules/server-registry.ts.
       "files": ["modules/core/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}", "middleware.ts"],

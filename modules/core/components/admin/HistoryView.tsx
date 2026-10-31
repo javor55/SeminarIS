@@ -37,7 +37,7 @@ export function HistoryView({ userId }: { userId?: string }) {
   }, [load, actor, search]);
 
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
-  // eslint-disable-next-line no-unused-vars
+   
   const reset = <T,>(set: (v: T) => void) => (v: T) => {
     setPage(0);
     set(v);

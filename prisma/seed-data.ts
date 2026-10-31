@@ -138,7 +138,7 @@ async function main() {
   const occ1 = await prisma.subjectOccurrence.create({
     data: { subjectId: sub1.id, blockId: block1.id, teacherId: t1.id, capacity: 15, subCode: "Pondělí", createdById: admin.id }
   });
-  const occ2 = await prisma.subjectOccurrence.create({
+  await prisma.subjectOccurrence.create({
     data: { subjectId: sub1.id, blockId: block1.id, teacherId: t3.id, capacity: 15, subCode: "Pátek", createdById: admin.id }
   });
   

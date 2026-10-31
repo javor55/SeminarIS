@@ -17,7 +17,7 @@ type AuthContextValue = {
   enabledModules: string[];
   // Znovu načte session (např. po zapnutí/vypnutí modulu)
   refreshSession: () => Promise<void>;
-  // eslint-disable-next-line no-unused-vars
+   
   login: (email: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
 };

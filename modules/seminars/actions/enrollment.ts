@@ -22,7 +22,7 @@ import { checkStudentCanChange } from "@/modules/seminars/window-rules";
 const fullName = (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`.trim();
 
 /** Serializable transakce se při souběhu může odmítnout (P2034); pak se zkusí znovu a dostane správné výsledky kontrol. */
-// eslint-disable-next-line no-unused-vars
+ 
 async function serializable<T>(fn: (tx: TxClient) => Promise<T>): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {

@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars -- názvy parametrů v typech funkcí */
+ 
 import type { Role } from "@/lib/types";
 
 // Položka hlavního menu. Zobrazí se jen uživateli s daným oprávněním.

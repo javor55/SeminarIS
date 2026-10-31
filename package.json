@@ -7,7 +7,7 @@
     "build": "next build",
     "vercel-build": "sh scripts/vercel-build.sh",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --ext .js,.mjs,.ts,.tsx --report-unused-disable-directives",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:status": "prisma migrate status",
