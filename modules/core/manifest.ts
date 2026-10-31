@@ -56,6 +56,7 @@ export const coreModule = {
     { label: "Upozornění", href: "/admin/notifications", permission: "core.admin", order: 40 },
     { label: "Historie", href: "/admin/history", permission: "core.admin", order: 50 },
     { label: "Diagnostika", href: "/admin/diagnostics", permission: "core.admin", order: 60 },
+    { label: "Ukázková data", href: "/admin/demo", permission: "core.admin", order: 70 },
   ],
   // Nastavení jádra. Klíče jsou historické a nesmí se přejmenovat (uložené hodnoty v SystemSetting).
   settings: [
