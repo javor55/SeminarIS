@@ -102,7 +102,7 @@ test("třídy, předměty, import se třídou, přesun mezi třídami, cílení 
   // filtry v seznamu pro admina: ročník
   await pa.goto('/subjects'); await pa.waitForLoadState('networkidle');
   await pa.getByRole('button', { name: 'Filtry' }).click();
-  await pa.locator('[data-radix-popper-content-wrapper]').getByRole('combobox').first().click(); await pa.getByRole('option', { name: '1. ročník' }).click();
+  await pa.locator('[data-radix-popper-content-wrapper]').getByRole('combobox').first().selectOption({ label: '1. ročník' });
   const filtered = await pa.locator('table').innerText();
   check('grade filter hides Matematika', !filtered.includes('Matematika') && filtered.includes('Dějepis'), filtered.slice(0, 200));
   await pa.keyboard.press('Escape');

@@ -97,8 +97,7 @@ test("seznam předmětů: štítek s počtem termínů dopisování, filtr podle
 
   await pa.getByRole("button", { name: "Filtry" }).click();
   const popover = pa.locator("[data-radix-popper-content-wrapper]");
-  await popover.getByRole("combobox").nth(1).click();
-  await pa.getByRole("option", { name: "S termínem dopisování" }).click();
+  await popover.getByRole("combobox").nth(1).selectOption({ label: "S termínem dopisování" });
   let text = await pa.locator("table").innerText();
   check("filter keeps subjects with makeup", text.includes("Matematika") && text.includes("Čeština") && !text.includes("Fyzika") && !text.includes("Programování"), text.slice(0, 300));
   await pa.keyboard.press("Escape");

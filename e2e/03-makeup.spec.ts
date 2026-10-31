@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { sql, resetDb, seedSubjects, login, tryLogin, navLabels, toastText, tmpFile, currentSchoolYear, yearLabel } from "./helpers";
+import { sql, resetDb, seedSubjects, login, navLabels, toastText } from "./helpers";
 
 // Převedeno z ručních scénářů; každá kontrola je samostatná „soft“ aserce.
 const check = (name: string, ok: boolean, extra = "") => expect.soft(ok, `${name} ${extra}`).toBe(true);

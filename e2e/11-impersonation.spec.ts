@@ -107,10 +107,12 @@ test("náhled: jako učitel a host; ukončení odhlášením", async ({ browser 
   await pa.getByRole("button", { name: "Zobrazit jako Petr Učitel" }).click();
   await pa.waitForURL("**/dashboard");
   await expect(pa.getByTestId("impersonation-banner")).toContainText("(učitel)");
-  check("teacher nav while viewing", JSON.stringify(await navLabels(pa)) === JSON.stringify(["Dashboard", "Zápisy", "Předměty", "Moje předměty", "Dopisování", "Uživatelé", "Můj profil"]), JSON.stringify(await navLabels(pa)));
-  // učitel vidí Uživatele, ale ne Administraci
+  check("teacher nav while viewing", JSON.stringify(await navLabels(pa)) === JSON.stringify(["Dashboard", "Zápisy", "Předměty", "Moje předměty", "Dopisování", "Uživatelé", "Administrace", "Můj profil"]), JSON.stringify(await navLabels(pa)));
+  // učitel vidí Uživatele a Administraci jen pro čtení (Přehled, Školní rok a třídy), ostatní sekce ne
   await pa.goto("/admin");
-  check("/admin refused like for teacher", pa.url().endsWith("/dashboard"), pa.url());
+  check("/admin open like for teacher", pa.url().endsWith("/admin"), pa.url());
+  await pa.goto("/admin/registration");
+  check("/admin/registration refused like for teacher", pa.url().endsWith("/dashboard"), pa.url());
   await pa.goto("/users");
   await pa.waitForLoadState("networkidle");
   check("/users open like for teacher", pa.url().endsWith("/users"), pa.url());
@@ -158,7 +160,7 @@ test("náhled: podvržená, prošlá, cizí nebo nepovolená cookie se ignoruje"
   await ignored("target does not exist", await signImpersonation({ ...good, t: "neexistuje" }, secret));
   // cizí cookie: platný podpis, ale přihlášený není ten admin / není admin
   await ignored("stolen by another admin", await signImpersonation(good, secret), "admin2@skola.cz");
-  await ignored("stolen by a teacher", await signImpersonation(good, secret), "teacher@skola.cz", ["Dashboard", "Zápisy", "Předměty", "Moje předměty", "Dopisování", "Uživatelé", "Můj profil"]);
+  await ignored("stolen by a teacher", await signImpersonation(good, secret), "teacher@skola.cz", ["Dashboard", "Zápisy", "Předměty", "Moje předměty", "Dopisování", "Uživatelé", "Administrace", "Můj profil"]);
   await ignored("stolen by a student", await signImpersonation(good, secret), "eva.studentova@skola.cz", STUDENT_NAV);
 
   // admin byl během náhledu degradován: náhled končí
@@ -168,7 +170,7 @@ test("náhled: podvržená, prošlá, cizí nebo nepovolená cookie se ignoruje"
   await p1.reload();
   await p1.waitForLoadState("networkidle");
   check("demoted admin loses the preview", (await p1.getByTestId("impersonation-banner").count()) === 0);
-  check("…and is just a teacher", JSON.stringify(await navLabels(p1)) === JSON.stringify(["Dashboard", "Zápisy", "Předměty", "Moje předměty", "Dopisování", "Uživatelé", "Můj profil"]), JSON.stringify(await navLabels(p1)));
+  check("…and is just a teacher", JSON.stringify(await navLabels(p1)) === JSON.stringify(["Dashboard", "Zápisy", "Předměty", "Moje předměty", "Dopisování", "Uživatelé", "Administrace", "Můj profil"]), JSON.stringify(await navLabels(p1)));
   // …a deaktivace admina náhled také ukončí
   sql(`update "User" set role='ADMIN', "isActive"=false where id='usr_admin'`);
   await p1.goto("/dashboard");
