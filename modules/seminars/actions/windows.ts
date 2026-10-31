@@ -16,6 +16,7 @@ import type { Prisma } from "@prisma/client";
 import { audit, describeChanges } from "@/lib/audit";
 import { formatDateTime } from "@/lib/datetime";
 import { notifyWindowOpenedIfOpen } from "@/modules/seminars/notifications";
+import { compareNames, formatName, sortByName } from "@/lib/names";
 
 // === ČTENÍ DAT ===
 
@@ -144,11 +145,8 @@ export async function getEnrollmentMatrixData(windowId: string) {
   const students = await prisma.user.findMany({
     where: await audienceWhereForWindow(windowId),
     include: { classGroup: true },
-    orderBy: [
-      { lastName: "asc" },
-      { firstName: "asc" }
-    ]
   });
+  students.sort(compareNames);
 
   // 3. Získáme všechny aktivní zápisy pro toto okno
   const enrollments = await prisma.studentEnrollment.findMany({
@@ -233,8 +231,8 @@ export async function getEnrollmentDetails(windowId: string) {
     const allStudents = await prisma.user.findMany({
         where: await audienceWhereForWindow(windowId),
         include: { classGroup: true },
-        orderBy: [{ lastName: "asc" }, { firstName: "asc" }]
     });
+    allStudents.sort(compareNames);
 
     // Třída každého studenta ("3.A") pro exporty
     const classLabels: Record<string, string> = {};
@@ -786,10 +784,9 @@ export async function searchAudienceStudents(query: string) {
       ],
     },
     include: { classGroup: true },
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     take: 12,
   });
-  return users.map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim(), email: u.email, classLabel: u.classGroup ? classLabel(u.classGroup) : null }));
+  return sortByName(users).map((u) => ({ id: u.id, name: formatName(u, "list"), email: u.email, classLabel: u.classGroup ? classLabel(u.classGroup) : null }));
 }
 
 const AUDIENCE_PREVIEW_LIMIT = 300;
@@ -798,14 +795,14 @@ const AUDIENCE_PREVIEW_LIMIT = 300;
 export async function previewAudience(draft: AudienceDraft) {
   await requirePermission("seminars.windows.manage");
   const where = audienceWhere(entriesFromDraft({ grades: sanitizeGrades(draft?.grades), classIds: draft?.classIds ?? [], userIds: draft?.userIds ?? [], excludeUserIds: draft?.excludeUserIds ?? [] }));
-  const [count, students] = await Promise.all([
-    prisma.user.count({ where }),
-    prisma.user.findMany({ where, include: { classGroup: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }], take: AUDIENCE_PREVIEW_LIMIT }),
-  ]);
+  // Řadí se v JS (česká kolace), proto se načte celé publikum a zkrátí až po seřazení
+  const all = sortByName(await prisma.user.findMany({ where, include: { classGroup: true } }));
+  const count = all.length;
+  const students = all.slice(0, AUDIENCE_PREVIEW_LIMIT);
   return {
     count,
     truncated: count > students.length,
-    students: students.map((u) => ({ id: u.id, name: `${u.lastName} ${u.firstName}`.trim(), classLabel: u.classGroup ? classLabel(u.classGroup) : null })),
+    students: students.map((u) => ({ id: u.id, name: formatName(u, "list"), classLabel: u.classGroup ? classLabel(u.classGroup) : null })),
   };
 }
 
@@ -841,7 +838,7 @@ async function occurrenceLabel(tx: TxClient, subjectId: string, blockId: string,
   ]);
   return {
     text: `„${subject?.name ?? "?"}“ v bloku „${block?.name ?? "?"}“ (zápis „${block?.enrollmentWindow.name ?? "?"}“)`,
-    teacher: teacher ? `${teacher.firstName} ${teacher.lastName}` : null,
+    teacher: teacher ? formatName(teacher, "text") : null,
   };
 }
 

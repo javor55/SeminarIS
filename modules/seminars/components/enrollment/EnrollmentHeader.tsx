@@ -26,6 +26,8 @@ import {
 
 import { windowPhase } from "@/modules/seminars/window-phase";
 import { formatDateTime, formatRemaining } from "@/lib/datetime";
+import { occurrenceCode } from "@/modules/seminars/occurrence-code";
+import { compareCs, formatName } from "@/lib/names";
 
 
 type EnrollmentHeaderProps = {
@@ -114,8 +116,8 @@ export function EnrollmentHeader({
               classLabels[en.studentId] || "",
               b.name,
               occ.subject.name,
-              occ.subCode || "",
-              occ.teacher ? `${occ.teacher.firstName} ${occ.teacher.lastName}` : "—",
+              occurrenceCode(occ.subject.code, occ.subCode),
+              occ.teacher ? formatName(occ.teacher, "list") : "—",
               formatDateTime(en.createdAt)
             ]);
           });
@@ -139,12 +141,12 @@ export function EnrollmentHeader({
 
       window.blocks.forEach(b => {
         b.subjectOccurrences.forEach(occ => {
-          const students = occ.studentEnrollments.map(e => `${e.student.lastName} ${e.student.firstName}`).join(", ");
+          const students = occ.studentEnrollments.map(e => formatName(e.student, "list")).join(", ");
           rows.push([
             b.name,
             occ.subject.name,
-            occ.subCode || "",
-            occ.teacher ? `${occ.teacher.firstName} ${occ.teacher.lastName}` : "—",
+            occurrenceCode(occ.subject.code, occ.subCode),
+            occ.teacher ? formatName(occ.teacher, "list") : "—",
             occ.capacity === null ? "∞" : occ.capacity.toString(),
             occ.studentEnrollments.length.toString(),
             students
@@ -169,14 +171,14 @@ export function EnrollmentHeader({
 
       window.blocks.forEach(b => {
         b.subjectOccurrences.forEach(occ => {
-          const teacherName = occ.teacher ? `${occ.teacher.firstName} ${occ.teacher.lastName}` : "NEPŘIŘAZEN";
+          const teacherName = occ.teacher ? formatName(occ.teacher, "list") : "NEPŘIŘAZEN";
           occ.studentEnrollments.forEach(en => {
             rows.push([
               teacherName,
               b.name,
               occ.subject.name,
-              occ.subCode || "",
-              `${en.student.lastName} ${en.student.firstName}`,
+              occurrenceCode(occ.subject.code, occ.subCode),
+              formatName(en.student, "list"),
               en.student.email,
               classLabels[en.studentId] || ""
             ]);
@@ -184,7 +186,7 @@ export function EnrollmentHeader({
         });
       });
       // Seřadit podle učitele
-      rows.sort((a,b) => a[0].localeCompare(b[0], 'cs'));
+      rows.sort((a, b) => compareCs(a[0], b[0]) || compareCs(a[4], b[4]));
 
       const csv = [headers.map(h => `"${h}"`), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`))].map(e => e.join(";")).join("\n");
       downloadCSV(csv, `sestavy_pro_ucitele_${ew.name.replace(/\s+/g, "_")}.csv`);

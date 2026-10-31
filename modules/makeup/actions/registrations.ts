@@ -10,7 +10,7 @@ import { formatMinutes, formatTimeRange } from "@/lib/datetime";
 import {
   changeDeadlineOf,
   findStudentConflict,
-  fullName,
+  textName,
   getStudentSubjectIds,
   registrationInclude,
   resolveSubjectTeachers,
@@ -123,7 +123,7 @@ export async function registerForSession(sessionId: string, subjectIds: string[]
           action: "makeup.registration.add",
           entityType: "makeupRegistration",
           entityId: created.id,
-          summary: `${fullName(user)} se zapsal(a) na termín dopisování ${formatTimeRange(s.startsAt, s.endsAt)} (${await subjectNames(tx, ids)})`,
+          summary: `${textName(user)} se zapsal(a) na termín dopisování ${formatTimeRange(s.startsAt, s.endsAt)} (${await subjectNames(tx, ids)})`,
           data: { sessionId, subjectIds: ids, note: cleanedNote },
         });
       },
@@ -166,7 +166,7 @@ export async function updateMyRegistration(registrationId: string, subjectIds: s
         action: "makeup.registration.update",
         entityType: "makeupRegistration",
         entityId: r.id,
-        summary: `${fullName(user)} upravil(a) svůj zápis na termín ${formatTimeRange(r.session.startsAt, r.session.endsAt)}: předměty ${before} → ${await subjectNames(tx, ids)}`,
+        summary: `${textName(user)} upravil(a) svůj zápis na termín ${formatTimeRange(r.session.startsAt, r.session.endsAt)}: předměty ${before} → ${await subjectNames(tx, ids)}`,
         data: { before: { subjectIds: r.subjects.map((x) => x.subjectId), note: r.note }, after: { subjectIds: ids, note: cleanedNote } },
       });
     });
@@ -186,7 +186,7 @@ export async function cancelMyRegistration(registrationId: string) {
         action: "makeup.registration.cancel",
         entityType: "makeupRegistration",
         entityId: r.id,
-        summary: `${fullName(user)} se odhlásil(a) z termínu dopisování ${formatTimeRange(r.session.startsAt, r.session.endsAt)}${r.session.cancelledAt ? " (zrušený termín)" : ""}`,
+        summary: `${textName(user)} se odhlásil(a) z termínu dopisování ${formatTimeRange(r.session.startsAt, r.session.endsAt)}${r.session.cancelledAt ? " (zrušený termín)" : ""}`,
         data: { sessionId: r.sessionId, subjectIds: r.subjects.map((x) => x.subjectId) },
       });
     });
@@ -227,7 +227,7 @@ export async function moveMyRegistration(registrationId: string, targetSessionId
           action: "makeup.registration.move",
           entityType: "makeupRegistration",
           entityId: r.id,
-          summary: `${fullName(user)} se přepsal(a) z termínu ${formatTimeRange(r.session.startsAt, r.session.endsAt)} na termín ${formatTimeRange(target.startsAt, target.endsAt)}`,
+          summary: `${textName(user)} se přepsal(a) z termínu ${formatTimeRange(r.session.startsAt, r.session.endsAt)} na termín ${formatTimeRange(target.startsAt, target.endsAt)}`,
           data: { fromSessionId: r.sessionId, toSessionId: target.id },
         });
       },

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import { DEFAULT_STUDY_YEARS, classLabel, compareClasses, parseLetters, sanitizeGrades, studyStatusLabel } from "@/lib/school";
+import { sortByName } from "@/lib/names";
 
 export type ClassOption = {
   id: string;
@@ -59,10 +60,9 @@ export async function getClassStudents(): Promise<ClassStudent[]> {
   await requirePermission("core.classes.view");
   const users = await prisma.user.findMany({
     where: { role: "STUDENT", classGroupId: { not: null } },
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     select: { id: true, firstName: true, lastName: true, email: true, classGroupId: true, studyStatus: true, studyEndReason: true },
   });
-  return users.map((u) => ({
+  return sortByName(users).map((u) => ({
     id: u.id,
     firstName: u.firstName,
     lastName: u.lastName,

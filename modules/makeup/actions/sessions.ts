@@ -18,6 +18,7 @@ import {
   canManageSession,
   findStudentConflict,
   fullName,
+  textName,
   overlappingWhere,
   registrationInclude,
   sessionInclude,
@@ -37,6 +38,7 @@ import {
   type MakeupSessionItem,
   type SessionInput,
 } from "@/modules/makeup/types";
+import { sortByName, sortByText } from "@/lib/names";
 
 function revalidateMakeup() {
   revalidatePath("/makeup", "layout");
@@ -94,11 +96,10 @@ export async function getSessionFormOptions() {
   const manageAll = can(user.role, "makeup.sessions.manageAll");
   const year = await getCurrentSchoolYear();
   const [subjects, teachers, assignments] = await Promise.all([
-    prisma.subject.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.subject.findMany({ where: { isActive: true } }),
     manageAll
       ? prisma.user.findMany({
           where: { role: { in: ["TEACHER", "ADMIN"] }, isActive: true },
-          orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
           select: { id: true, firstName: true, lastName: true },
         })
       : Promise.resolve([]),
@@ -113,10 +114,10 @@ export async function getSessionFormOptions() {
   const teacherSubjects: Record<string, string[]> = {};
   for (const a of assignments) (teacherSubjects[a.teacherId] ??= []).push(a.subjectId);
   return {
-    subjects: subjects.map((s) => ({ id: s.id, name: s.name, code: s.code, grades: s.grades })),
+    subjects: sortByText(subjects, (s) => s.name).map((s) => ({ id: s.id, name: s.name, code: s.code, grades: s.grades })),
     // předměty z úvazků podle učitele (dozorujícího), pro zobrazení nahoře ve výběru
     teacherSubjects,
-    teachers: teachers.map((t) => ({ id: t.id, name: fullName(t) })),
+    teachers: sortByName(teachers).map((t) => ({ id: t.id, name: fullName(t) })),
     canChooseTeacher: manageAll,
     currentUserId: user.id,
     // Výchozí hodnoty nového termínu (Administrace → Dopisování)
@@ -264,8 +265,8 @@ export async function createSessions(input: SessionInput & { occurrences: { star
         entityId: ids[0],
         summary:
           intervals.length === 1
-            ? `Vypsán termín dopisování ${formatTimeRange(intervals[0].start, intervals[0].end)}, učebna ${clean.room}, dozor ${teacher ? fullName(teacher) : ""}`
-            : `Vypsána řada ${intervals.length} termínů dopisování od ${formatTimeRange(intervals[0].start, intervals[0].end)}, učebna ${clean.room}, dozor ${teacher ? fullName(teacher) : ""}`,
+            ? `Vypsán termín dopisování ${formatTimeRange(intervals[0].start, intervals[0].end)}, učebna ${clean.room}, dozor ${teacher ? textName(teacher) : ""}`
+            : `Vypsána řada ${intervals.length} termínů dopisování od ${formatTimeRange(intervals[0].start, intervals[0].end)}, učebna ${clean.room}, dozor ${teacher ? textName(teacher) : ""}`,
         data: { sessionIds: ids, seriesId, room: clean.room, capacity: clean.capacity, subjects: subjects.map((x) => x.name), teacherId: clean.teacherId },
       });
     });
@@ -307,7 +308,7 @@ export async function updateSession(
     const removed = s.registrations.filter((r) => r.subjects.some((x) => !clean.subjectIds.includes(x.subjectId)));
     if (removed.length > 0) {
       throw new Error(
-        `Předmět nelze odebrat – zvolili si ho: ${removed.map((r) => fullName(r.student)).join(", ")}. Nejdřív je přesuňte nebo odepište.`
+        `Předmět nelze odebrat – zvolili si ho: ${removed.map((r) => textName(r.student)).join(", ")}. Nejdřív je přesuňte nebo odepište.`
       );
     }
     await assertNoSessionConflict(clean.teacherId, clean.room, start, end, s.id);
@@ -338,7 +339,7 @@ export async function updateSession(
       const before = {
         termin: formatTimeRange(s.startsAt, s.endsAt),
         ucebna: s.room,
-        dozor: fullName(s.teacher),
+        dozor: textName(s.teacher),
         kapacita: s.capacity,
         uzaverka: formatMinutes(s.changeDeadlineMinutes),
         poznamka: s.note,
@@ -346,7 +347,7 @@ export async function updateSession(
       const after = {
         termin: formatTimeRange(start, end),
         ucebna: clean.room,
-        dozor: newTeacher ? fullName(newTeacher) : "",
+        dozor: newTeacher ? textName(newTeacher) : "",
         kapacita: clean.capacity,
         uzaverka: formatMinutes(clean.changeDeadlineMinutes),
         poznamka: clean.note,
@@ -404,8 +405,8 @@ export async function cancelSession(sessionId: string, reason: string, wholeSeri
           entityId: first.id,
           summary:
             allowed.length === 1
-              ? `Zrušen termín dopisování ${formatTimeRange(first.startsAt, first.endsAt)} (dozor ${fullName(first.teacher)}, zapsáno ${registered})${cancelReason ? `, důvod: ${cancelReason}` : ""}`
-              : `Zrušena řada ${allowed.length} termínů dopisování od ${formatTimeRange(first.startsAt, first.endsAt)} (dozor ${fullName(first.teacher)}, zapsáno ${registered})${cancelReason ? `, důvod: ${cancelReason}` : ""}`,
+              ? `Zrušen termín dopisování ${formatTimeRange(first.startsAt, first.endsAt)} (dozor ${textName(first.teacher)}, zapsáno ${registered})${cancelReason ? `, důvod: ${cancelReason}` : ""}`
+              : `Zrušena řada ${allowed.length} termínů dopisování od ${formatTimeRange(first.startsAt, first.endsAt)} (dozor ${textName(first.teacher)}, zapsáno ${registered})${cancelReason ? `, důvod: ${cancelReason}` : ""}`,
           data: { sessionIds: allowed.map((t) => t.id), reason: cancelReason },
         });
       }
@@ -430,7 +431,7 @@ export async function deleteSession(sessionId: string) {
         action: "makeup.session.delete",
         entityType: "makeupSession",
         entityId: s.id,
-        summary: `Smazán termín dopisování ${formatTimeRange(s.startsAt, s.endsAt)}, učebna ${s.room} (dozor ${fullName(s.teacher)})`,
+        summary: `Smazán termín dopisování ${formatTimeRange(s.startsAt, s.endsAt)}, učebna ${s.room} (dozor ${textName(s.teacher)})`,
         data: { startsAt: s.startsAt, endsAt: s.endsAt, room: s.room },
       });
     });
@@ -465,7 +466,7 @@ export async function removeRegistration(registrationId: string) {
         action: "makeup.registration.remove",
         entityType: "makeupRegistration",
         entityId: r.id,
-        summary: `${fullName(user)} odepsal(a) studenta ${fullName(r.student)} z termínu dopisování ${formatTimeRange(r.session.startsAt, r.session.endsAt)} (${subjectNames.join(", ")})`,
+        summary: `${textName(user)} odepsal(a) studenta ${textName(r.student)} z termínu dopisování ${formatTimeRange(r.session.startsAt, r.session.endsAt)} (${subjectNames.join(", ")})`,
         data: { studentId: r.studentId, sessionId: r.sessionId, subjects: subjectNames, attendance: r.attendance },
       });
     });
@@ -509,7 +510,7 @@ export async function moveRegistration(registrationId: string, targetSessionId: 
           action: "makeup.registration.move",
           entityType: "makeupRegistration",
           entityId: r.id,
-          summary: `${fullName(user)} přesunul(a) studenta ${fullName(r.student)} z termínu ${formatTimeRange(r.session.startsAt, r.session.endsAt)} na termín ${formatTimeRange(target.startsAt, target.endsAt)}`,
+          summary: `${textName(user)} přesunul(a) studenta ${textName(r.student)} z termínu ${formatTimeRange(r.session.startsAt, r.session.endsAt)} na termín ${formatTimeRange(target.startsAt, target.endsAt)}`,
           data: { studentId: r.studentId, fromSessionId: r.sessionId, toSessionId: target.id },
         });
       },
@@ -533,7 +534,7 @@ export async function setAttendance(registrationId: string, attendance: MakeupAt
         action: "makeup.attendance.set",
         entityType: "makeupRegistration",
         entityId: r.id,
-        summary: `Docházka studenta ${fullName(r.student)} na termínu ${formatTimeRange(r.session.startsAt, r.session.endsAt)}: ${ATTENDANCE_LABELS[r.attendance as MakeupAttendanceValue]} → ${ATTENDANCE_LABELS[attendance]}`,
+        summary: `Docházka studenta ${textName(r.student)} na termínu ${formatTimeRange(r.session.startsAt, r.session.endsAt)}: ${ATTENDANCE_LABELS[r.attendance as MakeupAttendanceValue]} → ${ATTENDANCE_LABELS[attendance]}`,
         data: { studentId: r.studentId, before: r.attendance, after: attendance },
       });
     });

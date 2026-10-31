@@ -4,6 +4,7 @@ import { formatDateTime } from "@/lib/datetime";
 import { appUrl, sendEventEmail, type SendSummary } from "@/lib/email";
 import { audienceWhere, loadAudienceEntries } from "@/modules/seminars/eligibility";
 import { isInOccurrenceAudience, type AudienceStudent } from "@/modules/seminars/audience";
+import { sortByName } from "@/lib/names";
 
 // Nezapsaní studenti zápisového okna: aktivní studenti z publika okna, kteří nemají dost zápisů
 // v povinných blocích (nepovinné bloky se nepočítají). Blok se studentovi počítá, jen když si
@@ -83,7 +84,6 @@ export async function computeUnenrolled(windowId: string): Promise<UnenrolledOve
     prisma.user.findMany({
       where: audienceWhere(entries),
       include: { classGroup: true },
-      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
     prisma.studentEnrollment.findMany({
       where: { deletedAt: null, subjectOccurrence: { deletedAt: null, block: { enrollmentWindowId: windowId } } },
@@ -99,7 +99,7 @@ export async function computeUnenrolled(windowId: string): Promise<UnenrolledOve
   }
 
   const result: UnenrolledStudent[] = [];
-  for (const s of students) {
+  for (const s of sortByName(students)) {
     const student = { id: s.id, classGroupId: s.classGroupId, grade: s.classGroup?.grade ?? null };
     const missing = missingBlocksFor(blocks, enrolled.get(s.id) ?? new Map(), student);
     if (missing.length === 0) continue;

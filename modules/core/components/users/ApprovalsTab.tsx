@@ -21,6 +21,7 @@ import type { ClassOption } from "@/modules/core/actions/classes";
 import { formatDateTime } from "@/lib/datetime";
 import type { UserListRow as UserRow } from "@/modules/core/users-query";
 import { Checkbox } from "@/components/ui/checkbox";
+import { formatName } from "@/lib/names";
 
 /** Hosté čekající na schválení (aktivní účty s rolí GUEST). */
 export function pendingApprovals(users: UserRow[]) {
@@ -40,7 +41,7 @@ export function ApprovalsTab({ users, classes }: { users: UserRow[]; classes: Cl
   const [busy, setBusy] = useState(false);
 
   const classOf = (u: UserRow) => classChoice[u.id] ?? u.requestedClassGroupId ?? "";
-  const nameOf = (u: UserRow) => `${u.firstName} ${u.lastName}`;
+  const nameOf = (u: UserRow) => formatName(u, "text");
 
   async function run(action: () => Promise<unknown>, success: string) {
     setBusy(true);
@@ -95,7 +96,7 @@ export function ApprovalsTab({ users, classes }: { users: UserRow[]; classes: Cl
                     onChange={() => setSelected(allSelected ? [] : pending.map((u) => u.id))}
                   />
                 </TableHead>
-                <TableHead>Jméno</TableHead>
+                <TableHead>Příjmení a jméno</TableHead>
                 <TableHead>E-mail</TableHead>
                 <TableHead>Registrace</TableHead>
                 <TableHead>Třída</TableHead>
@@ -112,7 +113,7 @@ export function ApprovalsTab({ users, classes }: { users: UserRow[]; classes: Cl
                       onChange={() => toggle(u.id)}
                     />
                   </TableCell>
-                  <TableCell className="font-medium">{nameOf(u)}</TableCell>
+                  <TableCell className="font-medium">{formatName(u, "list")}</TableCell>
                   <TableCell>{u.email}</TableCell>
                   <TableCell className="whitespace-nowrap">{u.createdAt ? formatDateTime(u.createdAt) : "—"}</TableCell>
                   <TableCell>

@@ -16,6 +16,7 @@ import { createClasses, deleteClass, type ClassOverview, type ClassStudent } fro
 import { setUsersClass } from "@/modules/core/actions/users";
 import { GRADES } from "@/lib/school";
 import { Chip } from "@/components/ui/chip";
+import { formatName } from "@/lib/names";
 
 /** Záložka Třídy: seznam tříd, studenti třídy, přesun do jiné třídy, generátor a smazání prázdné třídy. */
 export function ClassesTab({
@@ -154,7 +155,7 @@ export function ClassesTab({
                                 {members.map((u) => (
                                   <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-sm" data-student={u.email}>
                                     <span>
-                                      <span className="font-medium">{u.lastName} {u.firstName}</span>
+                                      <span className="font-medium">{formatName(u, "list")}</span>
                                       <span className="ml-2 text-muted-foreground">{u.email}</span>
                                       {u.studyLabel && <span className="ml-2 text-xs text-muted-foreground">· {u.studyLabel}</span>}
                                     </span>
@@ -162,7 +163,7 @@ export function ClassesTab({
                                       <NativeSelect
                                         compact
                                         className="w-[150px]"
-                                        aria-label={`Přesunout do třídy – ${u.lastName} ${u.firstName}`}
+                                        aria-label={`Přesunout do třídy – ${formatName(u, "text")}`}
                                         disabled={busy}
                                         value=""
                                         onChange={(e) => {
@@ -170,7 +171,7 @@ export function ClassesTab({
                                           if (!target) return;
                                           run(
                                             async () => unwrap(await setUsersClass([u.id], target.id)),
-                                            () => `${u.firstName} ${u.lastName}: přesunuto do ${target.label}.`
+                                            () => `${formatName(u, "text")}: přesunuto do ${target.label}.`
                                           );
                                         }}
                                       >

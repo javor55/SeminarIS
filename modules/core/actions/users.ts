@@ -18,9 +18,11 @@ import {
   STUDY_END_REASON_LABELS,
   type StudyEndReasonValue,
 } from "@/lib/school";
+import { formatName } from "@/lib/names";
+import { sortByName } from "@/lib/names";
 
 /** "Jan Novák" pro popisy v historii změn */
-const userName = (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`.trim();
+const userName = (u: { firstName: string; lastName: string }) => formatName(u, "text");
 
 const ROLES: readonly Role[] = ["GUEST", "STUDENT", "TEACHER", "ADMIN"];
 
@@ -46,9 +48,8 @@ export async function getUsersForFilters(): Promise<User[]> {
       createdAt: true,
       updatedAt: true
     },
-    orderBy: { lastName: 'asc' }
   });
-  return users;
+  return sortByName(users);
 }
 
 // Rozšířené získání uživatelů vcetne historie tříd a zapisů (seminářů – zatím vazba jádra na modul seminars)

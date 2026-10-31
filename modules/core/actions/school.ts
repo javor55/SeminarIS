@@ -19,8 +19,10 @@ import {
   findOrCreateClass,
   setStudentClass,
 } from "@/modules/core/school";
+import { formatName } from "@/lib/names";
+import { sortByName } from "@/lib/names";
 
-const fullName = (u: { firstName: string; lastName: string }) => `${u.lastName} ${u.firstName}`.trim();
+const fullName = (u: { firstName: string; lastName: string }) => formatName(u, "list");
 
 // === ŠKOLNÍ ROK ===
 
@@ -130,7 +132,6 @@ export async function getYearClosurePreview(): Promise<YearClosurePreview> {
     prisma.user.findMany({
       where: { ...activeStudentsWhere, classGroupId: { not: null } },
       include: { classGroup: true },
-      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
     prisma.user.count({ where: { ...activeStudentsWhere, classGroupId: null } }),
     prisma.classGroup.findMany(),
@@ -140,7 +141,7 @@ export async function getYearClosurePreview(): Promise<YearClosurePreview> {
   return {
     currentYear: { startYear: current.startYear, label: schoolYearLabel(current.startYear) },
     nextYear: { startYear: next, label: schoolYearLabel(next) },
-    students: students
+    students: sortByName(students)
       .map((u) => {
         const cls = u.classGroup!;
         return {

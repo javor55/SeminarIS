@@ -11,6 +11,7 @@ import { windowPhase, type WindowPhaseInput } from "@/modules/seminars/window-ph
 import { getStudentAudienceInfo, isStudentInWindowAudience } from "@/modules/seminars/eligibility";
 import { isInOccurrenceAudience } from "@/modules/seminars/audience";
 import { checkStudentCanChange } from "@/modules/seminars/window-rules";
+import { formatName } from "@/lib/names";
 
 // Pozn.: tyto akce nepoužívají safeAction (vracejí { success } | { error }), proto si
 // režim „zobrazit jako“ (jen pro čtení) hlídají samy.
@@ -18,7 +19,7 @@ import { checkStudentCanChange } from "@/modules/seminars/window-rules";
 // Všechna pravidla (publikum, otevřenost okna, omezení výskytu, kapacita, počet zápisů v bloku,
 // odepisování a termín změn) se vyhodnocují tady na serveru, v transakci. UI je jen zobrazuje.
 
-const fullName = (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`.trim();
+const fullName = (u: { firstName: string; lastName: string }) => formatName(u, "text");
 
 /** Serializable transakce se při souběhu může odmítnout (P2034); pak se zkusí znovu a dostane správné výsledky kontrol. */
  

@@ -5,8 +5,9 @@ import { getViewerContext, windowsForViewerWhere } from "@/modules/seminars/elig
 import type { User } from "@/lib/types";
 import type { MySubjectsSection } from "@/modules/server-types";
 import { can } from "@/modules/registry";
+import { formatName } from "@/lib/names";
 
-const fullName = (u: { firstName: string; lastName: string }) => `${u.lastName} ${u.firstName}`.trim();
+const fullName = (u: { firstName: string; lastName: string }) => formatName(u, "list");
 
 /** Učitel: výskyty v zápisech, které vede (nesmazané bloky a výskyty), s obsazeností. */
 async function TeacherSection({ user }: { user: User }) {

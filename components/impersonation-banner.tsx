@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ROLE_LABELS } from "@/lib/school";
 import type { User } from "@/lib/types";
 import { stopImpersonation } from "@/modules/core/actions/impersonation";
+import { formatName } from "@/lib/names";
 
 /** Výrazný pruh nahoře, dokud admin prohlíží aplikaci jako jiný uživatel. */
 export function ImpersonationBanner({ user }: { user: User }) {
@@ -37,7 +38,7 @@ export function ImpersonationBanner({ user }: { user: User }) {
           <span>
             Prohlížíte jako{" "}
             <strong>
-              {user.firstName} {user.lastName}
+              {formatName(user, "text")}
             </strong>{" "}
             ({role}
             {user.classLabel ? ` ${user.classLabel}` : ""}) – jen pro čtení, nic nelze měnit.

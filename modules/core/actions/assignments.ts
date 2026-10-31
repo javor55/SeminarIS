@@ -8,11 +8,13 @@ import { audit } from "@/lib/audit";
 import { can } from "@/modules/registry";
 import { classLabel, compareClasses, schoolYearLabel, subjectInGrade, DEFAULT_STUDY_YEARS } from "@/lib/school";
 import { ensureCurrentSchoolYear } from "@/modules/core/school";
+import { formatName } from "@/lib/names";
+import { compareCs, sortByName, sortByText } from "@/lib/names";
 
 // Úvazky: učitel × předmět × třída × školní rok. Upravují se z detailu předmětu a z Uživatelé → Úvazky,
 // vždy pro aktuální školní rok. Čtení je dostupné všem, kdo vidí předměty.
 
-const fullName = (u: { firstName: string; lastName: string }) => `${u.lastName} ${u.firstName}`.trim();
+const fullName = (u: { firstName: string; lastName: string }) => formatName(u, "list");
 
 function revalidateAssignments() {
   revalidatePath("/", "layout");
@@ -31,10 +33,9 @@ export type SubjectTeaching = {
 async function listTeachers() {
   const teachers = await prisma.user.findMany({
     where: { role: { in: ["TEACHER", "ADMIN"] }, isActive: true },
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     select: { id: true, firstName: true, lastName: true },
   });
-  return teachers.map((t) => ({ id: t.id, name: fullName(t) }));
+  return sortByName(teachers).map((t) => ({ id: t.id, name: fullName(t) }));
 }
 
 /** Mřížka tříd předmětu s učiteli pro aktuální školní rok (detail předmětu). */
@@ -60,7 +61,7 @@ export async function getSubjectTeaching(subjectId: string): Promise<SubjectTeac
       .map((c) => ({ id: c.id, grade: c.grade, letter: c.letter, label: classLabel(c) })),
     assignments: assignments
       .map((a) => ({ id: a.id, teacherId: a.teacherId, teacherName: fullName(a.teacher), classGroupId: a.classGroupId }))
-      .sort((a, b) => a.teacherName.localeCompare(b.teacherName, "cs")),
+      .sort((a, b) => compareCs(a.teacherName, b.teacherName)),
     teachers: can(user.role, "core.school.manage") ? await listTeachers() : null,
   };
 }
@@ -78,7 +79,7 @@ export async function getTeacherAssignments(teacherId: string): Promise<TeacherA
   await requirePermission("core.school.manage");
   const year = await ensureCurrentSchoolYear();
   const [subjects, classes, assignments] = await Promise.all([
-    prisma.subject.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, code: true, grades: true } }),
+    prisma.subject.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true, grades: true } }),
     prisma.classGroup.findMany(),
     prisma.teachingAssignment.findMany({
       where: { teacherId, schoolYearId: year.id },
@@ -87,7 +88,7 @@ export async function getTeacherAssignments(teacherId: string): Promise<TeacherA
   ]);
   return {
     yearLabel: schoolYearLabel(year.startYear),
-    subjects,
+    subjects: sortByText(subjects, (s) => s.name),
     classes: classes.sort(compareClasses).map((c) => ({ id: c.id, grade: c.grade, label: classLabel(c) })),
     assignments: assignments
       .sort((a, b) => compareClasses(a.classGroup, b.classGroup))

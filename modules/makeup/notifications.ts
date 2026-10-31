@@ -4,11 +4,12 @@ import { formatDayShort, formatTimeRange, startOfSchoolDay } from "@/lib/datetim
 import { isEmailEventActive } from "@/lib/email/settings";
 import type { DailyJobStep } from "@/modules/server-types";
 import type { EmailEventId } from "@/lib/email/events";
+import { formatName } from "@/lib/names";
 
 // E-mailová upozornění modulu Dopisování. Volá se vždy PO commitu transakce, která změnu
 // provedla; chyba odeslání akci nikdy neshodí (sendEventEmail výjimky nevyhazuje).
 
-const displayName = (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`.trim();
+const displayName = (u: { firstName: string; lastName: string }) => formatName(u, "text");
 
 const registrationMailInclude = {
   student: { select: { id: true, email: true, firstName: true, lastName: true, isActive: true, studyStatus: true } },
@@ -153,12 +154,12 @@ function digestRecipients(sessions: TomorrowSession[], datum: string): EmailReci
     const regs = s.registrations.filter((r) => studentActive(r.student));
     if (regs.length === 0) continue;
     const when = `${formatTimeRange(s.startsAt, s.endsAt)}, učebna ${s.room}`;
-    add(s.teacher, `${when} (dozor):\n${regs.map((r) => `  - ${r.student.lastName} ${r.student.firstName}: ${subjectsText(r)}`).join("\n")}`);
+    add(s.teacher, `${when} (dozor):\n${regs.map((r) => `  - ${displayName(r.student)}: ${subjectsText(r)}`).join("\n")}`);
     for (const r of regs) {
       for (const x of r.subjects) {
         // dozor vlastního termínu už souhrn má; vyučující předmětu dostane jen své předměty
         if (x.subjectTeacher && x.subjectTeacher.id !== s.teacher.id) {
-          add(x.subjectTeacher, `${when}: ${r.student.lastName} ${r.student.firstName} – ${x.subject.name}`);
+          add(x.subjectTeacher, `${when}: ${displayName(r.student)} – ${x.subject.name}`);
         }
       }
     }

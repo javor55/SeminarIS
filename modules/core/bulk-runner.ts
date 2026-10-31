@@ -8,6 +8,7 @@ import { collectBulkUserActions } from "@/modules/core/extensions";
 import { BULK_MAX, type BulkActionDescriptor, type BulkPreviewResult, type BulkRunOutcome, type BulkSelection } from "@/modules/core/bulk-runner-types";
 import { parseUserFilter, serializeUserListQuery } from "@/modules/core/users-filter";
 import { userFilterWhere } from "@/modules/core/users-query";
+import { sortByName } from "@/lib/names";
 
 // Společný běh hromadných akcí nad uživateli (F3): výběr (id nebo filtr vyhodnocený na serveru),
 // náhled dopadu, potvrzení počtů, jedna transakce a jeden souhrnný záznam v historii.
@@ -51,7 +52,7 @@ export async function resolveSelection(raw: BulkSelection, db: TxClient = prisma
 }
 
 export async function loadBulkUsers(ids: string[], db: TxClient = prisma): Promise<BulkUserInfo[]> {
-  const users = await db.user.findMany({ where: { id: { in: ids } }, include: { classGroup: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] });
+  const users = sortByName(await db.user.findMany({ where: { id: { in: ids } }, include: { classGroup: true } }));
   return users.map((u) => ({
     id: u.id,
     firstName: u.firstName,

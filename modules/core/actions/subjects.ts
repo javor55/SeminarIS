@@ -10,6 +10,7 @@ import { sanitizeGrades, subjectGradesLabel, subjectInGrade } from "@/lib/school
 import { getCurrentSchoolYear, getStudentGrade } from "@/modules/core/school";
 import { collectSubjectBadges, collectSubjectUsage } from "@/modules/core/extensions";
 import type { SubjectBadge, SubjectUsageItem } from "@/modules/types";
+import { compareCs, formatName, sortByText } from "@/lib/names";
 
 export type SubjectListItem = {
   id: string;
@@ -43,7 +44,7 @@ export type SubjectInput = {
   grades?: number[];
 };
 
-const fullName = (u: { firstName: string; lastName: string }) => `${u.lastName} ${u.firstName}`.trim();
+const fullName = (u: { firstName: string; lastName: string }) => formatName(u, "list");
 
 function revalidateSubjects() {
   revalidatePath("/", "layout");
@@ -113,9 +114,9 @@ export async function getSubjects(): Promise<SubjectListItem[]> {
 
   const subjects = await prisma.subject.findMany({
     where: privileged ? {} : { isActive: true },
-    orderBy: { name: "asc" },
     include: await teachingInclude(),
   });
+  subjects.sort((a, b) => compareCs(a.name, b.name));
   const badges = await collectSubjectBadges(subjects.map((s) => s.id), user);
 
   if (privileged) return subjects.map((s) => ({ ...toItem(s, badges.get(s.id) ?? []), syllabus: s.syllabus }));
@@ -131,10 +132,9 @@ export async function getSubjectOptions(): Promise<{ id: string; name: string; c
   await requirePermission("core.subjects.view");
   const subjects = await prisma.subject.findMany({
     where: { isActive: true },
-    orderBy: { name: "asc" },
     select: { id: true, name: true, code: true },
   });
-  return subjects;
+  return sortByText(subjects, (s) => s.name);
 }
 
 /** Detail předmětu, nebo null, když neexistuje / není pro uživatele viditelný. */
