@@ -6,7 +6,7 @@ import { IMPERSONATION_COOKIE, signImpersonation } from "../lib/impersonation-to
 // Cookie se uplatní jen s platným podpisem, pro právě přihlášeného admina a neadminského cíle.
 
 const check = (name: string, ok: boolean, extra = "") => expect.soft(ok, `${name} ${extra}`).toBe(true);
-const STUDENT_NAV = ["Dashboard", "Předměty", "Moje předměty", "Dopisování", "Můj profil"];
+const STUDENT_NAV = ["Dashboard", "Zápisy", "Předměty", "Moje předměty", "Dopisování", "Můj profil"];
 const ADMIN_NAV = ["Dashboard", "Zápisy", "Předměty", "Dopisování", "Uživatelé", "Administrace", "Můj profil"];
 const secret = process.env.NEXTAUTH_SECRET!;
 const inHour = () => Math.floor(Date.now() / 1000) + 3600;
@@ -41,6 +41,7 @@ test("náhled jako student: jeho data, pruh, žádná změna a žádný e-mail, 
 
   // vidí data studenta: zápis do semináře a termín dopisování
   await expect(pa.getByTestId("makeup-widget")).toContainText("učebna 204");
+  await pa.goto("/zapisy/enr_ls_2025");
   await expect(pa.getByRole("button", { name: "Odepsat" })).toBeVisible();
   await pa.goto("/makeup");
   await pa.waitForLoadState("networkidle");
@@ -54,6 +55,7 @@ test("náhled jako student: jeho data, pruh, žádná změna a žádný e-mail, 
   await expect(pa.getByTestId("impersonation-banner")).toBeVisible();
 
   // 1) odepsání ze semináře se odmítne
+  await pa.goto("/zapisy/enr_ls_2025");
   await pa.getByRole("button", { name: "Odepsat" }).click();
   await pa.getByRole("button", { name: "Odhlásit se" }).click();
   expect(await toastText(pa)).toContain("V režimu náhledu nelze nic měnit.");

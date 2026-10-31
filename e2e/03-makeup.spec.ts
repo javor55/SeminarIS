@@ -67,8 +67,13 @@ test("dopisování: termíny, řady, kolize, zápis, přepis, přesun, uzávěrk
   check('teacher card: my supervisions with occupancy', (await pt.locator('[data-card="makeup.supervision"]').innerText()).includes('zapsáno 1/1'));
   check('teacher card: who writes my subjects', (await pt.locator('[data-card="makeup.who-writes"]').innerText()).includes('Student Jan'));
   const pa0 = await login(b, 'admin@skola.cz');
+  // termíny „dnes“ a „zítra“ (poledne podle pásma školy) založíme jen na chvíli, ostatní kontroly s nimi nepočítají
+  const noon = `(date_trunc('day', now() at time zone 'Europe/Prague') + interval '12 hours') at time zone 'Europe/Prague'`;
+  sql(`insert into "MakeupSession"(id,"teacherId","startsAt","endsAt",room,capacity,"changeDeadlineMinutes","createdById","updatedAt") values ('sd1','usr_teacher',${noon},${noon}+interval '45 min','301',4,60,'usr_teacher',now()),('sd2','usr_teacher',${noon}+interval '1 day',${noon}+interval '1 day 45 min','302',4,60,'usr_teacher',now())`);
   await pa0.goto('/dashboard'); await pa0.waitForLoadState('networkidle');
-  check('admin card: today and tomorrow terms', (await pa0.locator('[data-card="makeup.today"] [data-day="Zítra"]').innerText()).includes('2 termíny') && (await pa0.locator('[data-card="makeup.today"] [data-day="Dnes"]').innerText()).includes('0 termínů'));
+  const today = pa0.locator('[data-card="makeup.today"]');
+  check('admin card: today and tomorrow terms', (await today.locator('[data-day="Dnes"]').innerText()).includes('1 termín') && (await today.locator('[data-day="Zítra"]').innerText()).includes('učebna 302') && (await today.locator('[data-day="Dnes"]').innerText()).includes('zapsáno 0/4'), await today.innerText());
+  sql(`delete from "MakeupSession" where id in ('sd1','sd2')`);
 
   // 5) Eva vidí plno
   const pe = await login(b, 'eva.studentova@skola.cz');

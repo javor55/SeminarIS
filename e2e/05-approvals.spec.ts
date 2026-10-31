@@ -95,5 +95,5 @@ test("povinný výběr třídy při registraci", async ({ browser }) => {
   check('registered with required class', userInfo('bez@skola.cz') === 'GUEST|true|-|3A', userInfo('bez@skola.cz'));
   // host vidí výzvu k výběru třídy (už vybraná)
   await p.waitForSelector('[data-testid=class-request]');
-  check('guest prompt present', (await p.locator('[data-testid=class-request]').innerText()).includes('Vyberte svou třídu'));
+  check('guest prompt present', (await p.locator('[data-card="core.class-request"]').innerText()).includes('Vyberte svou třídu'));
 });

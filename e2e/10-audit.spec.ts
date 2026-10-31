@@ -14,7 +14,7 @@ test("historie: odepsání v seminářích a z dopisování, nastavení, filtr a
 
   // 1) student se sám odepíše ze semináře (Programování mikrokontrolérů)
   const ps = await login(browser, "jan.student@skola.cz");
-  await ps.goto("/dashboard");
+  await ps.goto("/zapisy/enr_ls_2025");
   await ps.getByRole("button", { name: "Odepsat" }).click();
   await ps.getByRole("button", { name: "Odhlásit se" }).click();
   await ps.waitForTimeout(1500);
