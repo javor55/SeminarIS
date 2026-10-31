@@ -63,8 +63,9 @@ test("třídy, předměty, import se třídou, přesun mezi třídami, cílení 
   await pa.goto('/users'); await pa.waitForLoadState('networkidle');
   await pa.getByRole('button', { name: /Import/ }).first().click();
   await pa.setInputFiles('#csv-file', csvFile);
-  await pa.getByRole('button', { name: /Importovat|Spustit import|Nahrát/ }).last().click(); await pa.waitForTimeout(3000);
+  await pa.waitForSelector('[data-testid=import-preview]');
   const dlg = await pa.locator('[role=dialog]').innerText();
+  await pa.getByTestId('import-confirm').click(); await pa.waitForSelector('[data-testid=import-result]');
   check('import result shows error line', dlg.includes('neplatná třída') && dlg.includes('9.Z'), dlg.replace(/\n/g, ' | ').slice(0, 300));
   check('import assigned classes', sql(`select string_agg(u.email||'='||c.grade||c.letter, ',' order by u.email) from "User" u join "ClassGroup" c on c.id=u."classGroupId"`) === `eva.studentova@skola.cz=1A,jan.student@skola.cz=3A,novy.zak@skola.cz=2B`);
   await pa.keyboard.press('Escape'); await pa.reload(); await pa.waitForLoadState('networkidle');
