@@ -11,6 +11,11 @@ import {
   EnrollmentRow,
 } from "@/modules/seminars/components/enrollment/enrollment-columns";
 import { EnrollmentWindow, User, EnrollmentWindowWithBlocks } from "@/lib/types";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { MobileCard, MobileCardField } from "@/components/ui/mobile-card";
+import { formatDateTime } from "@/lib/datetime";
+import { WindowPhaseBadge } from "@/modules/seminars/components/enrollment/enrollment-columns";
 import { PageHeader } from "@/components/page-header";
 
 const newEnrollmentMock: Partial<EnrollmentWindow> = {
@@ -127,6 +132,40 @@ export function EnrollmentsClientView({ enrollments, currentUser, newWindowDefau
           <DataTable<EnrollmentRow>
             data={rows}
             columns={columns}
+            renderCard={(r) => (
+              <MobileCard
+                data-testid="enrollment-card"
+                title={
+                  <Link href={`/enrollments/${r.id}`} className="text-info hover:underline">
+                    {r.name}
+                  </Link>
+                }
+                badge={<WindowPhaseBadge window={r} />}
+                actions={
+                  currentUser.role === "ADMIN" ? (
+                    <Button variant="outline" onClick={() => setEditEnrollment(r.fullData as EnrollmentWindowWithBlocks)}>
+                      Upravit zápis
+                    </Button>
+                  ) : undefined
+                }
+              >
+                {r.description && <p className="line-clamp-2 text-xs text-muted-foreground">{r.description}</p>}
+                <MobileCardField label="Publikum">{r.audienceView?.summary ?? "—"}</MobileCardField>
+                <MobileCardField label="Začátek">{formatDateTime(r.startsAt)}</MobileCardField>
+                <MobileCardField label="Konec">{formatDateTime(r.endsAt)}</MobileCardField>
+                <MobileCardField label="Zapsaní studenti">{r.uniqueStudentCount}</MobileCardField>
+                <MobileCardField label="Kompletně zapsaní">{r.fullyEnrolledCount}</MobileCardField>
+                {r.blocksWithCounts.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {r.blocksWithCounts.map((b) => (
+                      <Badge key={b.id} variant="muted" className="font-normal">
+                        {b.name} · {b.count}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </MobileCard>
+            )}
             searchKeys={["name"]}
             searchPlaceholder="Hledat podle názvu..."
             selectFilters={[

@@ -22,6 +22,13 @@ export type EnrollmentRow = EnrollmentWindow & {
   fullData: unknown;
 };
 
+/** Pilulka stavu okna (koncept / naplánováno / otevřeno / uzavřeno). */
+export function WindowPhaseBadge({ window }: { window: EnrollmentWindow }) {
+  const info = windowPhase(window);
+  const variant = { DRAFT: "secondary", PLANNED: "infoSolid", OPEN: "successSolid", CLOSED: "outline" }[info.phase] as "outline" | "secondary" | "successSolid" | "infoSolid";
+  return <Badge variant={variant}>{info.label}</Badge>;
+}
+
 // Funkce pro generování sloupců
 export function getEnrollmentColumns(opts: {
   currentUser: User | null;
@@ -57,9 +64,7 @@ export function getEnrollmentColumns(opts: {
       accessorFn: (ew) => windowPhase(ew).phase,
       header: "Stav",
       cell: ({ row }) => {
-        const info = windowPhase(row.original);
-        const variant = { DRAFT: "secondary", PLANNED: "infoSolid", OPEN: "successSolid", CLOSED: "outline" }[info.phase] as "outline" | "secondary" | "successSolid" | "infoSolid";
-        return <Badge variant={variant}>{info.label}</Badge>;
+        return <WindowPhaseBadge window={row.original} />;
       },
       filterFn: (row, id, value) => {
         if (!value || value.length === 0) return true;
