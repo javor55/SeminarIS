@@ -101,10 +101,10 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Vytvořit nový účet</CardTitle>
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <Card className="w-full max-w-md rounded-xl shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-xl">Vytvořit nový účet</CardTitle>
           <CardDescription>
             Zadejte své údaje pro registraci do systému.
           </CardDescription>

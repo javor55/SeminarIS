@@ -11,6 +11,8 @@ import { KeyRound, ShieldCheck, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { changeOwnPassword, getMyPreferences, setReceiveOptionalEmails } from "@/modules/core/actions/profile";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { ROLE_LABELS } from "@/lib/school";
 import { PageHeader } from "@/components/page-header";
 
 export default function ProfilePage() {
@@ -104,15 +106,15 @@ export default function ProfilePage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="text-muted-foreground">Role:</div>
-                <div className="font-medium text-foreground">{user.role}</div>
+                <div><Badge variant="secondary">{ROLE_LABELS[user.role] ?? user.role}</Badge></div>
                 <div className="text-muted-foreground">ID systému:</div>
                 <div className="font-mono text-[10px] text-muted-foreground truncate">{user.id}</div>
             </div>
           </CardContent>
           <CardFooter className="pt-0">
-             <div className="flex items-center gap-1.5 text-xs text-success bg-success/10 px-2.5 py-1 rounded-full font-medium">
+             <Badge variant="success" className="gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5" /> Účet je aktivní
-             </div>
+             </Badge>
           </CardFooter>
         </Card>
 
