@@ -4,7 +4,8 @@ import { SubjectCard, SubjectRow, subjectsColumns } from "./subjects-columns";
 import { DataTable } from "@/components/ui/data-table";
 import { toast } from "sonner";
 import { Download, Plus } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { StatTile } from "@/components/ui/stat-tile";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { User } from "@/lib/types";
@@ -110,31 +111,10 @@ export function SubjectsClientView({ subjects, currentUser }: { subjects: Subjec
       ) : (
         <>
           {canEdit && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-md">Celkem předmětů</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold">{subjects.length}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-md">Aktivní</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold text-success">{subjects.filter((s) => s.isActive).length}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-md">Archivováno</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold text-danger">{subjects.filter((s) => !s.isActive).length}</p>
-                </CardContent>
-              </Card>
+            <div className="grid grid-cols-3 gap-3" data-testid="subjects-stats">
+              <StatTile label="Celkem předmětů" value={subjects.length} />
+              <StatTile label="Aktivní" value={subjects.filter((s) => s.isActive).length} tone="text-success" />
+              <StatTile label="Archivováno" value={subjects.filter((s) => !s.isActive).length} tone="text-danger" />
             </div>
           )}
 

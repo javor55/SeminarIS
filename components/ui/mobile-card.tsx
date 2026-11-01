@@ -36,7 +36,7 @@ export function MobileCard({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className={cn("space-y-3 rounded-lg border bg-card p-4 text-card-foreground shadow-sm", className)} {...props}>
+    <div className={cn("space-y-3 rounded-xl border bg-card p-4 text-card-foreground shadow-sm", className)} {...props}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 break-words font-medium">{title}</div>
         {badge && <div className="shrink-0">{badge}</div>}

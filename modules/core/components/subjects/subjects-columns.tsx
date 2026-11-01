@@ -97,9 +97,9 @@ export const subjectsColumns: ColumnDef<SubjectRow>[] = [
     accessorFn: (s) => (s.isActive ? "active" : "archived"),
     cell: ({ row }) =>
       row.original.isActive ? (
-        <span className="text-success text-xs font-medium">Aktivní</span>
+        <Badge variant="success">Aktivní</Badge>
       ) : (
-        <span className="text-danger text-xs font-medium">Archivováno</span>
+        <Badge variant="danger">Archivováno</Badge>
       ),
     filterFn: includesFilter,
   },
@@ -116,7 +116,7 @@ export function SubjectCard({ s }: { s: SubjectRow }) {
       }
       badge={
         s.isActive ? (
-          <span className="text-success text-xs font-medium">Aktivní</span>
+          <Badge variant="success">Aktivní</Badge>
         ) : (
           <Badge variant="danger" className="rounded-sm px-1.5 py-0.5 text-[10px] uppercase font-bold">Archiv</Badge>
         )
