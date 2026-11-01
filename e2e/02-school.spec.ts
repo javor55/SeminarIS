@@ -87,7 +87,7 @@ test("třídy, předměty, import se třídou, přesun mezi třídami, cílení 
   await pj.goto('/zapisy/' + wid); await pj.waitForLoadState('networkidle');
   check('3rd grader opens the window on Zápisy', (await pj.locator('main').innerText()).includes('Zápis LS 2025'));
   const pe = await login(b, 'eva.studentova@skola.cz');
-  check('1st grader does not see window', !(await pe.content()).includes('Zápis LS 2025') && (await pe.content()).includes('Vítejte'));
+  check('1st grader does not see window', !(await pe.content()).includes('Zápis LS 2025') && (await pe.content()).includes('Teď tu nic nečeká'));
   await pe.goto('/zapisy'); await pe.waitForLoadState('networkidle');
   check('1st grader has an empty Zápisy list', (await pe.getByTestId('student-window').count()) === 0 && !(await pe.content()).includes('Zápis LS 2025'));
   await pe.goto('/zapisy/' + wid); await pe.waitForLoadState('networkidle');

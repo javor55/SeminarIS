@@ -13,7 +13,12 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
 
   // --- Student ---
   let p = await login(browser, 'jan.student@skola.cz');
-  check('student nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Moje předměty', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(p)));
+  // F12: student s jediným otevřeným oknem a bez termínů dopisování skončí rovnou v zápisu, bez lišty záložek;
+  // Dashboard, Předměty, Moje předměty a profil nejsou v menu (jsou v menu účtu)
+  check('student lands on the only open window', p.url().endsWith('/zapisy/enr_ls_2025'), p.url());
+  check('student nav: one tab means no bar', (await navLabels(p)).length === 0 && (await p.getByTestId('student-bottom-nav').count()) === 0, JSON.stringify(await navLabels(p)));
+  check('student has the account menu', (await p.getByTestId('account-menu').count()) === 1);
+  await p.goto('/dashboard'); await p.waitForLoadState('networkidle');
   check('student dashboard card shows window', (await p.locator('[data-card="seminars.windows"]').innerText()).includes('Zápis LS 2025'));
   check('student dashboard does not enroll (no enroll buttons)', (await p.getByTestId('enroll-button').count()) === 0);
   await p.goto('/users'); check('student /users redirected', p.url().endsWith('/dashboard'), p.url());
@@ -26,10 +31,12 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   await p.goto('/dashboard'); await p.waitForLoadState('networkidle');
   await p.locator('[data-card="seminars.windows"]').getByRole('link', { name: 'Upravit zápis' }).click();
   await p.waitForURL('**/zapisy/*');
-  await p.goto('/zapisy'); await p.waitForLoadState('networkidle');
-  check('zapisy list shows the window', (await p.getByTestId('student-window').count()) === 1 && (await p.getByTestId('student-window').innerText()).includes('Zápis LS 2025'));
+  await p.goto('/zapisy'); await p.waitForURL('**/zapisy/enr_ls_2025');
+  check('/zapisy leads straight to the only window', p.url().endsWith('/zapisy/enr_ls_2025'), p.url());
+  await p.goto('/zapisy?vse=1'); await p.waitForLoadState('networkidle');
+  check('zapisy list (?vse=1) shows the window', (await p.getByTestId('student-window').count()) === 1 && (await p.getByTestId('student-window').innerText()).includes('Zápis LS 2025'));
   await p.getByTestId('student-window').getByRole('link', { name: 'Upravit zápis' }).click(); await p.waitForURL('**/zapisy/*'); await p.waitForLoadState('networkidle');
-  const btn = p.getByRole('button', { name: /Zapsat/ }).first();
+  const btn = p.getByTestId('enroll-button').first();
   if (await btn.count()) {
     await btn.click(); await p.waitForTimeout(2500);
     check('student enrolled via UI', sql(`select count(*) from "StudentEnrollment" e join "User" u on u.id=e."studentId" where u.email='jan.student@skola.cz' and e."deletedAt" is null`) !== '0');
@@ -94,7 +101,8 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   await pa.goto('/dashboard'); check('dashboard empty when disabled', (await pa.content()).includes('Vítejte'));
   // student: zápis přes action musí selhat → ověř přes dashboard a nav
   const ps = await login(browser, 'eva.studentova@skola.cz');
-  check('student nav without seminars', JSON.stringify(await navLabels(ps)) === JSON.stringify(['Dashboard', 'Předměty', 'Moje předměty', 'Dopisování', 'Můj profil']), JSON.stringify(await navLabels(ps)));
+  // bez seminářů a bez termínů dopisování nemá student žádnou záložku: prázdný stav s menu účtu
+  check('student nav without seminars', (await navLabels(ps)).length === 0 && (await ps.getByTestId('student-empty').count()) === 1, JSON.stringify(await navLabels(ps)));
   const rz = await ps.goto('/zapisy'); check('/zapisy 404 when disabled', rz.status() === 404, String(rz.status()));
   await ps.goto('/dashboard'); check('student dashboard card gone when disabled', (await ps.locator('[data-card^="seminars."]').count()) === 0);
   // zapnout zpět

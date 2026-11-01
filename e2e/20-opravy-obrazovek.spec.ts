@@ -53,7 +53,7 @@ test("stav okna: koncept → zveřejněno → předčasně uzavřít (server odm
   const refused = await toastText(pj);
   check("server refuses enrolling into an early-closed window", refused.includes("uzavřen") && sql(`select count(*) from "StudentEnrollment" e join "SubjectOccurrence" o on o.id=e."subjectOccurrenceId" where o.id='o_flow'`) === "0", refused);
 
-  await pj.goto("/zapisy");
+  await pj.goto("/zapisy?vse=1");
   await pj.waitForLoadState("networkidle");
   const closedCard = await pj.locator('[data-testid=student-window][data-window=w_flow]').innerText();
   check("student sees it closed, no warning", closedCard.includes("Uzavřeno") && !closedCard.includes("Chybí") && closedCard.includes("Nezapsáno"), closedCard);
@@ -125,7 +125,7 @@ test("kód výskytu bez koncového lomítka; student ho nevidí, učitel ano; n�
   const pj = await login(browser, "jan.student@skola.cz");
   await pj.goto("/zapisy/" + WINDOW);
   await pj.waitForLoadState("networkidle");
-  check("student sees seminars but no Kód výskytu", (await pj.locator("tr", { hasText: "Základy IoT" }).count()) >= 1 && (await pj.locator("th", { hasText: "Kód výskytu" }).count()) === 0);
+  check("student sees seminars but no Kód výskytu", (await pj.locator("[data-occurrence]", { hasText: "Základy IoT" }).count()) >= 1 && (await pj.locator("th", { hasText: "Kód výskytu" }).count()) === 0);
 });
 
 test("české řazení jmen v seznamu uživatelů (Bartáček < Bartoš < Bartošová, S < Š < T, H < CH)", async ({ browser }) => {
@@ -165,11 +165,11 @@ test("nezapsaní a export: jména česky a ve tvaru Příjmení Jméno", async (
 test("student: uzavřené okno bez varování „Chybí zápis…“", async ({ browser }) => {
   resetDb();
   const pj = await login(browser, "jan.student@skola.cz");
-  await pj.goto("/zapisy");
+  await pj.goto("/zapisy?vse=1");
   await pj.waitForLoadState("networkidle");
   check("open window warns about the missing block", (await pj.locator('[data-testid=student-window]').first().innerText()).includes("Chybí zápis"));
   sql(`update "EnrollmentWindow" set "startsAt"=now()-interval '5 days', "endsAt"=now()-interval '1 day' where id='${WINDOW}'`);
-  await pj.goto("/zapisy");
+  await pj.goto("/zapisy?vse=1");
   await pj.waitForLoadState("networkidle");
   const t = await pj.locator('[data-testid=student-window]').first().innerText();
   check("closed window: neutral, no warning", t.includes("Uzavřeno") && !t.includes("Chybí") && t.includes("Zapsáno:"), t);

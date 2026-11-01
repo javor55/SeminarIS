@@ -170,7 +170,11 @@ test("Moje předměty: učitel, student, admin bez stránky, vypnutý modul", as
   check("only Moje předměty highlighted in nav", JSON.stringify(active.map((s) => s.trim())) === JSON.stringify(["Moje předměty"]), JSON.stringify(active));
 
   const ps = await login(browser, "jan.student@skola.cz");
-  check("student nav has Moje předměty", (await navLabels(ps)).includes("Moje předměty"));
+  // F12: Moje předměty a Předměty nejsou v hlavní navigaci studenta, ale v menu účtu
+  check("student nav (F12) has no Moje předměty", !(await navLabels(ps)).includes("Moje předměty"));
+  await ps.getByTestId("account-menu").click();
+  check("student account menu has Moje předměty, Katalog předmětů, profil and logout", (await ps.getByRole("menuitem").allInnerTexts()).map((t) => t.trim()).join("|") === "Můj profil|Moje předměty|Katalog předmětů|Odhlásit se", (await ps.getByRole("menuitem").allInnerTexts()).join("|"));
+  await ps.keyboard.press("Escape");
   await ps.goto("/subjects/mine");
   await ps.waitForSelector("[data-testid=my-subjects]");
   const grade = await ps.getByTestId("my-grade-subjects").innerText();

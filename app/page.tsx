@@ -1,32 +1,20 @@
 // app/page.tsx
-"use client";
-
-import { useAuth } from "@/components/auth/auth-provider";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/app-config";
+import { getCurrentUser } from "@/lib/session";
+import { getStudentNav } from "@/modules/core/student-nav";
 
-export default function PublicHomePage() {
-  const { user } = useAuth();
-  const router = useRouter();
-
-  // 🔥 Tento efekt automaticky přesměruje přihlášené uživatele
-  // z veřejné domovské stránky rovnou na jejich dashboard.
-  useEffect(() => {
-    if (user) {
-      router.replace("/dashboard"); // Přesměrujeme na dashboard
-    }
-  }, [user, router]);
-
-  // Pokud se `user` stále načítá, nebo pokud je přihlášen
-  // (a čeká na přesměrování), zobrazíme prázdnou stránku.
+// Úvod: nepřihlášený uživatel vidí nabídku přihlášení. Přihlášeného student pošle na zápis (má-li co dokončit),
+// jinak na dopisování, jinak na prázdný stav (F12); ostatní role na dashboard.
+export default async function PublicHomePage() {
+  const user = await getCurrentUser();
   if (user) {
-    return null; // Nebo <LoadingSpinner />
+    if (user.role === "STUDENT") redirect((await getStudentNav(user)).home);
+    redirect("/dashboard");
   }
 
-  // 🔥 Toto uvidí pouze nepřihlášení uživatelé
   return (
     <div className="mx-auto max-w-3xl text-center py-20">
       <h1 className="text-4xl font-bold mb-2">{APP_NAME}</h1>

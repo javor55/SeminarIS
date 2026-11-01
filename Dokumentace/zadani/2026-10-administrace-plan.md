@@ -22,7 +22,9 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F8 Dashboard jako přehled (karty z modulů) a stránka Zápisy pro studenty (PR #14)
 - [x] F9 Ukázková data (naplnit / smazat) pro prezentaci (PR #15)
 - [x] F10 Opravy z procházení skutečných obrazovek (chyby, workflow, sjednocení) (PR #16)
-- [x] F11 Mobilní zobrazení: zápis a dopisování jako karty
+- [x] F11 Mobilní zobrazení: zápis a dopisování jako karty (PR #17)
+- [x] F12 Zjednodušené rozhraní pro studenta (jen Zápis seminářů a Dopisování, zápis po krocích)
+- [ ] F13 Učitel a administrátor ve stejném stylu (bez ztráty jakékoli funkce)
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,
@@ -314,3 +316,93 @@ karty na mobilu“, kde to dává smysl. Zachovat `data-testid` / `data-session`
 Test: Playwright projekt nebo test s viewportem 390×844 – student na `/zapisy/[id]` a `/makeup`
 vidí tlačítko zápisu celé uvnitř viewportu (bounding box), `document.documentElement.scrollWidth
 <= innerWidth`, zápis i zapsání na dopisování z mobilu proběhne.
+
+## F12 Zjednodušené rozhraní pro studenta
+Zpětná vazba ze školy: studentům se rozhraní plete, mají mít v podstatě jen dvě záložky. Schválený
+klikací návrh (artifact „Zjednodušené UI pro studenty“, zdroj obrazovek `Main.dc.html` = telefon,
+`Student-Desktop.dc.html` = počítač) – vzhled se drží stávajících komponent a barev aplikace.
+
+**Nejdřív inventura (nesmí se ztratit žádná funkce):** projít stránky a akce dostupné studentovi
+(a hostovi) dnes – zápis/odepsání/přepsání v okně, „Zapsaní“ (jména, když je okno ukazuje), detail
+předmětu, Moje předměty, dopisování (zápis na termín s výběrem předmětů a poznámkou, odhlášení,
+přepis), profil, odhlášení, banner „zobrazit jako“ u admina – a sepsat je sem jako checklist
+„kde to je po změně“. Každá položka musí zůstat dostupná.
+
+1. **Navigace studenta:** jen „Zápis seminářů“ a „Dopisování písemek“.
+   - Záložka Zápis seminářů je vidět jen když má student aspoň jedno zveřejněné okno, které je
+     pro něj určené a není uzavřené (otevřené nebo naplánované); Dopisování jen když existuje
+     budoucí nezrušený termín, nebo když má student budoucí přihlášku.
+   - Jen jedna z nich → bez lišty, rovnou ta stránka. Žádná → stránka „Teď tu nic nečeká“
+     (krátký text, že se mu ozveme e-mailem).
+   - Na mobilu spodní lišta (2 záložky, min. 44 px, tečka = zápis není dokončený);
+     na počítači stejné dvě položky v horní liště.
+   - Profil, Moje předměty a Odhlásit se přesunout do menu pod kolečkem s iniciálami vpravo nahoře.
+   - Dashboard, Předměty a Moje předměty z hlavní navigace studenta zmizí; stránky zůstanou
+     dostupné přes odkazy (detail předmětu, menu účtu). Učitel a admin beze změny.
+2. **Úvod po přihlášení** (`/` pro studenta): přesměrovat na zápis, pokud má otevřené okno s
+   nedokončenými povinnými bloky; jinak na dopisování; jinak prázdný stav. Má-li student
+   jediné relevantní okno, `/zapisy` vede rovnou do něj.
+3. **Zápis po krocích** (`/zapisy/[id]`, student):
+   - Bloky jako sbalitelné karty s číslem kroku; hotový blok = zelená fajfka a název vybraného
+     semináře, rozbalený je vždy blok, který je na řadě (po výběru se sbalí a otevře další).
+   - Uvnitř výskyty: název je odkaz na detail předmětu (zachovat!), učitel, volná místa
+     (česky skloňovat), plné na konci a neaktivní.
+   - Tlačítka: Vybrat; když už má v bloku plno (max zápisů) → Vyměnit (`switchEnrollment`, jedna
+     transakce); vybraný = „Vybráno“ + možnost Odepsat (když to pravidla okna dovolí – stávající
+     `canUnenroll`/důvod). Bloky s max > 1 musí dál fungovat (víc výběrů).
+   - Nepovinný blok má „Nechci nic z tohoto bloku“ (jen sbalí; když v něm student je, odepíše).
+   - Dole lepivá lišta „Zbývá vybrat: Blok B“ / „Zápis je kompletní“. **Žádná** velká bublina
+     „Máte hotovo“.
+   - Na počítači výskyty v mřížce karet a vpravo panel „Váš výběr“ (stav bloků, uzávěrka).
+   - Zachovat stávající hlášky pravidel okna, „Zapsaní“, stav okna a `data-testid`.
+4. **Dopisování studenta** (`/makeup`):
+   - Nahoře „Moje přihlášky“ (karty: termín, učebna, dozor, předměty, poznámka, Odhlásit, případně
+     Změnit předměty/poznámku, pokud to dnes jde).
+   - Pod tím „Který předmět potřebujete dopsat?“ – čipy s předměty, které jsou na budoucích
+     termínech (zvýraznit jeho předměty), po výběru jen termíny s tímto předmětem.
+   - Přihlášení v dialogu / spodním panelu: předmět předvyplněný (lze přidat další z termínu),
+     pole **Poznámka pro vyučujícího (nepovinné)**, Potvrdit.
+   - Zrušit filtr „Jen moje zápisy“ a rozbalovací filtr předmětů u studenta (nahrazeno výše).
+5. Dokumentace (architektura – sekce o studentském rozhraní) a E2E: navigace studenta podle stavu,
+   přesměrování z `/`, krokový zápis včetně Vyměnit, nepovinný blok, odkaz na detail předmětu,
+   dopisování přes čip předmětu s poznámkou, mobil 390×844 (spodní lišta, nic neutíká do strany).
+   Stávající E2E testy upravit, ne mazat (kromě kroků, které testují zrušené prvky).
+
+### Inventura funkcí studenta a hosta: kde to je po změně (F12, ověřeno)
+- [x] Zápis do výskytu (Vybrat) – `/zapisy/[id]`, rozbalený blok; server beze změny (`enrollStudent`).
+- [x] Vyměnit (blok s plným počtem zápisů) – tlačítko Vyměnit + potvrzení, `switchEnrollment`; u max > 1 student vybere, který výběr nahradí.
+- [x] Odepsání dle pravidel okna (`allowSelfUnenroll`, termín změn, otevřené okno) – tlačítko Odepsat u vybraného; zakázané s důvodem.
+- [x] Více výběrů v bloku s max > 1 – blok zůstane otevřený, „Zapsáno X z Y“.
+- [x] Nepovinný blok – „Nechci nic z tohoto bloku“ (sbalí, případně odepíše).
+- [x] Odkaz na detail předmětu – název semináře u výskytu (`/subjects/[id]`).
+- [x] „Zapsaní“ (jména, když okno povoluje) – tlačítko u výskytu.
+- [x] Stav okna, odpočet, pravidla okna, upozornění hosta o schválení – hlavička `/zapisy/[id]`.
+- [x] Seznam oken, uzavřená okna – `/zapisy?vse=1` (odkaz „Všechny zápisy“ na detailu); jediné neuzavřené okno → `/zapisy` vede rovnou do něj.
+- [x] Dopisování: zápis na termín s výběrem předmětů (i více) a poznámkou – čip předmětu → „Přihlásit se“ → dialog; Moje přihlášky: Upravit (předměty i poznámka), Přepsat, Odhlásit se, zrušený termín, uzávěrka; proběhlé zápisy sbalené dole. Termín s více předměty = výběr více předmětů v dialogu.
+- [x] Dashboard – `/dashboard` zůstává (po URL; prázdný stav studenta, karty uzavřeného okna, výzva hosta „Vyberte svou třídu“); z navigace studenta zmizel.
+- [x] Předměty (katalog) – menu účtu „Katalog předmětů“ (`/subjects`); Moje předměty – menu účtu (`/subjects/mine`); Můj profil – menu účtu; Odhlásit se – menu účtu; přepínač tmavého režimu – horní lišta.
+- [x] Banner „zobrazit jako“ – beze změny (nad lištou); náhled startuje na `/` (úvod studenta).
+- [x] Host: menu (Zápisy) a úvod `/dashboard` beze změny, zápis jen ke čtení se všemi bloky rozbalenými.
+- Učitel a admin: navigace i stránky beze změny.
+
+## F13 Učitel a administrátor ve stejném stylu
+Stejný vizuální jazyk jako F12 (karty, pilulky stavu, čitelné stavy). **Zásada: žádná funkce
+nesmí zmizet.** Nejdřív inventura akcí učitele a admina (zápisy: zapsat/odepsat/přesunout studenta,
+správa oken, bloků a výskytů, publikum, pravidla; dopisování: termíny, řady, zrušení, docházka,
+přidat/odebrat/přesunout studenta, poznámky; předměty, uživatelé, administrace, importy, „zobrazit
+jako“) jako checklist sem a ověřit, že každá zůstala.
+1. **Učitel – přehled:** nahoře nejbližší věci („Zítra 14:30 dopisování, 6 studentů, 2 s poznámkou“,
+   stav jeho seminářů v otevřeném zápisu, nezapsaní z jeho třídy, je-li třídní); pod tím jeho
+   termíny dopisování se jmény studentů, předměty a poznámkami a obsazenost jeho seminářů.
+   Postavit na stávajících kartách přehledu z modulů (`getDashboardCards`), ne natvrdo.
+2. **Detail termínu dopisování** (hlavně telefon): přehled (přihlášeno / volno / s poznámkou),
+   seznam studentů s předměty a poznámkou, docházka, odebrat/přesunout studenta, přidat studenta,
+   upravit termín – vše co dnes.
+3. **Admin – průběh zápisu** (detail okna): souhrn (hotovo / rozpracováno / nezačali, plné
+   semináře), obsazenost výskytů v blocích, seznam „Chybí dokončit“ (jména, třída, co chybí).
+   Akce stávající (upravit, předčasně uzavřít/otevřít, zapsat/odepsat/přesunout studenta).
+4. **Administrace:** boční menu sekcí ve skupinách (Škola / Moduly / Provoz), úvod = seznam
+   „K vyřízení“ (stávající `getAdminTodos`) a dlaždice stavu (e-maily, přihlášení, moduly).
+5. Nové nápady z návrhu, které dnes neexistují (ruční připomenutí e-mailem, export do Excelu,
+   záložka Studenti pro učitele), **nedělat** – jen zapsat sem jako možné rozšíření.
+6. Dokumentace a E2E (stávající upravit, přidat na nové přehledy).

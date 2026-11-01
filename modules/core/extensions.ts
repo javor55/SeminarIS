@@ -5,7 +5,7 @@ import { MODULE_SERVERS } from "@/modules/server-registry";
 import type { ModuleId } from "@/modules/registry";
 import { getHiddenTodoIds } from "@/modules/core/admin-todo-hidden";
 import type { AdminSection, AdminTodo, SubjectBadge, SubjectUsageItem } from "@/modules/types";
-import type { AdminStat, BulkUserAction, DashboardCard, ModuleServer, ModuleTab, MySubjectsSection } from "@/modules/server-types";
+import type { AdminStat, BulkUserAction, DashboardCard, ModuleServer, ModuleTab, MySubjectsSection, StudentTab } from "@/modules/server-types";
 import { MODULES, can, type Permission } from "@/modules/registry";
 
 // Sběr bodů rozšíření (viz ModuleServer) ze zapnutých modulů. Jádro nesmí importovat moduly
@@ -94,6 +94,12 @@ export async function collectMySubjectsSections(user: User): Promise<MySubjectsS
 export async function collectDashboardCards(user: User): Promise<DashboardCard[]> {
   const parts = await collect((s) => s.getDashboardCards?.(user));
   return parts.flatMap((p) => p.value.map((c) => ({ ...c, id: `${p.id}.${c.id}` }))).sort(byOrder);
+}
+
+/** Záložky zjednodušené navigace studenta (F12) ze zapnutých modulů, seřazené. */
+export async function collectStudentTabs(user: User): Promise<StudentTab[]> {
+  const parts = await collect((s) => s.getStudentTabs?.(user));
+  return parts.flatMap((p) => p.value.map((t) => ({ ...t, id: `${p.id}.${t.id}` }))).sort(byOrder);
 }
 
 /** Záložky detailu uživatele ze zapnutých modulů, seřazené. */

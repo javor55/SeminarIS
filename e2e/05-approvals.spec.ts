@@ -77,7 +77,7 @@ test("registrace se třídou a schválení hosta jedním klikem", async ({ brows
 
   // schválený student se přihlásí a vidí menu studenta
   const ps = await login(b, 'nova@skola.cz', 'password123');
-  check('approved student sees student menu', (await ps.locator('header nav a').allInnerTexts()).map((s) => s.trim()).includes('Dopisování'));
+  check('approved student sees the student UI (account menu, no old menu)', (await ps.getByTestId('account-menu').count()) === 1 && !(await ps.locator('header nav a').allInnerTexts()).map((s) => s.trim()).includes('Uživatelé'));
   const rejected = await tryLogin(b, 'g4@skola.cz');
   check('rejected account cannot log in', !rejected.url().endsWith('/dashboard'));
 });

@@ -23,7 +23,7 @@ export function ImpersonateButton({ userId, name, label }: { userId: string; nam
         setBusy(true);
         try {
           unwrap(await startImpersonation(userId));
-          window.location.assign("/dashboard");
+          window.location.assign("/");
         } catch (err) {
           toast.error((err as Error).message || "Náhled se nepodařilo spustit.");
           setBusy(false);

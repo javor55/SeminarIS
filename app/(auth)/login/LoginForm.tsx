@@ -69,7 +69,7 @@ export function LoginForm({ microsoftEnabled, passwordNote, errorCode }: LoginFo
               variant="outline"
               className="w-full gap-2"
               data-testid="microsoft-login"
-              onClick={() => signIn("azure-ad", { callbackUrl: "/dashboard" })}
+              onClick={() => signIn("azure-ad", { callbackUrl: "/" })}
             >
               {/* Logo Microsoftu (4 čtverce) */}
               <svg width="16" height="16" viewBox="0 0 21 21" aria-hidden="true">

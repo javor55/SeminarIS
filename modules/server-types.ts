@@ -108,6 +108,26 @@ export type DashboardCard = {
   linkLabel?: string;
 };
 
+/**
+ * Záložka zjednodušené navigace studenta (F12). Student vidí jen záložky, které mu moduly vrátí
+ * (např. „Zápis seminářů“, „Dopisování písemek“); modul ji vrací jen tehdy, když na ní pro studenta něco je.
+ */
+export type StudentTab = {
+  // Jedinečné v rámci modulu; jádro ho prefixuje id modulu
+  id: string;
+  label: string;
+  // Stránka modulu, kam záložka vede (může vést rovnou do detailu, např. jediného otevřeného zápisu)
+  href: string;
+  // Ikona záložky (klient zná jen tyto)
+  icon: "book" | "pencil";
+  // Pořadí záložek (nižší = dříve)
+  order: number;
+  // Student má něco dokončit (tečka na záložce, záložka se otevře jako úvodní)
+  attention?: boolean;
+  // V modulu už není nic, co by student musel udělat; úvodní je pak jiná záložka, pokud nějaká je
+  complete?: boolean;
+};
+
 /** Sekce stránky „Moje předměty“ (F4), kterou přispívá modul. Obsah je serverová komponenta modulu. */
 export type MySubjectsSection = {
   // Jedinečné v rámci modulu; jádro ho prefixuje id modulu
@@ -234,6 +254,9 @@ export type ModuleServer = {
   // Karty dashboardu (F8) pro daného uživatele; prázdné pole, když modul pro jeho roli nemá co ukázat.
   // Karta respektuje oprávnění uživatele (viditelnost zápisů, vlastní data) a vrací jen to, co smí vidět.
   getDashboardCards?: (user: User) => Promise<DashboardCard[]>;
+  // Záložky zjednodušené navigace studenta (F12). Vrací prázdné pole, když modul pro studenta nemá nic otevřeného;
+  // rozhoduje se na serveru (viditelnost oken, publikum, termíny), klient jen zobrazí.
+  getStudentTabs?: (user: User) => Promise<StudentTab[]>;
   // Sekce stránky „Moje předměty“ (F4): co uživatel v modulu k předmětům učí / navštěvuje. Vrací
   // prázdné pole, když modul pro roli uživatele nemá co ukázat.
   getMySubjectsSections?: (user: User) => Promise<MySubjectsSection[]>;

@@ -92,9 +92,9 @@ test("detail uživatele: záložky, moduly, učitel jen čte, student nemá př�
 
   // „Zobrazit jako“ zůstává dostupné z detailu
   await pa.getByTestId("impersonate").click();
-  await pa.waitForURL("**/dashboard");
+  await pa.waitForURL((u) => !u.pathname.startsWith("/users"));
   await pa.waitForLoadState("networkidle");
-  check("impersonating the student", (await navLabels(pa)).includes("Můj profil") && !(await navLabels(pa)).includes("Uživatelé"));
+  check("impersonating the student", (await pa.getByTestId("account-menu").count()) === 1 && !(await navLabels(pa)).includes("Uživatelé"));
   const denied = await pa.goto("/users/usr_stud2");
   check("student in preview cannot open other user detail", pa.url().endsWith("/dashboard"), `${denied?.status()} ${pa.url()}`);
   await pa.context().clearCookies();

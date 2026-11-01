@@ -22,7 +22,7 @@ export async function notifyAccountsApproved(userIds: string[]) {
         jmeno: u.firstName,
         role: ROLE_LABELS[u.role] ?? u.role,
         trida: u.role === "STUDENT" && u.classGroup ? `, třída ${classLabel(u.classGroup)}` : "",
-        odkaz: appUrl("/dashboard"),
+        odkaz: appUrl("/"),
       },
     }))
   );

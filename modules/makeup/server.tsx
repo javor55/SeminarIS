@@ -20,6 +20,17 @@ export const makeupServer: ModuleServer = {
 
   getDashboardCards: getMakeupDashboardCards,
 
+  // Zjednodušená navigace studenta (F12): záložka „Dopisování písemek“, když existuje budoucí nezrušený termín
+  // nebo má student budoucí přihlášku (i na zrušený termín, aby se mohl přepsat).
+  async getStudentTabs(user) {
+    if (!can(user.role, "makeup.register")) return [];
+    const count = await prisma.makeupSession.count({
+      where: { endsAt: { gte: new Date() }, OR: [{ cancelledAt: null }, { registrations: { some: { studentId: user.id } } }] },
+    });
+    if (count === 0) return [];
+    return [{ id: "sessions", label: "Dopisování písemek", href: "/makeup", icon: "pencil", order: 30 }];
+  },
+
   // Detail uživatele: zápisy studenta s docházkou, u učitele dozorované termíny. Admin vidí vše,
   // učitel jen termíny, které dozoruje, a písemky svých předmětů.
   async getUserTabs(userId, viewer) {

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { sql, resetDb, seedSubjects, login, toastText } from "./helpers";
+import { sql, resetDb, seedSubjects, login, toastText, occ } from "./helpers";
 
 // F8: dashboard je přehled s kartami podle role, zapisuje se na stránce Zápisy (/zapisy). Student nikde neuvidí
 // skryté okno, koncept ani okno určené jiné třídě (dashboard, seznam Zápisy i detail okna přímým odkazem).
@@ -56,6 +56,9 @@ test("student: karta Zápisy, stránka Zápisy a zápis, skrytá okna se nikde n
   sql(`insert into "EnrollmentWindowAudience"(id,"windowId",type,"classGroupId",key) select 'aud_3b','w_3b','CLASS',id,'CLASS:'||id from "ClassGroup" where grade=3 and letter='B'`);
 
   const pj = await login(browser, "jan.student@skola.cz");
+  // F12: student po přihlášení přistane na zápisu; přehled s kartami je dál na /dashboard (jen bez odkazu v menu)
+  await pj.goto("/dashboard");
+  await pj.waitForLoadState("networkidle");
   const card = pj.locator('[data-card="seminars.windows"]');
   await expect(card).toBeVisible();
   const cardText = await card.innerText();
@@ -82,7 +85,7 @@ test("student: karta Zápisy, stránka Zápisy a zápis, skrytá okna se nikde n
   // zápis na detailu okna; karta a seznam pak hlásí hotovo
   await pj.goto("/zapisy/" + WINDOW);
   await pj.waitForLoadState("networkidle");
-  await pj.locator("tr", { hasText: "Základy IoT" }).first().getByTestId("enroll-button").click();
+  await (await occ(pj, "Základy IoT")).getByTestId("enroll-button").click();
   await toastText(pj);
   check("enrolled on the Zápisy detail", sql(`select count(*) from "StudentEnrollment" where "studentId"='usr_stud1' and "deletedAt" is null`) === "2");
   await pj.goto("/dashboard");

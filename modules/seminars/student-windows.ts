@@ -3,7 +3,9 @@ import type { User } from "@/lib/types";
 import { getViewerContext, occurrencesForViewerWhere, windowsForViewerWhere } from "@/modules/seminars/eligibility";
 import { missingBlocksFor, type MissingBlock } from "@/modules/seminars/unenrolled";
 import { notifyWindowOpenedIfOpen } from "@/modules/seminars/notifications";
-import { windowPhase } from "@/modules/seminars/window-phase";
+import { liveWindowWhere, windowPhase } from "@/modules/seminars/window-phase";
+import { can } from "@/modules/registry";
+import type { StudentTab } from "@/modules/server-types";
 
 // Pohled studenta (a hosta) na zápisová okna: stránka Zápisy a karty dashboardu. JEDINÉ místo, které vybírá
 // okna pro studenta: jen okna zveřejněná studentům, ne koncept a určená právě jemu (publikum), výskyty
@@ -35,12 +37,12 @@ const STATUS_RANK: Record<StudentWindowStatus, number> = { OPEN: 0, SCHEDULED: 1
  * uzavřená (nejnovější první). Pro učitele a admina vrací prázdný seznam. Tři dotazy bez ohledu na počet oken
  * (okna + bloky + výskyty + moje zápisy jsou jeden `findMany`).
  */
-export async function listStudentWindows(user: User): Promise<StudentWindow[]> {
+export async function listStudentWindows(user: User, opts: { liveOnly?: boolean } = {}): Promise<StudentWindow[]> {
   const ctx = await getViewerContext(user);
   if (!ctx) return [];
   const occWhere = occurrencesForViewerWhere(ctx);
   const windows = await prisma.enrollmentWindow.findMany({
-    where: windowsForViewerWhere(ctx),
+    where: opts.liveOnly ? { AND: [windowsForViewerWhere(ctx), liveWindowWhere()] } : windowsForViewerWhere(ctx),
     include: {
       blocks: {
         where: { deletedAt: null },
@@ -99,4 +101,27 @@ export async function listStudentWindows(user: User): Promise<StudentWindow[]> {
     if (a.status === "SCHEDULED") return a.startsAt.getTime() - b.startsAt.getTime();
     return b.endsAt.getTime() - a.endsAt.getTime();
   });
+}
+
+/**
+ * Záložka „Zápis seminářů“ ve zjednodušené navigaci studenta: jen když má student zveřejněné, jemu určené okno,
+ * které není uzavřené (otevřené nebo naplánované). Jediné takové okno = odkaz rovnou na něj. Tečka (`attention`)
+ * = otevřené okno, kde mu chybí povinný blok. Host (jiná role) záložku nemá, jeho menu se nemění.
+ */
+export async function getSeminarsStudentTabs(user: User): Promise<StudentTab[]> {
+  if (user.role !== "STUDENT" || !can(user.role, "seminars.enroll.view")) return [];
+  const live = (await listStudentWindows(user, { liveOnly: true })).filter((w) => w.status !== "CLOSED");
+  if (live.length === 0) return [];
+  const attention = live.some((w) => w.status === "OPEN" && w.missingBlocks.length > 0);
+  return [
+    {
+      id: "windows",
+      label: "Zápis seminářů",
+      href: live.length === 1 ? `/zapisy/${live[0].id}` : "/zapisy",
+      icon: "book",
+      order: 10,
+      attention,
+      complete: !attention,
+    },
+  ];
 }

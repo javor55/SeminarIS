@@ -53,7 +53,8 @@ function AuthContextWrapper({ children }: { children: ReactNode }) {
     }
     
     // replace místo push – login stránka se nemá vracet v historii
-    router.replace("/dashboard");
+    // Úvod ("/") podle role pošle studenta na zápis / dopisování, ostatní na dashboard
+    router.replace("/");
     router.refresh();
   }
 
