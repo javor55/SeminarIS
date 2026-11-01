@@ -142,3 +142,12 @@ export function formatRemaining(ms: number): string {
   if (m > 0) return `${m} min`;
   return "méně než minuta";
 }
+
+/** „Dnes“, „Zítra“, jinak „út 4. 11.“ – den ve školním pásmu (pro přehledy učitele a admina). */
+export function formatDayRelative(d: Date | string, now: Date = new Date()): string {
+  const key = schoolDayKey(new Date(d));
+  const today = schoolDayKey(now);
+  if (key === today) return "Dnes";
+  if (key === addDaysToDayKey(today, 1)) return "Zítra";
+  return formatDayShort(d);
+}

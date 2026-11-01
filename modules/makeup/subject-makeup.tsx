@@ -1,3 +1,4 @@
+import { roomText } from "@/lib/room";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import type { User } from "@/lib/types";
@@ -57,7 +58,7 @@ export async function SubjectMakeupPanel({ subjectId, viewer }: { subjectId: str
           <li key={s.id} className="space-y-1 px-3 py-2" data-testid="subject-makeup-session" data-session={s.id}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Link href={manage ? `/makeup/sessions/${s.id}` : "/makeup"} className="hover:underline">
-                <strong>{formatTimeRange(s.startsAt, s.endsAt)}</strong>, učebna {s.room}
+                <strong>{formatTimeRange(s.startsAt, s.endsAt)}</strong>, {roomText(s.room)}
                 <span className="text-muted-foreground"> – dozor {fullName(s.teacher)}</span>
               </Link>
               <span className="flex items-center gap-2 text-xs text-muted-foreground">

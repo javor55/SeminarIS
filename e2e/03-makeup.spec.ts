@@ -65,7 +65,7 @@ test("dopisování: termíny, řady, kolize, zápis, přepis, přesun, uzávěrk
   check('Jan card: registration with room and change deadline, free terms', janCard.includes('učebna 204') && janCard.includes('změny do') && janCard.includes('Volných termínů: 4'), janCard);
   // dashboard učitele: dozory a kdo u něj dopisuje; admina: dnešní a zítřejší termíny
   await pt.goto('/dashboard'); await pt.waitForLoadState('networkidle');
-  check('teacher card: my supervisions with occupancy', (await pt.locator('[data-card="makeup.supervision"]').innerText()).includes('zapsáno 1/1'));
+  check('teacher card: my supervisions with occupancy', (await pt.locator('[data-card="makeup.supervision"]').innerText()).includes('přihlášeno 1 z 1'));
   check('teacher card: who writes my subjects', (await pt.locator('[data-card="makeup.who-writes"]').innerText()).includes('Student Jan'));
   const pa0 = await login(b, 'admin@skola.cz');
   // termíny „dnes“ a „zítra“ (poledne podle pásma školy) založíme jen na chvíli, ostatní kontroly s nimi nepočítají

@@ -49,14 +49,15 @@ export const coreModule = {
   ],
   // Boční menu administrace (moduly přidávají vlastní přes `adminSections`)
   adminSections: [
-    { label: "Přehled", href: "/admin", permission: "core.admin.view", order: 0 },
-    { label: "Registrace a přihlášení", href: "/admin/registration", permission: "core.admin", order: 10 },
-    { label: "Školní rok a třídy", href: "/admin/school-year", permission: "core.classes.view", order: 20, match: ["/admin/close-year"] },
-    { label: "Moduly", href: "/admin/modules", permission: "core.admin", order: 30 },
-    { label: "Upozornění", href: "/admin/notifications", permission: "core.admin", order: 40 },
-    { label: "Historie", href: "/admin/history", permission: "core.admin", order: 50 },
-    { label: "Diagnostika", href: "/admin/diagnostics", permission: "core.admin", order: 60 },
-    { label: "Ukázková data", href: "/admin/demo", permission: "core.admin", order: 70 },
+    { label: "Přehled", href: "/admin", permission: "core.admin.view", group: "overview", order: 0 },
+    { label: "Školní rok a třídy", href: "/admin/school-year", permission: "core.classes.view", group: "school", order: 10, match: ["/admin/close-year"] },
+    { label: "Registrace a přihlášení", href: "/admin/registration", permission: "core.admin", group: "school", order: 20 },
+    // Zapnutí a vypnutí modulů je ve skupině Moduly až za sekcemi samotných modulů (100+)
+    { label: "Moduly", href: "/admin/modules", permission: "core.admin", group: "modules", order: 900 },
+    { label: "Upozornění", href: "/admin/notifications", permission: "core.admin", group: "ops", order: 40 },
+    { label: "Historie", href: "/admin/history", permission: "core.admin", group: "ops", order: 50 },
+    { label: "Diagnostika", href: "/admin/diagnostics", permission: "core.admin", group: "ops", order: 60 },
+    { label: "Ukázková data", href: "/admin/demo", permission: "core.admin", group: "ops", order: 70 },
   ],
   // Nastavení jádra. Klíče jsou historické a nesmí se přejmenovat (uložené hodnoty v SystemSetting).
   settings: [

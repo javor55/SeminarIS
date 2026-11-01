@@ -2,6 +2,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getEnrollmentWindowByIdWithBlocks } from "@/modules/seminars/actions/windows";
+import { getWindowProgress } from "@/modules/seminars/window-progress";
+import { EnrollmentProgressPanel } from "@/modules/seminars/components/enrollment/EnrollmentProgressPanel";
 import { EnrollmentView } from "@/modules/seminars/components/enrollment/EnrollmentView";
 import { EnrollmentDetailTabs } from "@/modules/seminars/components/enrollment/EnrollmentDetailTabs";
 import { User } from "@/lib/types";
@@ -46,9 +48,12 @@ export default async function EnrollmentDetailPage({
     );
   }
 
+  // Průběh zápisu (F13): hotovo / rozpracováno / nezačali, plné semináře, kdo co dokončí
+  const progress = await getWindowProgress(ew.id);
+
   return (
     <EnrollmentDetailTabs windowId={ew.id} windowName={ew.name} canRemind={can(user.role, "seminars.windows.manage")}>
-      <EnrollmentView enrollmentWindow={ew} currentUser={user} />
+      <EnrollmentView enrollmentWindow={ew} currentUser={user} summary={progress ? <EnrollmentProgressPanel progress={progress} /> : undefined} />
     </EnrollmentDetailTabs>
   );
 }

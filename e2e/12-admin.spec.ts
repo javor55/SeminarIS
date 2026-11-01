@@ -7,7 +7,8 @@ import { sql, resetDb, seedSubjects, login, toastText } from "./helpers";
 const check = (name: string, ok: boolean, extra = "") => expect.soft(ok, `${name} ${extra}`).toBe(true);
 const auditCount = (where: string) => Number(sql(`select count(*) from "AuditLog" where ${where}`));
 
-const NAV = ["Přehled", "Registrace a přihlášení", "Školní rok a třídy", "Moduly", "Upozornění", "Historie", "Diagnostika", "Ukázková data", "Semináře", "Dopisování"];
+// Menu je ve skupinách (F13): Přehled, Škola, Moduly (sekce modulů, pak zapnutí modulů), Provoz
+const NAV = ["Přehled", "Školní rok a třídy", "Registrace a přihlášení", "Semináře", "Dopisování", "Moduly", "Upozornění", "Historie", "Diagnostika", "Ukázková data"];
 
 test("administrace: boční menu s oddíly, staré adresy fungují, na mobilu je výběr", async ({ browser }) => {
   resetDb();

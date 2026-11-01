@@ -26,7 +26,8 @@ async function todosCard(user: User): Promise<DashboardCard | null> {
   return {
     id: "core.todos",
     title: "Co udělat",
-    order: 5,
+    // Admin má „Co udělat“ jako první, učitel až za svými termíny a semináři (F13)
+    order: can(user.role, "core.admin") ? 5 : 30,
     size: "md",
     href: "/admin",
     linkLabel: todos.length > shown.length ? `Všech ${todos.length} položek` : "Přehled administrace",

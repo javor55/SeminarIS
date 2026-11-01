@@ -17,7 +17,7 @@ export async function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex flex-col gap-6 md:flex-row md:items-start" data-testid="admin-shell">
-      <AdminNav items={sections.map((s) => ({ label: s.label, href: s.href, match: s.match }))} />
+      <AdminNav items={sections.map((s) => ({ label: s.label, href: s.href, match: s.match, group: s.group ?? "modules" }))} />
       <div className="min-w-0 flex-1 space-y-6">{children}</div>
     </div>
   );

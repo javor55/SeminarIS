@@ -1,5 +1,6 @@
 "use server";
 
+import { roomText } from "@/lib/room";
 import { safeAction } from "@/lib/safe-action";
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
@@ -334,8 +335,8 @@ export async function createSessions(input: SessionInput & { occurrences: { star
         entityId: ids[0],
         summary:
           intervals.length === 1
-            ? `Vypsán termín dopisování ${formatTimeRange(intervals[0].start, intervals[0].end)}, učebna ${clean.room}, dozor ${teacher ? textName(teacher) : ""}`
-            : `Vypsána řada ${intervals.length} termínů dopisování od ${formatTimeRange(intervals[0].start, intervals[0].end)}, učebna ${clean.room}, dozor ${teacher ? textName(teacher) : ""}`,
+            ? `Vypsán termín dopisování ${formatTimeRange(intervals[0].start, intervals[0].end)}, ${roomText(clean.room)}, dozor ${teacher ? textName(teacher) : ""}`
+            : `Vypsána řada ${intervals.length} termínů dopisování od ${formatTimeRange(intervals[0].start, intervals[0].end)}, ${roomText(clean.room)}, dozor ${teacher ? textName(teacher) : ""}`,
         data: { sessionIds: ids, seriesId, room: clean.room, capacity: clean.capacity, subjects: subjects.map((x) => x.name), teacherId: clean.teacherId },
       });
     });
@@ -500,7 +501,7 @@ export async function deleteSession(sessionId: string) {
         action: "makeup.session.delete",
         entityType: "makeupSession",
         entityId: s.id,
-        summary: `Smazán termín dopisování ${formatTimeRange(s.startsAt, s.endsAt)}, učebna ${s.room} (dozor ${textName(s.teacher)})`,
+        summary: `Smazán termín dopisování ${formatTimeRange(s.startsAt, s.endsAt)}, ${roomText(s.room)} (dozor ${textName(s.teacher)})`,
         data: { startsAt: s.startsAt, endsAt: s.endsAt, room: s.room },
       });
     });

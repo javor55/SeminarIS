@@ -4,6 +4,7 @@ import { unwrap, unwrapAsync } from "@/lib/action-result";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { roomText } from "@/lib/room";
 import { Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,8 @@ export function SessionDetailView({
   const router = useRouter();
   const started = new Date(session.startsAt) <= new Date();
   const cancelled = !!session.cancelledAt;
+  const roomLabel = roomText(session.room).replace(/^./, (c) => c.toUpperCase());
+  const withNote = registrations.filter((r) => r.note).length;
 
   async function run(action: () => Promise<unknown>, success: string) {
     try {
@@ -135,7 +138,7 @@ export function SessionDetailView({
         description={
           <div className="space-y-2">
             <p>
-              Učebna {session.room} · dozor {session.teacherName} · zapsáno {session.registeredCount}/{session.capacity} ·
+              {roomLabel} · dozor {session.teacherName} · zapsáno {session.registeredCount}/{session.capacity} ·
               změny do {deadlineText(session.changeDeadlineMinutes)}
             </p>
             <SubjectBadges subjects={session.subjects} />
@@ -144,7 +147,7 @@ export function SessionDetailView({
           </div>
         }
         actions={
-          <>
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap [&_button]:min-h-11 sm:[&_button]:min-h-0" data-testid="session-actions">
             <Button variant="outline" onClick={() => window.print()}>
               <Printer className="w-4 h-4 mr-1" /> Tisk
             </Button>
@@ -169,13 +172,26 @@ export function SessionDetailView({
                 trigger={<Button variant="outline" className="text-danger">Smazat</Button>}
               />
             )}
-          </>
+          </div>
         }
       />
 
+      <dl className="grid grid-cols-3 gap-2 sm:gap-3" data-testid="session-stats">
+        {[
+          ["Přihlášeno", registrations.length, "session-stat-registered"],
+          ["Volných míst", Math.max(0, session.capacity - registrations.length), "session-stat-free"],
+          ["S poznámkou", withNote, "session-stat-notes"],
+        ].map(([label, value, id]) => (
+          <div key={id} className="rounded-xl border bg-card p-3 shadow-sm sm:p-4" data-testid={id as string}>
+            <dd className="text-2xl font-bold leading-tight">{value}</dd>
+            <dt className="text-xs text-muted-foreground sm:text-sm">{label}</dt>
+          </div>
+        ))}
+      </dl>
+
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Zapsaní studenti</CardTitle>
+          <CardTitle>Přihlášení studenti</CardTitle>
         </CardHeader>
         <CardContent>
           {registrations.length === 0 ? (
@@ -226,8 +242,17 @@ export function SessionDetailView({
                         </>
                       }
                     >
-                      <div className="text-sm">{subjectsList(r)}</div>
-                      {r.note && <div className="text-sm italic text-muted-foreground">„{r.note}“</div>}
+                      <div className="flex flex-wrap gap-1.5" data-testid="registration-subjects">
+                        {r.subjects.map((x) => (
+                          <Badge key={x.id} variant="default" className="font-normal">{x.name}</Badge>
+                        ))}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {r.subjects.map((x) => `${x.name}: ${x.subjectTeacherName ?? "vyučující neuveden"}`).join(" · ")}
+                      </div>
+                      {r.note && (
+                        <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm" data-testid="registration-note">{r.note}</div>
+                      )}
                       <div className="space-y-1 text-sm">
                         <div className="text-muted-foreground">Docházka</div>
                         {attendanceControl(r, "w-full", false)}

@@ -1,3 +1,4 @@
+import { roomText } from "@/lib/room";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +53,7 @@ export async function UserMakeupPanel({ userId, role, scope }: { userId: string;
                 {registrations.map((r) => (
                   <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2" data-testid="user-makeup-registration" data-attendance={r.attendance}>
                     <span>
-                      <strong>{formatTimeRange(r.session.startsAt, r.session.endsAt)}</strong>, učebna {r.session.room}
+                      <strong>{formatTimeRange(r.session.startsAt, r.session.endsAt)}</strong>, {roomText(r.session.room)}
                       <span className="text-muted-foreground"> – {r.subjects.map((s) => s.subject.name).join(", ") || "bez předmětu"}</span>
                     </span>
                     {r.session.cancelledAt ? <Badge variant="destructive">termín zrušen</Badge> : <Badge variant={r.attendance === "ATTENDED" ? "default" : "outline"}>{ATTENDANCE_LABELS[r.attendance]}</Badge>}
@@ -77,7 +78,7 @@ export async function UserMakeupPanel({ userId, role, scope }: { userId: string;
                 {supervised.map((s) => (
                   <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2" data-testid="user-makeup-session">
                     <Link href={`/makeup/sessions/${s.id}`} className="hover:underline">
-                      <strong>{formatTimeRange(s.startsAt, s.endsAt)}</strong>, učebna {s.room}
+                      <strong>{formatTimeRange(s.startsAt, s.endsAt)}</strong>, {roomText(s.room)}
                     </Link>
                     <span className="text-xs text-muted-foreground">
                       zapsáno {s._count.registrations}/{s.capacity}

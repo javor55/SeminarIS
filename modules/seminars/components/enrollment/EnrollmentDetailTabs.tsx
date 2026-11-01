@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { OPEN_TAB_EVENT } from "@/modules/seminars/components/enrollment/EnrollmentProgressPanel";
 import { UnenrolledTab } from "@/modules/seminars/components/enrollment/UnenrolledTab";
 import { Button } from "@/components/ui/button";
 
@@ -20,6 +21,15 @@ export function EnrollmentDetailTabs({
 }) {
   const [tab, setTab] = useState<Tab>("enrollments");
   const [count, setCount] = useState<number | null>(null);
+
+  // Panel průběhu zápisu (v záložce Zápisy) umí přepnout na Nezapsané
+  useEffect(() => {
+    const open = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === "unenrolled") setTab("unenrolled");
+    };
+    window.addEventListener(OPEN_TAB_EVENT, open);
+    return () => window.removeEventListener(OPEN_TAB_EVENT, open);
+  }, []);
 
   return (
     <div className="space-y-6">
