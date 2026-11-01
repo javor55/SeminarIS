@@ -132,7 +132,7 @@ test("hromadná akce z Uživatelů: přidat do publika zápisu (náhled, audit, 
   addStudents();
   sql(`insert into "EnrollmentWindowAudience"(id,"windowId",type,"classGroupId",key) values ('a1','${WINDOW}','CLASS','${classId(3, "A")}','CLASS:${classId(3, "A")}')`);
   // druhé okno bez omezení publika (= všichni)
-  sql(`insert into "EnrollmentWindow"(id,name,status,"startsAt","endsAt","visibleToStudents","createdById","updatedAt") values ('w_all','Zápis pro všechny','OPEN',now()-interval '1 hour',now()+interval '30 days',true,'usr_admin',now())`);
+  sql(`insert into "EnrollmentWindow"(id,name,"startsAt","endsAt",published,"createdById","updatedAt") values ('w_all','Zápis pro všechny',now()-interval '1 hour',now()+interval '30 days',true,'usr_admin',now())`);
 
   const pa = await login(browser, "admin@skola.cz");
   const open = async () => {
@@ -210,7 +210,8 @@ test("pravidla bloků: povinný/nepovinný, min a max zápisů, nezapsaní poč�
   check("default rules shown on the block", (await pa.locator("h2", { hasText: "Blok 1 – povinné" }).locator("xpath=..").getByTestId("block-rules").innerText()) === "povinný, 1 zápis");
   check("block 3 shows min–max", (await pa.locator("h2", { hasText: "Blok 3 – dva" }).locator("xpath=..").getByTestId("block-rules").innerText()) === "povinný, 2 zápisy");
   const card = (name: string) => pa.locator("h2", { hasText: name }).locator('xpath=ancestor::div[contains(@class,"rounded-lg")][1]');
-  await card("Blok 2 – volitelné").getByRole("button", { name: "Upravit", exact: true }).first().click();
+  await card("Blok 2 – volitelné").getByTestId("block-menu").click();
+  await pa.getByRole("menuitem", { name: "Upravit blok" }).click();
   await pa.locator("#block-required").click();
   await pa.fill("#block-max", "2");
   await pa.getByRole("button", { name: "Uložit", exact: true }).click();
@@ -247,11 +248,13 @@ test("pravidla bloků: povinný/nepovinný, min a max zápisů, nezapsaní poč�
   check("third enrollment refused by the block maximum", (await toastText(jan)).includes("nejvyšší povolený počet zápisů (2)"));
   check("still three", enrolled("jan.student@skola.cz") === 3);
   // v bloku s max 1 se zápis přepisuje jednou transakcí (původní zůstane, když nový selže)
+  // student kód výskytu nevidí: výskyt B poznáme podle kapacity 14 (obsazeno 1/14)
+  sql(`update "SubjectOccurrence" set capacity=14 where id='occ_aj_b_b1'`);
   await enrollPage(jan);
   sql(`update "SubjectOccurrence" set capacity=1 where id='occ_aj_b_b1'`);
   sql(`insert into "StudentEnrollment"(id,"studentId","subjectOccurrenceId","createdById","updatedAt") values ('blocker','usr_stud2','occ_aj_b_b1','usr_stud2',now())`);
   sql(`delete from "StudentEnrollment" where id='enroll_stud2_aj'`);
-  await jan.locator("tr", { hasText: "AJT/B" }).getByTestId("enroll-button").click();
+  await jan.locator("tr", { hasText: "/14" }).getByTestId("enroll-button").click();
   await jan.getByRole("button", { name: "Přepsat" }).click();
   check("failed switch keeps the original enrollment", (await toastText(jan)).includes("Kapacita") && sql(`select count(*) from "StudentEnrollment" where "studentId"='usr_stud1' and "subjectOccurrenceId"='occ_prog_b1'`) === "1");
 
@@ -265,7 +268,8 @@ test("pravidla bloků: povinný/nepovinný, min a max zápisů, nezapsaní poč�
   // maximum nejde snížit pod zápisy, které studenti už mají
   await pa.goto("/enrollments/" + WINDOW);
   await pa.waitForLoadState("networkidle");
-  await card("Blok 3 – dva").getByRole("button", { name: "Upravit", exact: true }).first().click();
+  await card("Blok 3 – dva").getByTestId("block-menu").click();
+  await pa.getByRole("menuitem", { name: "Upravit blok" }).click();
   await pa.fill("#block-min", "1");
   await pa.fill("#block-max", "1");
   await pa.getByRole("button", { name: "Uložit", exact: true }).click();
@@ -290,7 +294,7 @@ test("pravidla okna: zákaz odepsání, termín změn, viditelnost zapsaných, u
   check("rules change audited", auditCount(`action='seminars.window.update' and summary like '%student se může sám odepsat: ano → ne%' and summary like '%jména i počty%'`) === 1, sql(`select summary from "AuditLog" where action='seminars.window.update'`));
   await pa.reload();
   await pa.waitForLoadState("networkidle");
-  check("header summarizes the rules", (await pa.getByTestId("window-rules-summary").innerText()).includes("Odepsání studentem: ne"));
+  check("header summarizes the rules", (await pa.getByTestId("window-rules-summary").innerText()).includes("Student se nemůže sám odepsat"));
   // vlastní termín změn z formuláře (výchozí hodnota = konec okna)
   await pa.getByRole("button", { name: "Upravit zápis" }).click();
   await pa.locator("#allowSelfUnenroll").click();
@@ -316,7 +320,7 @@ test("pravidla okna: zákaz odepsání, termín změn, viditelnost zapsaných, u
   await enrollPage(jan);
   check("button disabled with a reason after reload", await row(jan, "Programování mikrokontrolérů").getByTestId("unenroll-button").isDisabled());
   // přepsání v bloku s max 1 je také zakázáno (zápis zůstává)
-  await jan.locator("tr", { hasText: "AJT/A" }).getByTestId("enroll-button").click();
+  await jan.locator("tr", { hasText: "Angličtina" }).first().getByTestId("enroll-button").click();
   check("switching refused as well", (await toastText(jan)).includes("nemůžete odepsat ani přepsat") || (await toastText(jan)).includes("nelze změnit"));
 
   // termín změn uplynul: odepsání nejde, nový zápis do prázdného bloku ano
@@ -333,7 +337,7 @@ test("pravidla okna: zákaz odepsání, termín změn, viditelnost zapsaných, u
   // viditelnost výsledků: jména
   sql(`update "EnrollmentWindow" set "resultsVisibility"='NAMES', "changesUntil"=null where id='${WINDOW}'`);
   await enrollPage(jan);
-  await jan.locator("tr", { hasText: "AJT/A" }).getByTestId("participants-button").click();
+  await jan.locator("tr", { hasText: "Angličtina" }).first().getByTestId("participants-button").click();
   await jan.waitForSelector("[data-testid=participants-dialog] [data-testid=participant]");
   const names = await jan.getByTestId("participants-dialog").innerText();
   check("student sees the names when the window allows it", names.includes("Studentová Eva") && !names.includes("@"), names);
@@ -350,7 +354,8 @@ test("výskyt omezený na třídu: viditelnost, zápis, štítek předmětu, nez
   const pa = await login(browser, "admin@skola.cz");
   await pa.goto("/enrollments/" + WINDOW);
   await pa.waitForLoadState("networkidle");
-  await row(pa, "Základy IoT").getByRole("button", { name: "Upravit", exact: true }).click();
+  await row(pa, "Základy IoT").getByTestId("occurrence-menu").click();
+  await pa.getByRole("menuitem", { name: "Upravit", exact: true }).click();
   await pa.locator('#occurrence-classes [data-class="3.B"]').click();
   await pa.getByRole("button", { name: "Uložit", exact: true }).click();
   await toastText(pa);
@@ -404,7 +409,7 @@ test("duplikace okna: bloky, výskyty, publikum a pravidla se zkopírují, zápi
   await pa.waitForURL((u) => u.pathname.startsWith("/enrollments/") && !u.pathname.endsWith(WINDOW), { timeout: 15_000 });
 
   const copy = sql(`select id from "EnrollmentWindow" where name like '% (kopie)'`);
-  check("copy exists as a draft, hidden, with the rules", sql(`select status||'/'||"visibleToStudents"||'/'||"allowSelfUnenroll"||'/'||"resultsVisibility"||'/'||("changesUntil" is not null)||'/'||"reminderDaysBefore"||'/'||coalesce("reminderSentOn",'-')||'/'||("openedNotifiedAt" is null) from "EnrollmentWindow" where id='${copy}'`) === "DRAFT/false/false/NAMES/true/3/-/true", sql(`select status from "EnrollmentWindow" where id='${copy}'`));
+  check("copy exists as a draft, hidden, with the rules", sql(`select published||'/'||("closedEarlyAt" is null)||'/'||"allowSelfUnenroll"||'/'||"resultsVisibility"||'/'||("changesUntil" is not null)||'/'||"reminderDaysBefore"||'/'||coalesce("reminderSentOn",'-')||'/'||("openedNotifiedAt" is null) from "EnrollmentWindow" where id='${copy}'`) === "false/true/false/NAMES/true/3/-/true", sql(`select published from "EnrollmentWindow" where id='${copy}'`));
   check("blocks copied with rules", sql(`select string_agg(name||':'||required||':'||"minEnrollments"||'-'||"maxEnrollments", '|' order by "order") from "Block" where "enrollmentWindowId"='${copy}'`) === sql(`select string_agg(name||':'||required||':'||"minEnrollments"||'-'||"maxEnrollments", '|' order by "order") from "Block" where "enrollmentWindowId"='${WINDOW}'`));
   check("occurrences copied", sql(`select count(*) from "SubjectOccurrence" o join "Block" b on b.id=o."blockId" where b."enrollmentWindowId"='${copy}'`) === sql(`select count(*) from "SubjectOccurrence" o join "Block" b on b.id=o."blockId" where b."enrollmentWindowId"='${WINDOW}'`) && sql(`select count(*) from "SubjectOccurrence" o join "Block" b on b.id=o."blockId" where b."enrollmentWindowId"='${copy}'`) === "7");
   check("occurrence restrictions copied", sql(`select count(*) from "SubjectOccurrence" o join "Block" b on b.id=o."blockId" where b."enrollmentWindowId"='${copy}' and (o."restrictGrades"='{3}' or exists (select 1 from "_OccurrenceClasses" oc where oc."B"=o.id))`) === "2");

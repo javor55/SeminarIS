@@ -163,7 +163,7 @@ export function ClassesTab({
                                       <NativeSelect
                                         compact
                                         className="w-[150px]"
-                                        aria-label={`Přesunout do třídy – ${formatName(u, "text")}`}
+                                        aria-label={`Přesunout do třídy – ${formatName(u, "list")}`}
                                         disabled={busy}
                                         value=""
                                         onChange={(e) => {

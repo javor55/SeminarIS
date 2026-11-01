@@ -21,7 +21,7 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F7 Učitel v administraci, vypínač hromadného e-mailu, jednotné UI, úklid lintu (PR #12)
 - [x] F8 Dashboard jako přehled (karty z modulů) a stránka Zápisy pro studenty (PR #14)
 - [x] F9 Ukázková data (naplnit / smazat) pro prezentaci (PR #15)
-- [ ] F10 Opravy z procházení skutečných obrazovek (chyby, workflow, sjednocení)
+- [x] F10 Opravy z procházení skutečných obrazovek (chyby, workflow, sjednocení)
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,

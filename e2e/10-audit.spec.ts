@@ -29,7 +29,7 @@ test("historie: odepsání v seminářích a z dopisování, nastavení, filtr a
   await pt.getByRole("button", { name: "Odepsat", exact: true }).last().click();
   await pt.waitForTimeout(1500);
   check("registration removed", sql(`select count(*) from "MakeupRegistration"`) === "0");
-  check("removal audited with readable summary", auditCount(`action='makeup.registration.remove' and "actorId"='usr_teacher' and summary like 'Učitel Petr odepsal(a) studenta Student Jan z termínu%Matematika%'`) === 1);
+  check("removal audited with readable summary", auditCount(`action='makeup.registration.remove' and "actorId"='usr_teacher' and summary like 'Petr Učitel odepsal(a) studenta Jan Student z termínu%Matematika%'`) === 1);
 
   // 3) admin změní nastavení: vypne registraci
   await pa.goto("/admin/registration");
@@ -42,7 +42,7 @@ test("historie: odepsání v seminářích a z dopisování, nastavení, filtr a
   await pa.goto("/admin/history");
   await expect(pa.getByTestId("audit-row").first()).toBeVisible();
   const text = await pa.getByTestId("history-card").innerText();
-  check("history lists all three", text.includes("se odepsal(a) z předmětu") && text.includes("odepsal(a) studenta Student Jan") && text.includes("Registrace nových uživatelů"));
+  check("history lists all three", text.includes("se odepsal(a) z předmětu") && text.includes("odepsal(a) studenta Jan Student") && text.includes("Registrace nových uživatelů"));
   // filtr oblasti
   await pa.selectOption("#h-area", "seminars");
   await expect(pa.getByTestId("audit-row")).toHaveCount(1);

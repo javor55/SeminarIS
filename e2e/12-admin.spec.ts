@@ -83,7 +83,7 @@ test("přehled „co udělat“: položky jádra i modulů s odkazy, po vyřeše
   check("pending accounts links to approvals", (await todo("core.pending-accounts").getByRole("link").getAttribute("href")) === "/users?tab=approvals");
   check("students without class listed", (await todo("core.students-without-class").count()) === 1);
   // seminars: otevřené okno, ve kterém někdo chybí
-  const windowId = sql(`select id from "EnrollmentWindow" where status='OPEN' limit 1`);
+  const windowId = sql(`select id from "EnrollmentWindow" where published and "startsAt" < now() and "endsAt" > now() limit 1`);
   const unenrolled = pa.locator(`[data-todo="seminars.unenrolled.${windowId}"]`);
   check("seminars todo present and links to the window", (await unenrolled.count()) === 1 && (await unenrolled.getByRole("link").getAttribute("href")) === `/enrollments/${windowId}`);
   // makeup
@@ -170,7 +170,7 @@ test("nastavení přes registr: formulář z deklarací, validace, historie změ
   await pa.locator("#setting-seminars-defaultVisibleToStudents").click();
   await toastText(pa);
   check("boolean stored as true/false", sql(`select value from "SystemSetting" where key='seminars.defaultVisibleToStudents'`) === "true");
-  check("boolean change audited", auditCount(`summary='Nový zápis je hned viditelný studentům: vypnuto → zapnuto'`) === 1);
+  check("boolean change audited", auditCount(`summary='Nový zápis je hned zveřejněný: vypnuto → zapnuto'`) === 1);
 
   // výchozí hodnoty se použijí v novém termínu i v novém zápisu
   await pa.goto("/makeup");
@@ -179,7 +179,7 @@ test("nastavení přes registr: formulář z deklarací, validace, historie změ
   await pa.keyboard.press("Escape");
   await pa.goto("/enrollments");
   await pa.getByRole("button", { name: "Vytvořit nový zápis" }).first().click();
-  await expect(pa.locator("#visibleToStudents")).toHaveAttribute("data-state", "checked");
+  await expect(pa.locator("#published")).toHaveAttribute("data-state", "checked");
 
   // stávající nastavení jádra zůstala pod původními klíči a v původním tvaru
   await pa.goto("/admin/registration");

@@ -275,10 +275,12 @@ export function EnrollmentHeader({
                   {ew.resultsVisibility === "NAMES" ? "studenti vidí jména zapsaných" : "studenti vidí jen počty"}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-muted-foreground" />
-                <span data-testid="window-audience">Pro: {ew.audienceView?.summary ?? "vybraní studenti"}</span>
-              </div>
+              {ew.audienceView && (
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <span data-testid="window-audience">Pro: {ew.audienceView.summary}</span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2 pl-6 border-l border-border">
