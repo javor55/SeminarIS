@@ -37,6 +37,7 @@ import {
 import { SubjectBadges, deadlineText } from "./common";
 import { SessionFormDialog } from "./SessionFormDialog";
 import { MoveDialog } from "./RegistrationDialogs";
+import { MobileCard, MobileCardList, ResponsiveView } from "@/components/ui/mobile-card";
 import { PageHeader } from "@/components/page-header";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -74,6 +75,52 @@ export function SessionDetailView({
         s.registeredCount < s.capacity &&
         r.subjects.every((x) => s.subjects.some((y) => y.id === x.id))
     );
+
+  const attendanceControl = (r: MakeupRegistrationItem, className: string, compact = true) =>
+    started && !cancelled ? (
+      <NativeSelect
+        aria-label={`Docházka – ${r.studentName}`}
+        compact={compact} className={className}
+        value={r.attendance}
+        onChange={(e) =>
+          run(() => unwrapAsync(setAttendance(r.id, e.target.value as MakeupAttendanceValue)), "Docházka uložena.")
+        }
+      >
+        {(Object.keys(ATTENDANCE_LABELS) as MakeupAttendanceValue[]).map((a) => (
+          <option key={a} value={a}>{ATTENDANCE_LABELS[a]}</option>
+        ))}
+      </NativeSelect>
+    ) : (
+      <span>{ATTENDANCE_LABELS[r.attendance]}</span>
+    );
+
+  const moveButton = (r: MakeupRegistrationItem, className?: string) => (
+    <MoveDialog
+      title={`Přesunout – ${r.studentName}`}
+      description="Student se přesune i se zvolenými předměty a poznámkou."
+      candidates={candidatesFor(r)}
+      onMove={(target) => unwrapAsync(moveRegistration(r.id, target))}
+      trigger={<Button size="sm" variant="outline" className={className}>Přesunout</Button>}
+    />
+  );
+
+  const removeButton = (r: MakeupRegistrationItem) => (
+    <ConfirmAction
+      title={`Odepsat ${r.studentName}?`}
+      description="Student bude z termínu odepsán."
+      actionLabel="Odepsat"
+      onConfirm={() => run(() => unwrapAsync(removeRegistration(r.id)), "Student odepsán.")}
+      trigger={<Button size="sm" variant="outline" className="text-danger">Odepsat</Button>}
+    />
+  );
+
+  const subjectsList = (r: MakeupRegistrationItem) =>
+    r.subjects.map((x) => (
+      <div key={x.id}>
+        {x.name}
+        <span className="text-muted-foreground"> ({x.subjectTeacherName ?? "vyučující neuveden"})</span>
+      </div>
+    ));
 
   return (
     <div className="space-y-6">
@@ -134,6 +181,8 @@ export function SessionDetailView({
           {registrations.length === 0 ? (
             <p className="text-sm text-muted-foreground">Zatím nikdo.</p>
           ) : (
+            <ResponsiveView
+              desktop={
             <Table data-testid="registrations">
               <TableHeader>
                 <TableRow>
@@ -150,53 +199,44 @@ export function SessionDetailView({
                   <TableRow key={r.id} data-student={r.studentName}>
                     <TableCell className="font-medium">{r.studentName}</TableCell>
                     <TableCell>{r.classLabel ?? "—"}</TableCell>
-                    <TableCell>
-                      {r.subjects.map((x) => (
-                        <div key={x.id}>
-                          {x.name}
-                          <span className="text-muted-foreground"> ({x.subjectTeacherName ?? "vyučující neuveden"})</span>
-                        </div>
-                      ))}
-                    </TableCell>
+                    <TableCell>{subjectsList(r)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{r.note}</TableCell>
-                    <TableCell>
-                      {started && !cancelled ? (
-                        <NativeSelect
-                          aria-label={`Docházka – ${r.studentName}`}
-                          compact className="w-[170px] print:hidden"
-                          value={r.attendance}
-                          onChange={(e) =>
-                            run(() => unwrapAsync(setAttendance(r.id, e.target.value as MakeupAttendanceValue)), "Docházka uložena.")
-                          }
-                        >
-                          {(Object.keys(ATTENDANCE_LABELS) as MakeupAttendanceValue[]).map((a) => (
-                            <option key={a} value={a}>{ATTENDANCE_LABELS[a]}</option>
-                          ))}
-                        </NativeSelect>
-                      ) : (
-                        <span>{ATTENDANCE_LABELS[r.attendance]}</span>
-                      )}
-                    </TableCell>
+                    <TableCell>{attendanceControl(r, "w-[170px] print:hidden")}</TableCell>
                     <TableCell className="text-right whitespace-nowrap print:hidden">
-                      <MoveDialog
-                        title={`Přesunout – ${r.studentName}`}
-                        description="Student se přesune i se zvolenými předměty a poznámkou."
-                        candidates={candidatesFor(r)}
-                        onMove={(target) => unwrapAsync(moveRegistration(r.id, target))}
-                        trigger={<Button size="sm" variant="outline" className="mr-2">Přesunout</Button>}
-                      />
-                      <ConfirmAction
-                        title={`Odepsat ${r.studentName}?`}
-                        description="Student bude z termínu odepsán."
-                        actionLabel="Odepsat"
-                        onConfirm={() => run(() => unwrapAsync(removeRegistration(r.id)), "Student odepsán.")}
-                        trigger={<Button size="sm" variant="outline" className="text-danger">Odepsat</Button>}
-                      />
+                      {moveButton(r, "mr-2")}
+                      {removeButton(r)}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+              }
+              mobile={
+                <MobileCardList data-testid="registrations-cards">
+                  {registrations.map((r) => (
+                    <MobileCard
+                      key={r.id}
+                      data-student={r.studentName}
+                      title={r.studentName}
+                      badge={r.classLabel ? <Badge variant="muted">{r.classLabel}</Badge> : undefined}
+                      actions={
+                        <>
+                          {moveButton(r)}
+                          {removeButton(r)}
+                        </>
+                      }
+                    >
+                      <div className="text-sm">{subjectsList(r)}</div>
+                      {r.note && <div className="text-sm italic text-muted-foreground">„{r.note}“</div>}
+                      <div className="space-y-1 text-sm">
+                        <div className="text-muted-foreground">Docházka</div>
+                        {attendanceControl(r, "w-full", false)}
+                      </div>
+                    </MobileCard>
+                  ))}
+                </MobileCardList>
+              }
+            />
           )}
         </CardContent>
       </Card>

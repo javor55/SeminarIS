@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { MobileCard, MobileCardField, MobileCardList, ResponsiveView } from "@/components/ui/mobile-card";
 import { formatMinutes, formatTimeRange } from "@/lib/datetime";
 import type { MakeupSessionItem } from "@/modules/makeup/types";
 
@@ -51,6 +52,8 @@ export function SessionsTable({
 }) {
   if (sessions.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
   return (
+    <ResponsiveView
+      desktop={
     <Table>
       <TableHeader>
         <TableRow>
@@ -81,5 +84,28 @@ export function SessionsTable({
         ))}
       </TableBody>
     </Table>
+      }
+      mobile={
+        <MobileCardList>
+          {sessions.map((s) => (
+            <MobileCard
+              key={s.id}
+              data-session={s.id}
+              className={s.cancelledAt ? "opacity-60" : undefined}
+              title={formatTimeRange(s.startsAt, s.endsAt)}
+              badge={s.cancelledAt ? <Badge variant="destructive">zrušeno</Badge> : undefined}
+              actions={action?.(s)}
+            >
+              {s.note && <div className="text-xs text-muted-foreground">{s.note}</div>}
+              <MobileCardField label="Učebna">{s.room}</MobileCardField>
+              <MobileCardField label="Dozor">{s.teacherName}</MobileCardField>
+              <MobileCardField label="Obsazeno"><CapacityBadge s={s} /></MobileCardField>
+              <MobileCardField label="Uzávěrka změn">{deadlineText(s.changeDeadlineMinutes)}</MobileCardField>
+              <SubjectBadges subjects={s.subjects} highlight={highlightSubjects} />
+            </MobileCard>
+          ))}
+        </MobileCardList>
+      }
+    />
   );
 }

@@ -22,7 +22,7 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F8 Dashboard jako přehled (karty z modulů) a stránka Zápisy pro studenty (PR #14)
 - [x] F9 Ukázková data (naplnit / smazat) pro prezentaci (PR #15)
 - [x] F10 Opravy z procházení skutečných obrazovek (chyby, workflow, sjednocení) (PR #16)
-- [ ] F11 Mobilní zobrazení: zápis a dopisování jako karty
+- [x] F11 Mobilní zobrazení: zápis a dopisování jako karty
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,

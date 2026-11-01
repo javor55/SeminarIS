@@ -31,6 +31,8 @@ import { Filter, Settings2, X } from "lucide-react";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 // Import pro popisky "Od:" / "Do:"
 import { Label } from "@/components/ui/label";
+import { MobileCardList } from "@/components/ui/mobile-card";
+import { useIsMobile } from "@/lib/use-is-mobile";
 
 type SelectFilterDef = {
   /** id sloupce (ColumnDef.accessorKey) pro filtrování */
@@ -75,6 +77,12 @@ export type DataTableProps<T> = {
   hideToolbar?: boolean;
   /** Skryje celý dolní panel (stránkování) */
   hideFooter?: boolean;
+  /**
+   * Karta jednoho řádku pro mobil (pod `md`). Když je zadaná, vykreslí se na mobilu místo
+   * tabulky karty pod sebou (vyhledávání, filtry a stránkování zůstávají); na počítači
+   * tabulka beze změny.
+   */
+  renderCard?: (_: T) => React.ReactNode;
 };
 
 export function DataTable<T>({
@@ -89,8 +97,10 @@ export function DataTable<T>({
   // 🔥 NOVÉ PROPS
   hideToolbar = false,
   hideFooter = false,
+  renderCard,
   forceRefresh: externalForceRefresh,
 }: DataTableProps<T>) {
+  const isMobile = useIsMobile();
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [columnFilters, setColumnFilters] = React.useState<{ id: string; value: unknown }[]>([]);
   const [, force] = React.useState(0);
@@ -209,7 +219,7 @@ export function DataTable<T>({
                   setGlobalFilter(e.target.value);
                   setPageIndex(0);
                 }}
-                className="h-8 w-[240px]"
+                className="h-8 w-full sm:w-[240px]"
               />
 
               {/* Filtry */}
@@ -220,7 +230,7 @@ export function DataTable<T>({
                     Filtry
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[500px] space-y-3" align="start">
+                <PopoverContent className="w-[min(500px,calc(100vw-2rem))] space-y-3" align="start">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-medium text-muted-foreground">
                       Filtry
@@ -235,7 +245,7 @@ export function DataTable<T>({
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                     {/* SELECT filtry (faceted) */}
                     {selectFilters.map((sf) => {
                       const col = table.getColumn(sf.columnId);
@@ -273,12 +283,12 @@ export function DataTable<T>({
                       const st = dateState[df.id] ?? {};
                       
                       return (
-                        <div key={df.id} className="space-y-2 col-span-2 border-t pt-2 mt-2">
+                        <div key={df.id} className="space-y-2 sm:col-span-2 border-t pt-2 mt-2">
                           <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                             {df.label}
                           </p>
                           
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             {/* Vstup "OD" */}
                             <div className="flex flex-col gap-1 text-left">
                               <Label className="text-[10px] font-medium text-muted-foreground">Od:</Label>
@@ -358,6 +368,15 @@ export function DataTable<T>({
         )}
 
         {/* Tabulka */}
+        {renderCard && isMobile ? (
+          <MobileCardList className="p-2" data-testid="mobile-cards">
+            {pageSlice.length ? (
+              pageSlice.map((row) => <React.Fragment key={row.id}>{renderCard(row.original as T)}</React.Fragment>)
+            ) : (
+              <p className="py-8 text-center text-sm text-muted-foreground">Nic nenalezeno.</p>
+            )}
+          </MobileCardList>
+        ) : (
         <div className="overflow-auto">
           <Table>
             <TableHeader>
@@ -403,6 +422,7 @@ export function DataTable<T>({
             </TableBody>
           </Table>
         </div>
+        )}
 
         {/* 🔥 PODMÍNĚNÉ RENDEROVÁNÍ FOOTERU */}
         {!hideFooter && (

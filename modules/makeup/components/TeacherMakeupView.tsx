@@ -12,6 +12,7 @@ import { ATTENDANCE_LABELS, type MakeupSessionItem } from "@/modules/makeup/type
 import { SessionsTable } from "./common";
 import { SessionFormDialog } from "./SessionFormDialog";
 import { SessionFilters } from "./SessionFilters";
+import { MobileCard, MobileCardField, MobileCardList, ResponsiveView } from "@/components/ui/mobile-card";
 import { PageHeader } from "@/components/page-header";
 
 type SubjectRegistration = Awaited<ReturnType<typeof getMySubjectRegistrations>>[number];
@@ -88,6 +89,8 @@ export function TeacherMakeupView({
             {subjectRegistrations.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nikdo.</p>
             ) : (
+              <ResponsiveView
+                desktop={
               <Table data-testid="subject-registrations">
                 <TableHeader>
                   <TableRow>
@@ -114,6 +117,26 @@ export function TeacherMakeupView({
                   ))}
                 </TableBody>
               </Table>
+                }
+                mobile={(
+                  <MobileCardList data-testid="subject-registrations-cards">
+                    {subjectRegistrations.map((r) => (
+                      <MobileCard
+                        key={`${r.registrationId}-${r.subjectName}`}
+                        title={formatTimeRange(r.startsAt, r.endsAt)}
+                        badge={r.cancelled ? <Badge variant="destructive">termín zrušen</Badge> : <Badge variant="muted">{ATTENDANCE_LABELS[r.attendance]}</Badge>}
+                      >
+                        <MobileCardField label="Student">
+                          {r.studentName}{r.classLabel && <span className="text-muted-foreground"> ({r.classLabel})</span>}
+                        </MobileCardField>
+                        <MobileCardField label="Předmět">{r.subjectName}</MobileCardField>
+                        <MobileCardField label="Kde / dozor">{r.room} · {r.supervisorName}</MobileCardField>
+                        {r.note && <div className="text-sm text-muted-foreground">{r.note}</div>}
+                      </MobileCard>
+                    ))}
+                  </MobileCardList>
+                )}
+              />
             )}
           </CardContent>
         </Card>
