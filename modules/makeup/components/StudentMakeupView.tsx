@@ -151,7 +151,7 @@ export function StudentMakeupView({
         title="Přihlásit se na dopisování?"
         submitLabel="Potvrdit přihlášku"
         onSubmit={(ids, note) => unwrapAsync(registerForSession(s.id, ids, note))}
-        trigger={<Button className="min-h-11 w-full">Přihlásit se</Button>}
+        trigger={<Button className="min-h-11 min-w-28">Přihlásit se</Button>}
       />
     );
   }
@@ -248,7 +248,7 @@ export function StudentMakeupView({
                 <p className="text-sm text-muted-foreground">
                   Termíny pro předmět <strong className="text-foreground">{subject.name}</strong>:
                 </p>
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
                   {terms.map((s) => {
                     const r = regBySession.get(s.id);
                     return (
@@ -256,23 +256,25 @@ export function StudentMakeupView({
                         key={s.id}
                         data-session={s.id}
                         data-registered={r ? "true" : "false"}
-                        className={cn("space-y-3 rounded-xl border bg-card p-4 shadow-sm", r && "border-success/60 bg-success/5")}
+                        className={cn("space-y-2 rounded-xl border bg-card p-3 shadow-sm sm:p-4", r && "border-success/60 bg-success/5")}
                       >
-                        <div className="space-y-0.5">
-                          <div className="font-semibold">{formatTimeRange(s.startsAt, s.endsAt)}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {roomText(s.room)} · dozor {s.teacherName}
+                        <div className="flex items-center gap-3">
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="font-semibold">{formatTimeRange(s.startsAt, s.endsAt)}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {roomText(s.room)} · dozor {s.teacherName}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              <span className={s.registeredCount >= s.capacity ? "font-semibold text-danger" : ""} data-testid="capacity">
+                                {freeText(s)}
+                              </span>
+                              {" · "}přihlásit se lze {s.changeDeadlineMinutes > 0 ? "nejpozději " : ""}{deadlineText(s.changeDeadlineMinutes)}
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            <span className={s.registeredCount >= s.capacity ? "font-semibold text-danger" : ""} data-testid="capacity">
-                              {freeText(s)}
-                            </span>
-                            {" · "}přihlásit se lze {s.changeDeadlineMinutes > 0 ? "nejpozději " : ""}{deadlineText(s.changeDeadlineMinutes)}
-                          </div>
-                          {s.note && <div className="text-xs text-muted-foreground">{s.note}</div>}
+                          <div className="max-w-[9rem] shrink-0">{termAction(s)}</div>
                         </div>
+                        {s.note && <div className="text-xs text-muted-foreground">{s.note}</div>}
                         <SubjectBadges subjects={s.subjects} highlight={[subject.id]} />
-                        {termAction(s)}
                       </div>
                     );
                   })}

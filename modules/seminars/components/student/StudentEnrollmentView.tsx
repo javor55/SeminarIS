@@ -327,7 +327,7 @@ export function StudentEnrollmentView({ enrollmentWindow: ew, currentUser, canEn
                     {block.options.length === 0 ? (
                       <p className="p-4 text-sm text-muted-foreground">V tomto bloku zatím není žádný seminář.</p>
                     ) : (
-                      <ul className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
+                      <ul className="divide-y px-2 pb-2 pt-1 sm:px-4">
                         {block.options.map((opt) => (
                           <OptionCard
                             key={opt.id}
@@ -519,78 +519,84 @@ function OptionCard({
       data-selected={opt.mine ? "true" : "false"}
       data-full={opt.full ? "true" : "false"}
       data-free={opt.free ?? ""}
-      className={cn(
-        "flex flex-col gap-2 rounded-lg border p-3",
-        opt.mine ? "border-success bg-success/10" : opt.full ? "bg-muted/40" : "bg-background"
-      )}
+      className={cn("rounded-lg px-2 py-2.5", opt.mine && "bg-success/10", opt.full && !opt.mine && "bg-muted/40")}
     >
-      <div className="space-y-0.5">
-        <div className={cn("font-semibold leading-snug", opt.full && "text-muted-foreground")}>
-          <Link href={`/subjects/${opt.subjectId}`} className="underline decoration-muted-foreground/60 underline-offset-4 hover:decoration-foreground">
-            {opt.name}
-          </Link>
-          {opt.subCode && (
-            <span className="ml-1 font-normal text-muted-foreground" data-testid="occurrence-group">
-              (skupina {opt.subCode})
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <div className={cn("break-words font-semibold leading-snug", opt.full && "text-muted-foreground")}>
+            <Link href={`/subjects/${opt.subjectId}`} className="underline decoration-muted-foreground/60 underline-offset-4 hover:decoration-foreground">
+              {opt.name}
+            </Link>
+            {opt.subCode && (
+              <span className="ml-1 font-normal text-muted-foreground" data-testid="occurrence-group">
+                (skupina {opt.subCode})
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+            <span>
+              {opt.teacher && <>{opt.teacher} · </>}
+              <span className={cn(opt.full && "font-semibold text-danger")} data-testid="occurrence-free">
+                {freeText(opt)}
+              </span>
             </span>
-          )}
+            {opt.capacity ? (
+              <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-muted md:inline-block" aria-hidden="true" title={`Obsazeno ${opt.enrolled} z ${opt.capacity}`}>
+                <span className={cn("block h-full rounded-full", opt.full ? "bg-danger" : "bg-foreground/70")} style={{ width: `${fill}%` }} />
+              </span>
+            ) : null}
+            {namesVisible && (
+              <button
+                type="button"
+                data-testid="participants-button"
+                className="-my-2 inline-flex min-h-11 items-center px-1 font-medium text-foreground underline underline-offset-4 md:min-h-8"
+                onClick={onNames}
+              >
+                Zapsaní
+              </button>
+            )}
+          </div>
         </div>
-        <div className="text-sm text-muted-foreground">
-          {opt.teacher && <>{opt.teacher} · </>}
-          <span className={cn(opt.full && "font-semibold text-danger")} data-testid="occurrence-free">
-            {freeText(opt)}
-          </span>
-        </div>
-      </div>
-      {opt.capacity ? (
-        <div className="hidden h-1.5 overflow-hidden rounded-full bg-muted md:block" aria-hidden="true" title={`Obsazeno ${opt.enrolled} z ${opt.capacity}`}>
-          <div className={cn("h-full rounded-full", opt.full ? "bg-danger" : "bg-foreground/70")} style={{ width: `${fill}%` }} />
-        </div>
-      ) : null}
-      <div className="mt-auto flex flex-wrap items-center gap-2">
-        {opt.mine ? (
-          <>
-            <Badge variant="success" className="h-8 gap-1 px-3 text-sm md:h-6 md:text-xs" data-testid="selected-badge">
-              <Check className="h-3.5 w-3.5" aria-hidden="true" /> Vybráno
-            </Badge>
-            {interactive && (
+        <div className="flex shrink-0 items-center gap-2">
+          {opt.mine ? (
+            <>
+              <Badge variant="success" className="h-8 gap-1 px-2.5 text-sm md:h-6 md:text-xs" data-testid="selected-badge">
+                <Check className="h-3.5 w-3.5" aria-hidden="true" /> Vybráno
+              </Badge>
+              {interactive && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-11 text-danger md:h-8"
+                  disabled={busy || !!changeBlocked}
+                  title={changeBlocked}
+                  data-testid="unenroll-button"
+                  onClick={onUnenroll}
+                >
+                  Odepsat
+                </Button>
+              )}
+            </>
+          ) : (
+            interactive && (
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
-                className="h-11 min-w-24 text-danger md:h-8"
-                disabled={busy || !!changeBlocked}
-                title={changeBlocked}
-                data-testid="unenroll-button"
-                onClick={onUnenroll}
+                variant={opt.full ? "secondary" : "default"}
+                className="h-11 min-w-24 md:h-8"
+                disabled={busy || opt.full}
+                data-testid="enroll-button"
+                data-action={switching ? "switch" : "enroll"}
+                onClick={onPick}
               >
-                Odepsat
+                {opt.full ? "Plno" : switching ? "Vyměnit" : "Vybrat"}
               </Button>
-            )}
-          </>
-        ) : (
-          interactive && (
-            <Button
-              type="button"
-              size="sm"
-              variant={opt.full ? "secondary" : "default"}
-              className="h-11 min-w-24 md:h-8"
-              disabled={busy || opt.full}
-              data-testid="enroll-button"
-              data-action={switching ? "switch" : "enroll"}
-              onClick={onPick}
-            >
-              {opt.full ? "Plno" : switching ? "Vyměnit" : "Vybrat"}
-            </Button>
-          )
-        )}
-        {namesVisible && (
-          <Button type="button" size="sm" variant="ghost" className="h-11 md:h-8" data-testid="participants-button" onClick={onNames}>
-            Zapsaní
-          </Button>
-        )}
+            )
+          )}
+        </div>
       </div>
-      {opt.mine && interactive && changeBlocked && <p className="text-xs text-muted-foreground">{changeBlocked}</p>}
+      {opt.mine && interactive && changeBlocked && <p className="mt-1 text-xs text-muted-foreground">{changeBlocked}</p>}
     </li>
   );
 }

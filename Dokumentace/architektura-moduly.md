@@ -569,6 +569,10 @@ navigace zmizely, stránky zůstávají po URL. Učitel, admin a host mají navi
 - **Dopisování** (`StudentMakeupView`): Moje přihlášky (`data-registration`, `data-session-id`) a čipy předmětů
   (`data-subject-chip`); po výběru čipu karty termínů (`data-session`) s tlačítkem Přihlásit se → dialog s předvyplněným
   předmětem a poznámkou pro vyučujícího (`MakeupRegistration.note`, bez migrace).
+- **Kompaktní řádky (F14)**: výskyty v bloku jsou seznam řádků (název + malý řádek učitel · volná místa vlevo, tlačítko
+  Vybrat / Vyměnit / Vybráno + Odepsat / Plno vpravo, na telefonu min. 44 px); termíny v dopisování mají datum a
+  tlačítko na jednom řádku. Přehled `/dashboard` má nadpis „Přehled“ (bez uvítání). `e2e/24-layout.spec.ts` hlídá, že se
+  na hlavních stránkách všech rolí (390×844 a 1280×800) prvky nepřekrývají/nelepí a stránka nepřetéká.
 - E2E: `e2e/22-student-ui.spec.ts` (navigace podle stavu, kroky zápisu, Vyměnit, nepovinný blok, dopisování s poznámkou,
   host), mobil v `e2e/21-mobile.spec.ts`; helpery `occ`, `pickSubjectChip`, `waitForAppHome`.
 

@@ -28,7 +28,7 @@ export default async function DashboardPage() {
         <StudentEmptyState />
       ) : (
         <PageHeader
-          title={`Vítejte, ${user.firstName}`}
+          title="Přehled"
           description={cards.length === 0 ? "Momentálně tu pro vás není nic aktuálního – žádný otevřený zápis ani termín. Další agendu najdete v menu." : `${formatDate(new Date())} · co je právě aktuální.`}
         />
       )}
