@@ -25,6 +25,8 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F11 Mobilní zobrazení: zápis a dopisování jako karty (PR #17)
 - [x] F12 Zjednodušené rozhraní pro studenta (jen Zápis seminářů a Dopisování, zápis po krocích) (PR #18)
 - [x] F13 Učitel a administrátor ve stejném stylu (bez ztráty jakékoli funkce) (PR #19)
+- [ ] F14 Kompaktnější zápis, bez uvítání, opravy překrývání
+- [ ] F15 Zbytek aplikace ve stejném stylu
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,
@@ -432,3 +434,31 @@ Drobnost: „učebna Učebna 2.04“ opraveno (`roomText`).
 - Export do Excelu (.xlsx; dnes CSV).
 - Záložka Studenti pro učitele; „Zapsat studenta ručně“ z panelu Chybí dokončit; přidání studenta na termín učitelem.
 - Počty u položek bočního menu administrace.
+
+## F14 Kompaktnější zápis, bez uvítání, opravy překrývání
+Rozhodnutí majitele po F13: „Přidat studenta na termín“ učitelem **nedělat** (zůstává jak bylo).
+1. **Bez uvítání:** na přehledu (`/dashboard`) vynechat „Vítejte, …“; nadpis stránky = „Přehled“
+   (datum klidně v podtitulku). Upravit E2E, které hlídají „Vítejte“.
+2. **Kompaktnější zápis studenta** (`/zapisy/[id]`, F12): tlačítko Vybrat / Vyměnit / Vybráno / Plno
+   na **jednom řádku s názvem předmětu** (vpravo), pod názvem jen menší řádek učitel · volná místa.
+   Na telefonu i na počítači (na počítači místo mřížky vysokých karet seznam řádků). Řádek
+   nesmí přetékat: dlouhý název se zalomí, tlačítko zůstane vpravo (min. 44 px výška na mobilu).
+   Stejně kompaktně termíny v dopisování studenta (datum + tlačítko na jednom řádku), pokud to jde.
+3. **Překrývání a dotýkání prvků:** projít Playwrightem hlavní stránky všech rolí na 390×844
+   a 1280×800 (student: zápis, dopisování, menu účtu; učitel: přehled, zápisy, dopisování, detail
+   termínu; admin: přehled, administrace, průběh zápisu, uživatelé, předměty) a opravit prvky, které
+   se překrývají nebo dotýkají (chybějící `gap`, tlačítka nalepená na sebe nebo na okraj karty,
+   štítky přes text, hlavička s tlačítky, lepivá lišta zakrývající obsah – dát spodní odsazení).
+   Přidat do E2E jednoduchou kontrolu: na vybraných stránkách se bounding boxy tlačítek/odkazů
+   v jedné kartě nepřekrývají a `scrollWidth <= innerWidth`.
+
+## F15 Zbytek aplikace ve stejném stylu
+Dotáhnout vizuální jazyk z F12/F13 (karty se zaoblením, pilulky stavu, pruhy obsazenosti, čitelné
+nadpisy a podtitulky, akce vpravo v hlavičce, prázdné stavy s krátkým textem) na zbývající stránky:
+předměty (seznam, detail), uživatelé (seznam, detail, hromadné akce), třídy a školní rok, importy,
+sekce administrace (registrace, moduly, upozornění, historie, diagnostika, ukázková data, nastavení
+seminářů a dopisování), dopisování učitele/admina (seznam termínů, vytvoření řady), zápisy (seznam
+oken, úprava okna/bloku/výskytu, dialogy), profil, přihlášení a registrace.
+Zásady jako F13: **žádná funkce nesmí zmizet** (inventura před a ověření po), serverová pravidla
+a oprávnění beze změny, bez migrace, stávající `data-testid` a E2E zachovat (upravit, nemazat).
+Na mobilu 390×844 nic nepřetéká. Nafotit před/po.
