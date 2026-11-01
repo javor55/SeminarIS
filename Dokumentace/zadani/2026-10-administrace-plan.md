@@ -21,7 +21,8 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F7 Učitel v administraci, vypínač hromadného e-mailu, jednotné UI, úklid lintu (PR #12)
 - [x] F8 Dashboard jako přehled (karty z modulů) a stránka Zápisy pro studenty (PR #14)
 - [x] F9 Ukázková data (naplnit / smazat) pro prezentaci (PR #15)
-- [x] F10 Opravy z procházení skutečných obrazovek (chyby, workflow, sjednocení)
+- [x] F10 Opravy z procházení skutečných obrazovek (chyby, workflow, sjednocení) (PR #16)
+- [ ] F11 Mobilní zobrazení: zápis a dopisování jako karty
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,
@@ -296,3 +297,20 @@ Zjištěno při focení prezentace s ukázkovými daty (1440×900).
 
 Testy: upravit dotčené E2E, nové na řazení, filtry dopisování, stav okna (koncept → zveřejněno
 → předčasně uzavřít → znovu otevřít), skrytí informační položky přehledu, kód výskytu bez lomítka.
+
+## F11 Mobilní zobrazení (studenti používají hlavně telefon)
+Ověřeno na 390×844 (iPhone 14) s ukázkovými daty: stránka nikde neutíká do strany, menu, dashboard,
+dialogy a Moje předměty jsou v pořádku. Tabulky jsou ale širší než displej:
+- **Zápis do okna** (`/zapisy/[id]`, tabulka výskytů v bloku): tlačítka Zapsat/Odepsat jsou useknutá
+  nebo úplně mimo obrazovku (nutné posouvat do strany).
+- **Dopisování** (`/makeup`, tabulka termínů studenta i „Všechny termíny“): vidět je jen termín
+  a učebna; dozor, předměty, obsazenost a tlačítko Zapsat se jsou mimo obrazovku.
+- Méně kritické: detail termínu dopisování (`/makeup/sessions/[id]`), katalog předmětů (`/subjects`).
+
+Řešení: pod breakpointem `sm`/`md` zobrazit místo tabulky **karty pod sebou** (název/termín, učitel/dozor,
+učebna, předměty jako čipy, obsazenost, stav „Zapsáno“ a akce jako tlačítka přes celou šířku,
+min. výška 44 px). Na počítači tabulky beze změny. Sdílená komponenta pro „tabulka na počítači /
+karty na mobilu“, kde to dává smysl. Zachovat `data-testid` / `data-session` atributy, ať E2E dál fungují.
+Test: Playwright projekt nebo test s viewportem 390×844 – student na `/zapisy/[id]` a `/makeup`
+vidí tlačítko zápisu celé uvnitř viewportu (bounding box), `document.documentElement.scrollWidth
+<= innerWidth`, zápis i zapsání na dopisování z mobilu proběhne.
