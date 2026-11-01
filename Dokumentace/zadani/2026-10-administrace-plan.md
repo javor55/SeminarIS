@@ -26,7 +26,7 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F12 Zjednodušené rozhraní pro studenta (jen Zápis seminářů a Dopisování, zápis po krocích) (PR #18)
 - [x] F13 Učitel a administrátor ve stejném stylu (bez ztráty jakékoli funkce) (PR #19)
 - [x] F14 Kompaktnější zápis, bez uvítání, opravy překrývání
-- [ ] F15 Zbytek aplikace ve stejném stylu
+- [x] F15 Zbytek aplikace ve stejném stylu
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,
@@ -462,3 +462,16 @@ oken, úprava okna/bloku/výskytu, dialogy), profil, přihlášení a registrace
 Zásady jako F13: **žádná funkce nesmí zmizet** (inventura před a ověření po), serverová pravidla
 a oprávnění beze změny, bez migrace, stávající `data-testid` a E2E zachovat (upravit, nemazat).
 Na mobilu 390×844 nic nepřetéká. Nafotit před/po.
+
+### Inventura funkcí F15: kde to je po změně (ověřeno)
+Změny jsou jen vzhledové (serverová pravidla, oprávnění a schéma beze změny, bez migrace, `data-testid` zachována).
+- [x] Předměty `/subjects`: Export CSV, Katalog sylabů, Import předmětů/úvazků, Nový předmět, hledání a filtry, odkaz na detail – beze změny; souhrn jako kompaktní dlaždice `StatTile` (`subjects-stats`), stav jako pilulka (Aktivní / Archivováno); na mobilu karty (už byly).
+- [x] Detail předmětu (záložky, Upravit, Duplikovat, Archivovat, Smazat) – beze změny.
+- [x] Uživatelé `/users`: dlaždice (sdílená `StatTile`), filtry, výběr stránky / všech odpovídajících, hromadné akce, export CSV, změna role, přepínač Aktivní, Detail, Historie, Zobrazit jako, stránkování – na počítači tabulka beze změny; **na mobilu karty** (`users-cards`, každá s `user-row`, výběrem, rolí, přepínačem a akcemi). Detail uživatele, Ke schválení, importy beze změny.
+- [x] Školní rok a třídy, importy, uzavření roku – beze změny (už karty).
+- [x] Administrace (registrace, moduly, upozornění, historie, diagnostika, ukázková data, nastavení seminářů a dopisování): filtry historie na mobilu v mřížce 2 sloupců (dřív pod sebou a přetékající pole data); ostatní beze změny.
+- [x] Zápisy `/enrollments`: seznam oken na mobilu jako karty (`enrollment-card`: pilulka stavu, publikum, termíny, počty, bloky, Upravit zápis); stav okna sdílí `WindowPhaseBadge`. Dialogy úprav beze změny (kontrola překrývání v E2E).
+- [x] Dopisování učitele/admina (`/makeup`, Nový termín, řada, nastavení) – beze změny, přidána kontrola rozložení dialogu.
+- [x] Profil: role jako pilulka (česky), „Účet je aktivní“ jako `Badge`; změna hesla a upozornění beze změny.
+- [x] Přihlášení a registrace: stejná karta (zaoblení `xl`, nadpis, zarovnání), registrace už nemá `min-h-screen` (zbytečné posouvání).
+- E2E `e2e/24-layout.spec.ts` rozšířen o všechny výše uvedené stránky, přihlášení, registraci a dialogy (telefon 390×844 i počítač 1280×800).
