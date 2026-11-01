@@ -35,7 +35,7 @@ export function SessionFilters({
 
   return (
     <div className="flex flex-wrap items-end gap-3" data-testid="session-filters">
-      <div className="w-44 space-y-1">
+      <div className="w-full sm:w-44 space-y-1">
         <Label htmlFor="filter-period" className="text-xs text-muted-foreground">Období</Label>
         <NativeSelect id="filter-period" value={filter.period} onChange={(e) => update({ period: e.target.value as SessionFilter["period"] })}>
           {SESSION_PERIODS.map((p) => (
@@ -43,7 +43,7 @@ export function SessionFilters({
           ))}
         </NativeSelect>
       </div>
-      <div className="w-56 space-y-1">
+      <div className="w-full sm:w-56 space-y-1">
         <Label htmlFor="filter-teacher" className="text-xs text-muted-foreground">Učitel (dozor)</Label>
         <NativeSelect id="filter-teacher" value={filter.teacher ?? ""} onChange={(e) => update({ teacher: e.target.value || undefined })}>
           <option value="">Všichni</option>
@@ -52,7 +52,7 @@ export function SessionFilters({
           ))}
         </NativeSelect>
       </div>
-      <div className="w-56 space-y-1">
+      <div className="w-full sm:w-56 space-y-1">
         <Label htmlFor="filter-subject" className="text-xs text-muted-foreground">Předmět</Label>
         <NativeSelect id="filter-subject" value={filter.subject ?? ""} onChange={(e) => update({ subject: e.target.value || undefined })}>
           <option value="">Všechny</option>

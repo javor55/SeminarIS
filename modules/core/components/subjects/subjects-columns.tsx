@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { MobileCard, MobileCardField } from "@/components/ui/mobile-card";
 import { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
 import { subjectGradesLabel } from "@/lib/school";
@@ -103,3 +104,42 @@ export const subjectsColumns: ColumnDef<SubjectRow>[] = [
     filterFn: includesFilter,
   },
 ];
+
+/** Karta předmětu pro mobil (místo řádku tabulky). */
+export function SubjectCard({ s }: { s: SubjectRow }) {
+  return (
+    <MobileCard
+      title={
+        <Link href={`/subjects/${s.id}`} className="text-info hover:underline">
+          {s.name}
+        </Link>
+      }
+      badge={
+        s.isActive ? (
+          <span className="text-success text-xs font-medium">Aktivní</span>
+        ) : (
+          <Badge variant="danger" className="rounded-sm px-1.5 py-0.5 text-[10px] uppercase font-bold">Archiv</Badge>
+        )
+      }
+    >
+      <MobileCardField label="Zkratka">{s.code ?? "—"}</MobileCardField>
+      <MobileCardField label="Ročníky">{subjectGradesLabel(s.grades)}</MobileCardField>
+      {s.teachers.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {s.teachers.map((t) => (
+            <span key={t} className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded-full border">
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+      {s.badges.length > 0 && (
+        <div className="flex flex-wrap gap-1" data-testid="subject-badges">
+          {s.badges.map((b) => (
+            <SubjectBadgeChip key={b.id} badge={b} />
+          ))}
+        </div>
+      )}
+    </MobileCard>
+  );
+}

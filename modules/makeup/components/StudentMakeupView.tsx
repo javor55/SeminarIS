@@ -21,8 +21,13 @@ import {
 import { ATTENDANCE_LABELS, type MakeupSessionItem, type MyRegistrationItem } from "@/modules/makeup/types";
 import { CapacityBadge, SubjectBadges, deadlineText, isPastDeadline } from "./common";
 import { MoveDialog, RegisterDialog } from "./RegistrationDialogs";
+import { MobileCard, MobileCardField, MobileCardList, ResponsiveView } from "@/components/ui/mobile-card";
 import { PageHeader } from "@/components/page-header";
 import { NativeSelect } from "@/components/ui/native-select";
+
+/** Textový stav místo tlačítka; na mobilní kartě vycentrovaný přes celou šířku. */
+const stateText = (stacked: boolean, color = "text-muted-foreground") =>
+  stacked ? `block text-center text-sm ${color}` : `text-xs ${color}`;
 
 const overlaps = (a: MakeupSessionItem, b: MakeupSessionItem) =>
   new Date(a.startsAt) < new Date(b.endsAt) && new Date(a.endsAt) > new Date(b.startsAt);
@@ -73,12 +78,12 @@ export function StudentMakeupView({
         !activeRegs.some((o) => o.id !== r.id && overlaps(o.session, s))
     );
 
-  function actionFor(s: MakeupSessionItem, r: MyRegistrationItem | undefined) {
+  function actionFor(s: MakeupSessionItem, r: MyRegistrationItem | undefined, stacked = false) {
     if (r) {
       const locked = !s.cancelledAt && isPastDeadline(s);
-      if (locked) return <span className="text-xs text-muted-foreground">zapsáno, změny uzavřeny</span>;
+      if (locked) return <span className={stateText(stacked)}>zapsáno, změny uzavřeny</span>;
       return (
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className={stacked ? "flex flex-col gap-2" : "flex flex-wrap justify-end gap-2"}>
           {!s.cancelledAt && (
             <RegisterDialog
               session={s}
@@ -116,9 +121,9 @@ export function StudentMakeupView({
         </div>
       );
     }
-    if (isPastDeadline(s)) return <span className="text-xs text-muted-foreground">po uzávěrce</span>;
-    if (s.registeredCount >= s.capacity) return <span className="text-xs text-danger">plno</span>;
-    if (activeRegs.some((o) => overlaps(o.session, s))) return <span className="text-xs text-muted-foreground">kolize s jiným zápisem</span>;
+    if (isPastDeadline(s)) return <span className={stateText(stacked)}>po uzávěrce</span>;
+    if (s.registeredCount >= s.capacity) return <span className={stateText(stacked, "text-danger")}>plno</span>;
+    if (activeRegs.some((o) => overlaps(o.session, s))) return <span className={stateText(stacked)}>kolize s jiným zápisem</span>;
     return (
       <RegisterDialog
         session={s}
@@ -173,6 +178,8 @@ export function StudentMakeupView({
               {onlyMine ? "Nejste zapsaní na žádný termín." : "Žádné vypsané termíny."}
             </p>
           ) : (
+            <ResponsiveView
+              desktop={
             <Table data-testid="makeup-table">
               <TableHeader>
                 <TableRow>
@@ -227,6 +234,51 @@ export function StudentMakeupView({
                 })}
               </TableBody>
             </Table>
+              }
+              mobile={(
+    <MobileCardList data-testid="makeup-cards">
+      {rows.map((s) => {
+        const r = regBySession.get(s.id);
+        return (
+          <MobileCard
+            key={s.id}
+            data-session={s.id}
+            data-registered={r ? "true" : "false"}
+            className={s.cancelledAt ? "bg-destructive/5" : r ? "border-success bg-success/10" : undefined}
+            title={formatTimeRange(s.startsAt, s.endsAt)}
+            badge={
+              s.cancelledAt ? (
+                <Badge variant="destructive">termín zrušen</Badge>
+              ) : r ? (
+                <Badge variant="success">Zapsáno</Badge>
+              ) : undefined
+            }
+            actions={actionFor(s, r, true)}
+          >
+            <div className="space-y-0.5 text-xs">
+              {s.cancelledAt && s.cancelReason && <div className="text-danger">Důvod: {s.cancelReason}</div>}
+              {s.note && <div className="text-muted-foreground">{s.note}</div>}
+              {!s.cancelledAt && <div className="text-muted-foreground">Změny do {deadlineText(s.changeDeadlineMinutes)}</div>}
+            </div>
+            <MobileCardField label="Učebna">{s.room}</MobileCardField>
+            <MobileCardField label="Dozor">{s.teacherName}</MobileCardField>
+            <MobileCardField label="Obsazeno"><CapacityBadge s={s} /></MobileCardField>
+            {r ? (
+              <div className="space-y-1 text-sm" data-testid="my-subjects">
+                <div>
+                  {r.subjects.map((x) => x.name + (x.subjectTeacherName ? ` (${x.subjectTeacherName})` : "")).join(", ")}
+                </div>
+                {r.note && <div className="italic text-muted-foreground">„{r.note}“</div>}
+              </div>
+            ) : (
+              <SubjectBadges subjects={s.subjects} highlight={mySubjectIds} />
+            )}
+          </MobileCard>
+        );
+      })}
+    </MobileCardList>
+  )}
+            />
           )}
 
           {past.length > 0 && (

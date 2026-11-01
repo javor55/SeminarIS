@@ -12,6 +12,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { toast } from "sonner";
 import {
   getOccurrenceColumns,
+  OccurrenceCard,
   OccurrenceRow,
 } from "@/modules/seminars/components/occurrences/occurrence-columns";
 import { OccurrenceForDialog, OccurrencesStudentsDialog } from "@/modules/seminars/components/occurrences/OccurrencesStudentsDialog";
@@ -257,21 +258,28 @@ export function EnrollmentBlockCard({
     });
   }, [block, currentUser.id, isStudent, isWindowOpen, change.ok, change.reason, rules?.namesVisible]);
 
+  // Akce jsou společné pro tabulku (desktop) i karty (mobil)
+  const handlers = useMemo(
+    () => ({
+      onStudents: (row: OccurrenceRow) => setStudentsOccurrenceId(row.id),
+      onEdit: (row: OccurrenceRow) => setEditOccurrence(row),
+      onDelete: (row: OccurrenceRow) => setDeleteOccurrence(row),
+      onEnroll: (row: OccurrenceRow) => handleEnroll(row.id),
+      onUnenroll: (row: OccurrenceRow) => handleUnenroll(row.id),
+      onNames: (row: OccurrenceRow) => setNamesOccurrence({ id: row.id, title: `${row.subject?.name ?? "Předmět"}${row.subCode ? ` (${row.subCode})` : ""}` }),
+    }),
+    [handleEnroll, handleUnenroll]
+  );
   const columns = useMemo(
     () =>
       getOccurrenceColumns({
         currentUser,
-        onStudents: (row) => setStudentsOccurrenceId(row.id),
-        onEdit: (row) => setEditOccurrence(row),
-        onDelete: (row) => setDeleteOccurrence(row),
-        onEnroll: (row) => handleEnroll(row.id),
-        onUnenroll: (row) => handleUnenroll(row.id),
-        onNames: (row) => setNamesOccurrence({ id: row.id, title: `${row.subject?.name ?? "Předmět"}${row.subCode ? ` (${row.subCode})` : ""}` }),
+        ...handlers,
         showEnrollmentName: false,
         showStatus: false,
         showBlockName: false,
       }),
-    [currentUser, handleEnroll, handleUnenroll]
+    [currentUser, handlers]
   );
 
   const studentEnrolledInBlock =
@@ -309,6 +317,7 @@ export function EnrollmentBlockCard({
           columns={columns}
           hideToolbar
           hideFooter
+          renderCard={(occ) => <OccurrenceCard occ={occ} currentUser={currentUser} handlers={handlers} />}
         />
       </div>
 

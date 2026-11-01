@@ -2,6 +2,8 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { MobileCard, MobileCardField } from "@/components/ui/mobile-card";
 import {
   SubjectOccurrence,
   SubjectOccurrenceWithRelations,
@@ -176,79 +178,157 @@ export function getOccurrenceColumns(opts: {
   cols.push({
     id: "actions",
     header: "Akce",
-    cell: ({ row }) => {
-      const occ = row.original;
-      const hasStudents = occ.hasStudents ?? false;
-      const enrolledByMe = occ.enrolledByMe ?? false;
-      const isFull = occ.isFull ?? false;
-
-      return (
-        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-          {/* STUDENT – zápis / odepsání */}
-          {currentUser?.role === "STUDENT" && (
-            <>
-              {enrolledByMe ? (
-                onUnenroll && (
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    disabled={occ.isWindowOpen === false || occ.canUnenroll === false}
-                    title={occ.canUnenroll === false ? occ.unenrollBlockedReason : undefined}
-                    data-testid="unenroll-button"
-                    onClick={() => onUnenroll(occ)}
-                  >
-                    Odepsat
-                  </Button>
-                )
-              ) : (
-                onEnroll && (
-                  <Button
-                    size="sm"
-                    variant="default"
-                    disabled={isFull || occ.isWindowOpen === false}
-                    data-testid="enroll-button"
-                    onClick={() => onEnroll(occ)}
-                  >
-                    Zapsat
-                  </Button>
-                )
-              )}
-              {occ.canSeeNames && onNames && (
-                <Button size="sm" variant="outline" data-testid="participants-button" onClick={() => onNames(occ)}>
-                  Zapsaní
-                </Button>
-              )}
-            </>
-          )}
-
-          {/* ADMIN + TEACHER */}
-          {(currentUser?.role === "ADMIN" ||
-            currentUser?.role === "TEACHER") && (
-            <Button size="sm" variant="outline" onClick={() => onStudents(occ)}>
-              Studenti
-            </Button>
-          )}
-
-          {/* ADMIN pouze: další akce v menu, aby řádek zůstal nízký */}
-          {currentUser?.role === "ADMIN" && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label={`Akce výskytu ${occ.subject?.name ?? ""}`} data-testid="occurrence-menu">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => onEdit(occ)}>Upravit</DropdownMenuItem>
-                <DropdownMenuItem className="text-danger" disabled={hasStudents} onSelect={() => onDelete(occ)}>
-                  {hasStudents ? "Smazat (nejdřív odepište studenty)" : "Smazat"}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      );
-    },
+    cell: ({ row }) => (
+      <OccurrenceActions
+        occ={row.original}
+        currentUser={currentUser}
+        handlers={{ onStudents, onEdit, onDelete, onEnroll, onUnenroll, onNames }}
+      />
+    ),
   });
 
   return cols;
+}
+
+type OccurrenceHandlers = {
+  onStudents: (_: OccurrenceRow) => void;
+  onEdit: (_: OccurrenceRow) => void;
+  onDelete: (_: OccurrenceRow) => void;
+  onEnroll?: (_: OccurrenceRow) => void;
+  onUnenroll?: (_: OccurrenceRow) => void;
+  onNames?: (_: OccurrenceRow) => void;
+};
+
+/** Akce výskytu (student: zapsat / odepsat / zapsaní; učitel a admin: studenti, admin menu). */
+function OccurrenceActions({
+  occ,
+  currentUser,
+  handlers: { onStudents, onEdit, onDelete, onEnroll, onUnenroll, onNames },
+  stacked = false,
+}: {
+  occ: OccurrenceRow;
+  currentUser: User | null;
+  handlers: OccurrenceHandlers;
+  /** mobilní karta: tlačítka pod sebou (šířku a výšku řeší MobileCardActions) */
+  stacked?: boolean;
+}) {
+  const hasStudents = occ.hasStudents ?? false;
+  const enrolledByMe = occ.enrolledByMe ?? false;
+  const isFull = occ.isFull ?? false;
+
+  return (
+    <div className={stacked ? "contents" : "flex items-center justify-end gap-1 whitespace-nowrap"}>
+      {/* STUDENT – zápis / odepsání */}
+      {currentUser?.role === "STUDENT" && (
+        <>
+          {enrolledByMe ? (
+            onUnenroll && (
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={occ.isWindowOpen === false || occ.canUnenroll === false}
+                title={occ.canUnenroll === false ? occ.unenrollBlockedReason : undefined}
+                data-testid="unenroll-button"
+                onClick={() => onUnenroll(occ)}
+              >
+                Odepsat
+              </Button>
+            )
+          ) : (
+            onEnroll && (
+              <Button
+                size="sm"
+                variant="default"
+                disabled={isFull || occ.isWindowOpen === false}
+                data-testid="enroll-button"
+                onClick={() => onEnroll(occ)}
+              >
+                Zapsat
+              </Button>
+            )
+          )}
+          {occ.canSeeNames && onNames && (
+            <Button size="sm" variant="outline" data-testid="participants-button" onClick={() => onNames(occ)}>
+              Zapsaní
+            </Button>
+          )}
+        </>
+      )}
+
+      {/* ADMIN + TEACHER */}
+      {(currentUser?.role === "ADMIN" || currentUser?.role === "TEACHER") && (
+        <Button size="sm" variant="outline" onClick={() => onStudents(occ)}>
+          Studenti
+        </Button>
+      )}
+
+      {/* ADMIN pouze: další akce v menu, aby řádek zůstal nízký */}
+      {currentUser?.role === "ADMIN" && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant={stacked ? "outline" : "ghost"}
+              size="sm"
+              className={stacked ? undefined : "h-8 w-8 p-0"}
+              aria-label={`Akce výskytu ${occ.subject?.name ?? ""}`}
+              data-testid="occurrence-menu"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+              {stacked && "Další akce"}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => onEdit(occ)}>Upravit</DropdownMenuItem>
+            <DropdownMenuItem className="text-danger" disabled={hasStudents} onSelect={() => onDelete(occ)}>
+              {hasStudents ? "Smazat (nejdřív odepište studenty)" : "Smazat"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  );
+}
+
+/** Karta výskytu pro mobil (místo řádku tabulky); stejné akce a `data-testid` jako v tabulce. */
+export function OccurrenceCard({
+  occ,
+  currentUser,
+  handlers,
+}: {
+  occ: OccurrenceRow;
+  currentUser: User | null;
+  handlers: OccurrenceHandlers;
+}) {
+  const isStudentView = currentUser?.role === "STUDENT" || currentUser?.role === "GUEST";
+  return (
+    <MobileCard
+      data-occurrence={occ.id}
+      className={occ.enrolledByMe ? "border-success bg-success/10" : undefined}
+      title={
+        <>
+          <a href={`/subjects/${occ.subject?.id}`} className="hover:underline">
+            {occ.subject?.name}
+          </a>
+          {isStudentView && occ.subCode && (
+            <span className="ml-1 font-normal text-muted-foreground" data-testid="occurrence-group">(skupina {occ.subCode})</span>
+          )}
+        </>
+      }
+      badge={occ.enrolledByMe ? <Badge variant="success">Zapsáno</Badge> : occ.isFull ? <Badge variant="danger">Plno</Badge> : undefined}
+      actions={<OccurrenceActions occ={occ} currentUser={currentUser} handlers={handlers} stacked />}
+    >
+      {!isStudentView && (
+        <MobileCardField label="Kód výskytu">
+          <span className="font-mono text-xs text-muted-foreground">{occ.fullCode ?? ""}</span>
+          {occ.restrictionLabel && (
+            <div className="text-[11px] text-warning" data-testid="occurrence-restriction-label">
+              jen: {occ.restrictionLabel}
+            </div>
+          )}
+        </MobileCardField>
+      )}
+      <MobileCardField label="Učitel">{occ.teacherName || "—"}</MobileCardField>
+      <MobileCardField label="Obsazenost">{occ.capacityText ?? ""}</MobileCardField>
+    </MobileCard>
+  );
 }

@@ -925,6 +925,13 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
   stránkovaný seznam uživatelů (`queryUsers`) načte jen `id + jména` všech odpovídajících, seřadí v JS a plné řádky
   načte pro jednu stránku (škola: stovky až tisíce uživatelů). Řazení podle e-mailu, registrace a přihlášení zůstává v DB.
 - **Tabulky (`DataTable`):** výchozí 50 řádků na stránku (10 / 25 / 50 / 100).
+- **Mobil (pod `md`, < 768 px):** široké tabulky se na telefonu nahrazují kartami pod sebou. `DataTable` má volitelné
+  `renderCard`; tabulky mimo `DataTable` používají `ResponsiveView desktop/mobile` a `MobileCard`, `MobileCardField`,
+  `MobileCardList` z `components/ui/mobile-card.tsx`. Přepínání dělá `useIsMobile()` (`lib/use-is-mobile.ts`,
+  matchMedia, na serveru a při hydrataci `false`): vykreslí se **jen jedna varianta**, ne obě skryté CSS, aby v DOMu
+  nebyla duplicitní tlačítka a E2E selektory (`.first()`) netrefily skrytý prvek. Karty mají stejné `data-session` /
+  `data-testid` jako řádky; akce jsou tlačítka přes celou šířku vysoká aspoň 44 px (`MobileCardActions`). Na počítači
+  se tabulky nemění. Nová tabulka, kterou čtou studenti, má mít kartu; E2E pro mobil: `e2e/21-mobile.spec.ts`.
 - **Datum a čas:** jen přes `lib/datetime.ts` (`formatDateTime`, `formatTimeRange`, …). Pásmo
   je Europe/Prague a výstup stejný na serveru i v prohlížeči. `toLocaleString()` bez
   locale dává americký formát.

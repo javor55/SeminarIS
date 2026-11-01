@@ -1,6 +1,6 @@
 "use client";
 
-import { SubjectRow, subjectsColumns } from "./subjects-columns";
+import { SubjectCard, SubjectRow, subjectsColumns } from "./subjects-columns";
 import { DataTable } from "@/components/ui/data-table";
 import { toast } from "sonner";
 import { Download, Plus } from "lucide-react";
@@ -141,6 +141,7 @@ export function SubjectsClientView({ subjects, currentUser }: { subjects: Subjec
           <DataTable<SubjectRow>
             data={subjects}
             columns={subjectsColumns}
+            renderCard={(s) => <SubjectCard s={s} />}
             searchPlaceholder="Hledat podle názvu, zkratky nebo vyučujícího…"
             searchKeys={["name", "code", "teachers"]}
             selectFilters={[
