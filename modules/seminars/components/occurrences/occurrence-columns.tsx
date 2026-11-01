@@ -3,6 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Meter } from "@/components/ui/meter";
 import { MobileCard, MobileCardField } from "@/components/ui/mobile-card";
 import {
   SubjectOccurrence,
@@ -30,6 +31,8 @@ export type OccurrenceRow = SubjectOccurrence & {
   enrollmentName: string;
   statusLabel: string;
   capacityText: string;
+  /** počet zapsaných (pro pruh obsazenosti) */
+  enrolledCount?: number;
   hasStudents: boolean;  
   fullCode?: string;
   teacherName?: string;
@@ -168,8 +171,11 @@ export function getOccurrenceColumns(opts: {
     accessorKey: "capacityText",
     header: "Obsaz.",
     cell: ({ row: _row }) => (
-      <span className="text-muted-foreground text-center block">
+      <span className="text-muted-foreground text-center block min-w-16" data-testid="occurrence-capacity">
         {_row.original.capacityText ?? ""}
+        {_row.original.capacity != null && _row.original.enrolledCount != null && (
+          <Meter className="mt-1" value={_row.original.enrolledCount} max={_row.original.capacity} label={`Obsazeno ${_row.original.enrolledCount} z ${_row.original.capacity}`} />
+        )}
       </span>
     ),
   });
@@ -329,6 +335,9 @@ export function OccurrenceCard({
       )}
       <MobileCardField label="Učitel">{occ.teacherName || "—"}</MobileCardField>
       <MobileCardField label="Obsazenost">{occ.capacityText ?? ""}</MobileCardField>
+      {occ.capacity != null && occ.enrolledCount != null && (
+        <Meter value={occ.enrolledCount} max={occ.capacity} label={`Obsazeno ${occ.enrolledCount} z ${occ.capacity}`} />
+      )}
     </MobileCard>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { roomText } from "@/lib/room";
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -79,7 +80,7 @@ export function RegisterDialog({
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
-              {formatTimeRange(session.startsAt, session.endsAt)}, učebna {session.room}, dozor {session.teacherName}
+              {formatTimeRange(session.startsAt, session.endsAt)}, {roomText(session.room)}, dozor {session.teacherName}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -175,7 +176,7 @@ export function MoveDialog({
                 <label key={s.id} className="flex items-start gap-2 rounded-md border p-2 text-sm hover:bg-accent">
                   <Radio name="move-target" className="mt-0.5" value={s.id} checked={target === s.id} onChange={() => setTarget(s.id)} />
                   <span>
-                    <strong>{formatTimeRange(s.startsAt, s.endsAt)}</strong>, učebna {s.room}, dozor {s.teacherName}
+                    <strong>{formatTimeRange(s.startsAt, s.endsAt)}</strong>, {roomText(s.room)}, dozor {s.teacherName}
                     <span className="block text-xs text-muted-foreground">
                       obsazeno {s.registeredCount}/{s.capacity} · {s.subjects.map((x) => x.name).join(", ")}
                     </span>

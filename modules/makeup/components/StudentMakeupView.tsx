@@ -1,5 +1,6 @@
 "use client";
 
+import { roomText } from "@/lib/room";
 import { unwrap, unwrapAsync } from "@/lib/action-result";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -113,7 +114,7 @@ export function StudentMakeupView({
         />
         <ConfirmAction
           title="Odhlásit se z termínu?"
-          description={`${formatTimeRange(s.startsAt, s.endsAt)}, učebna ${s.room}.`}
+          description={`${formatTimeRange(s.startsAt, s.endsAt)}, ${roomText(s.room)}.`}
           actionLabel="Odhlásit"
           onConfirm={async () => {
             try {
@@ -187,7 +188,7 @@ export function StudentMakeupView({
                     <div className="space-y-0.5">
                       <div className="font-semibold">{formatTimeRange(s.startsAt, s.endsAt)}</div>
                       <div className="text-sm text-muted-foreground">
-                        učebna {s.room} · dozor {s.teacherName}
+                        {roomText(s.room)} · dozor {s.teacherName}
                       </div>
                     </div>
                     {s.cancelledAt ? <Badge variant="danger">termín zrušen</Badge> : <Badge variant="success">Zapsáno</Badge>}
@@ -260,7 +261,7 @@ export function StudentMakeupView({
                         <div className="space-y-0.5">
                           <div className="font-semibold">{formatTimeRange(s.startsAt, s.endsAt)}</div>
                           <div className="text-sm text-muted-foreground">
-                            učebna {s.room} · dozor {s.teacherName}
+                            {roomText(s.room)} · dozor {s.teacherName}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             <span className={s.registeredCount >= s.capacity ? "font-semibold text-danger" : ""} data-testid="capacity">

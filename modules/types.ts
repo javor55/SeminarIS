@@ -20,11 +20,15 @@ export type RouteRule = {
 
 // Položka bočního menu administrace (F2). Zobrazí se jen uživateli s daným oprávněním
 // a jen u zapnutého modulu. `href` leží pod `/admin/…` (nebo ve stránkách modulu).
+export type AdminSectionGroup = "overview" | "school" | "modules" | "ops";
+
 export type AdminSection = {
   label: string;
   href: string;
   permission: string;
-  // Pořadí v menu administrace (jádro používá 0–99, moduly 100+)
+  // Skupina v menu (F13): school = Škola, modules = Moduly (výchozí), ops = Provoz. Přehled je bez skupiny nahoře.
+  group?: AdminSectionGroup;
+  // Pořadí v menu administrace v rámci skupiny (jádro používá 0–99, moduly 100+)
   order: number;
   // Další cesty, pod kterými je sekce v menu zvýrazněná (např. podstránka průvodce)
   match?: readonly string[];

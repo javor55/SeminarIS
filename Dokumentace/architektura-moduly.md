@@ -693,7 +693,7 @@ vynechají, stránka jádra se neshodí. Id záložek, štítků a položek jád
 | `getAdminTodos(user)` | `collectAdminTodos` | přehled „co udělat“ v administraci (F2) |
 | `bulkUserActions` | `collectBulkUserActions` | hromadné akce v seznamu uživatelů (parametry, náhled dopadu, jedna transakce, audit) |
 | `getAdminStats()` | `collectAdminStats` | krátké statistiky pod přehledem v administraci a na dashboardu admina |
-| `getDashboardCards(user)` | `collectDashboardCards` | karty dashboardu (`{ id, title, order, size?, content, href?, linkLabel? }`), id prefixované id modulu |
+| `getDashboardCards(user)` | `collectDashboardCards` | karty dashboardu (`{ id, title, order, size?, content, href?, linkLabel?, highlights? }`; `highlights` = věty do pásu „Nejbližší“, F13), id prefixované id modulu |
 | `demoData` | Administrace → Ukázková data | `{ labels, seed, clear }`: ukázková data modulu; jádro volá `seed` jen u zapnutých modulů, `clear` u všech |
 | `adminSections` (v manifestu) | `collectAdminSections` | boční menu administrace (jádro i moduly, podle oprávnění) |
 | `settings` (v manifestu) | registr nastavení | deklarace nastavení modulu |
@@ -750,7 +750,7 @@ oprávnění stránky, sekce a pravidla cesty.
 
 | Sekce | URL | Obsah |
 | --- | --- | --- |
-| Přehled | `/admin` | **Co udělat** + statistiky |
+| Přehled | `/admin` | **K vyřízení** (`getAdminTodos`), dlaždice Stav systému (admin), statistiky |
 | Registrace a přihlášení | `/admin/registration` | registrace, výchozí role, výběr třídy, Microsoft 365, kdo smí heslem |
 | Školní rok a třídy | `/admin/school-year` (+ `/admin/close-year`) | školní rok, uzavření roku, třídy |
 | Moduly | `/admin/modules` | zapnutí a vypnutí modulů |
@@ -760,6 +760,26 @@ oprávnění stránky, sekce a pravidla cesty.
 | Ukázková data | `/admin/demo` | naplnění a smazání ukázkových dat pro prezentaci (jen admin) |
 | Semináře | `/enrollments/settings` | výchozí hodnoty nového zápisového okna |
 | Dopisování | `/makeup/settings` | výchozí kapacita a uzávěrka nových termínů |
+
+### Menu ve skupinách a přehled (F13)
+
+`AdminSection.group` (`overview` / `school` / `modules` / `ops`, výchozí `modules`) řadí menu do skupin **Škola**
+(Školní rok a třídy, Registrace a přihlášení), **Moduly** (sekce modulů 100+, „Moduly“ = zapnutí modulů nakonec, 900)
+a **Provoz** (Upozornění, Historie, Diagnostika, Ukázková data); Přehled je nahoře bez nadpisu. `order` platí uvnitř
+skupiny. Přehled administrace = seznam **K vyřízení** (`data-testid`: `admin-todos`, `admin-todo`, `todo-count`,
+`todos-summary` beze změny) a pro admina dlaždice **Stav systému** (`modules/core/admin-tiles.ts`: e-maily, přihlášení
+Microsoft 365, historie změn, moduly; jen čtení stávajících nastavení, `data-testid="admin-tile"`).
+
+### Přehled učitele a admina na dashboardu (F13)
+
+Dashboard učitele a admina má nad kartami pás **Nejbližší** (`DashboardHighlights`). Věty dodávají karty modulů přes
+volitelné `DashboardCard.highlights` (nejbližší termín dopisování se studenty a poznámkami, běžící zápis a kolik míst má
+můj seminář, u admina zápisy s nedokončenými studenty); jádro je jen sebere. Karta **Moje termíny dopisování** ukazuje
+jména přihlášených, předměty a poznámky, karta **Moje semináře v zápisu** pruh obsazenosti (`Meter`). Detail zápisového
+okna (`/enrollments/[id]`) má nad bloky panel **Průběh zápisu** (`modules/seminars/window-progress.ts`,
+`EnrollmentProgressPanel`): hotovo / rozpracováno / nezačali / plné semináře a „Chybí dokončit“; celý seznam, export a
+ruční připomínka e-mailem zůstaly v záložce Nezapsaní. Detail termínu dopisování má souhrn a na telefonu karty studentů.
+Místnost do věty skládá `roomText` (`lib/room.ts`), takže „Učebna 2.04“ se nezdvojí. E2E: `e2e/23-teacher-admin-ui.spec.ts`.
 
 ### Přehled „co udělat“
 

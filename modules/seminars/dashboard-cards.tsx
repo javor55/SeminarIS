@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { formatDateTime } from "@/lib/datetime";
+import { formatDateTime, formatRemaining } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
 import type { User } from "@/lib/types";
 import { can } from "@/modules/registry";
-import type { DashboardCard } from "@/modules/server-types";
+import type { DashboardCard, DashboardHighlight } from "@/modules/server-types";
 import { Badge } from "@/components/ui/badge";
+import { Meter } from "@/components/ui/meter";
 import { Progress } from "@/components/ui/progress";
 import { liveWindowWhere, openWindowWhere, windowPhase, type WindowPhaseInput } from "@/modules/seminars/window-phase";
 import { computeUnenrolled } from "@/modules/seminars/unenrolled";
@@ -91,6 +92,41 @@ function liveStatus(w: WindowPhaseInput): "OPEN" | "SCHEDULED" | null {
   return phase === "OPEN" ? "OPEN" : phase === "PLANNED" ? "SCHEDULED" : null;
 }
 
+/** Věta do pásu „Nejbližší“ o jednom zápisovém okně, ve kterém učitel vypisuje semináře. */
+function highlightFor(
+  g: { window: { id: string; name: string; startsAt: Date; endsAt: Date }; live: "OPEN" | "SCHEDULED"; items: { capacity: number | null; subject: { name: string }; _count: { studentEnrollments: number } }[] },
+  missing: number | null | undefined,
+  user: User,
+  index: number
+): DashboardHighlight {
+  const href = can(user.role, "seminars.windows.view") ? `/enrollments/${g.window.id}` : undefined;
+  const count = g.items.length;
+  if (g.live === "SCHEDULED") {
+    return {
+      id: `window-${g.window.id}`,
+      order: 30 + index,
+      tone: "info",
+      icon: "chart",
+      title: `${g.window.name}: zápis začíná ${formatDateTime(g.window.startsAt)}`,
+      text: `vypisujete ${count} ${plural(count, "seminář", "semináře", "seminářů")}`,
+      href,
+    };
+  }
+  const one = count === 1 ? g.items[0] : null;
+  const mine = one
+    ? `Váš seminář ${one.subject.name} má ${one.capacity == null ? `${one._count.studentEnrollments} zapsaných` : `${one._count.studentEnrollments} z ${one.capacity} míst`}`
+    : `Vypisujete ${count} ${plural(count, "seminář", "semináře", "seminářů")}, zapsáno ${g.items.reduce((n, o) => n + o._count.studentEnrollments, 0)}`;
+  return {
+    id: `window-${g.window.id}`,
+    order: 30 + index,
+    tone: "success",
+    icon: "chart",
+    title: `${g.window.name}: zápis běží`,
+    text: `${mine}, končí za ${formatRemaining(g.window.endsAt.getTime() - Date.now())}${missing != null && missing > 0 ? ` · nezapsáno ${missing} ${plural(missing, "student", "studenti", "studentů")}` : ""}`,
+    href,
+  };
+}
+
 /** Učitel (a admin, který nějaký seminář vede): moje výskyty v otevřených a blížících se oknech. */
 async function myOccurrencesCard(user: User): Promise<DashboardCard | null> {
   const occurrences = await prisma.subjectOccurrence.findMany({
@@ -147,20 +183,29 @@ async function myOccurrencesCard(user: User): Promise<DashboardCard | null> {
                 {g.items
                   .sort((a, b) => a.subject.name.localeCompare(b.subject.name, "cs"))
                   .map((o) => (
-                    <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2" data-testid="dashboard-my-occurrence">
-                      <span>
-                        <Link href={`/subjects/${o.subject.id}`} className="font-medium hover:underline">{o.subject.name}</Link>
-                        <span className="text-muted-foreground"> – {o.block.name}</span>
-                      </span>
-                      <span className="text-xs text-muted-foreground">zapsáno {o._count.studentEnrollments}/{o.capacity ?? "∞"}</span>
+                    <li key={o.id} className="space-y-1.5 px-3 py-2" data-testid="dashboard-my-occurrence">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                          <Link href={`/subjects/${o.subject.id}`} className="font-medium hover:underline">{o.subject.name}</Link>
+                          <span className="text-muted-foreground"> – {o.block.name}</span>
+                        </span>
+                        <span className="text-xs text-muted-foreground">zapsáno {o._count.studentEnrollments}/{o.capacity ?? "∞"}</span>
+                      </div>
+                      {o.capacity != null && <Meter value={o._count.studentEnrollments} max={o.capacity} label={`Obsazeno ${o._count.studentEnrollments} z ${o.capacity} míst`} />}
                     </li>
                   ))}
               </ul>
+              {canOpen && (
+                <Link href={`/enrollments/${g.window.id}`} className="inline-block text-sm font-medium underline underline-offset-4">
+                  Seznam zapsaných studentů
+                </Link>
+              )}
             </div>
           );
         })}
       </div>
     ),
+    highlights: list.map((g, i) => highlightFor(g, unenrolled.get(g.window.id), user, i)),
   };
 }
 
@@ -178,6 +223,21 @@ async function progressCard(): Promise<DashboardCard | null> {
     title: "Průběh otevřených zápisů",
     order: 10,
     size: "md",
+    highlights: open.flatMap((w, i) => {
+      const missing = overviews[i]?.students.length ?? 0;
+      if (missing === 0) return [];
+      return [
+        {
+          id: `missing-${w.id}`,
+          order: 40 + i,
+          tone: "attention" as const,
+          icon: "people" as const,
+          title: `${w.name}: chybí dokončit ${missing} ${plural(missing, "student", "studenti", "studentů")}`,
+          text: `zápis končí za ${formatRemaining(w.endsAt.getTime() - Date.now())}`,
+          href: `/enrollments/${w.id}`,
+        },
+      ];
+    }),
     content: (
       <ul className="space-y-4" data-testid="dashboard-progress">
         {open.map((w, i) => {

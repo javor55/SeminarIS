@@ -236,6 +236,7 @@ export function EnrollmentBlockCard({
         enrollmentName: "",
         statusLabel: "",
         capacityText,
+        enrolledCount,
         hasStudents: enrolledCount > 0,
         fullCode,
         teacherName,

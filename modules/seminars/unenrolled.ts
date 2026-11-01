@@ -19,6 +19,8 @@ export type UnenrolledStudent = {
   classLabel: string | null;
   // Povinné bloky, ve kterých má student méně zápisů, než potřebuje (have z need)
   missingBlocks: { id: string; name: string; have: number; need: number }[];
+  // Má v tomto zápisu aspoň jeden zápis (rozpracováno), nebo ještě nezačal
+  started: boolean;
 };
 
 export type UnenrolledOverview = {
@@ -111,6 +113,7 @@ export async function computeUnenrolled(windowId: string): Promise<UnenrolledOve
       classGroupId: s.classGroupId,
       classLabel: s.classGroup ? classLabel(s.classGroup) : null,
       missingBlocks: missing,
+      started: (enrolled.get(s.id)?.size ?? 0) > 0,
     });
   }
   return { windowName: ew.name, endsAt: ew.endsAt, blockCount: blocks.length, audienceCount: students.length, students: result };

@@ -17,7 +17,7 @@ type Manifest = {
   permissions: Record<string, string[]>;
   nav: { label: string; href: string; permission: string; order: number }[];
   routes: { prefix: string; permission: string; exact?: boolean }[];
-  adminSections?: { label: string; href: string; permission: string; order: number }[];
+  adminSections?: { label: string; href: string; permission: string; order: number; group?: string }[];
   settings?: {
     key: string;
     type: string;
@@ -101,6 +101,7 @@ for (const m of manifests) {
   for (const s of m.adminSections ?? []) {
     if (!(s.permission in m.permissions)) fail(`${where}: sekce administrace „${s.label}“ používá cizí/neexistující oprávnění „${s.permission}“.`);
     if (!s.href.startsWith("/")) fail(`${where}: sekce administrace „${s.label}“ má neplatný odkaz.`);
+    if (s.group !== undefined && !["overview", "school", "modules", "ops"].includes(s.group)) fail(`${where}: sekce administrace „${s.label}“ má neplatnou skupinu „${s.group}“.`);
     // stránka sekce musí být chráněná pravidlem cesty modulu (jinak by se menu dalo obejít odkazem)
     else if (!covered(m, s.href)) fail(`${where}: sekce administrace „${s.label}“ vede na „${s.href}“, které nechrání žádné pravidlo cesty.`);
     if (adminHrefs.has(s.href)) fail(`${where}: sekce administrace „${s.label}“ má odkaz „${s.href}“ už použitý jinou sekcí.`);

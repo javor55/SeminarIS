@@ -4,7 +4,7 @@ import { getEnabledModuleIds } from "@/lib/modules";
 import { MODULE_SERVERS } from "@/modules/server-registry";
 import type { ModuleId } from "@/modules/registry";
 import { getHiddenTodoIds } from "@/modules/core/admin-todo-hidden";
-import type { AdminSection, AdminTodo, SubjectBadge, SubjectUsageItem } from "@/modules/types";
+import type { AdminSection, AdminSectionGroup, AdminTodo, SubjectBadge, SubjectUsageItem } from "@/modules/types";
 import type { AdminStat, BulkUserAction, DashboardCard, ModuleServer, ModuleTab, MySubjectsSection, StudentTab } from "@/modules/server-types";
 import { MODULES, can, type Permission } from "@/modules/registry";
 
@@ -35,6 +35,8 @@ async function collect<T>(pick: (server: ModuleServer) => Promise<T> | undefined
   );
   return results.filter((r): r is { id: ModuleId; value: Awaited<T> } => r !== null);
 }
+
+const ADMIN_GROUP_RANK: Record<AdminSectionGroup, number> = { overview: 0, school: 1, modules: 2, ops: 3 };
 
 const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
 
@@ -93,7 +95,7 @@ export async function collectMySubjectsSections(user: User): Promise<MySubjectsS
 /** Karty dashboardu ze zapnutých modulů (id prefixované id modulu), seřazené. Chyba modulu jeho karty vynechá. */
 export async function collectDashboardCards(user: User): Promise<DashboardCard[]> {
   const parts = await collect((s) => s.getDashboardCards?.(user));
-  return parts.flatMap((p) => p.value.map((c) => ({ ...c, id: `${p.id}.${c.id}` }))).sort(byOrder);
+  return parts.flatMap((p) => p.value.map((c) => ({ ...c, id: `${p.id}.${c.id}`, highlights: c.highlights?.map((h) => ({ ...h, id: `${p.id}.${h.id}` })) }))).sort(byOrder);
 }
 
 /** Záložky zjednodušené navigace studenta (F12) ze zapnutých modulů, seřazené. */
@@ -142,7 +144,9 @@ export async function collectAdminSections(user: User): Promise<AdminSection[]> 
   return MODULES.filter((m) => enabled.includes(m.id))
     .flatMap((m) => ((m as { adminSections?: readonly AdminSection[] }).adminSections ?? []) as readonly AdminSection[])
     .filter((s) => can(user.role, s.permission as Permission))
-    .sort(byOrder);
+    .map((s) => ({ ...s, group: s.group ?? "modules" }))
+    // skupiny jdou za sebou (Přehled, Škola, Moduly, Provoz), uvnitř skupiny podle `order`
+    .sort((a, b) => ADMIN_GROUP_RANK[a.group] - ADMIN_GROUP_RANK[b.group] || a.order - b.order);
 }
 
 /** Krátké statistiky pro přehled administrace ze zapnutých modulů. */

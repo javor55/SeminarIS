@@ -1,3 +1,4 @@
+import { roomBare, roomText } from "@/lib/room";
 import { prisma } from "@/lib/prisma";
 import { sendEventEmail, type EmailRecipient } from "@/lib/email";
 import { formatDayShort, formatTimeRange, startOfSchoolDay } from "@/lib/datetime";
@@ -19,7 +20,7 @@ const registrationMailInclude = {
 type SessionLike = { startsAt: Date; endsAt: Date; room: string; teacher: { firstName: string; lastName: string } };
 
 function sessionVars(s: SessionLike) {
-  return { termin: formatTimeRange(s.startsAt, s.endsAt), ucebna: s.room, dozor: displayName(s.teacher) };
+  return { termin: formatTimeRange(s.startsAt, s.endsAt), ucebna: roomBare(s.room), dozor: displayName(s.teacher) };
 }
 
 const subjectsText = (r: { subjects: { subject: { name: string } }[] }) =>
@@ -63,7 +64,7 @@ export async function notifySessionChanged(
       ...sessionVars(s),
       predmety: subjectsText(r),
       puvodni_termin: formatTimeRange(before.startsAt, before.endsAt),
-      puvodni_ucebna: before.room,
+      puvodni_ucebna: roomBare(before.room),
     },
   }));
   await sendEventEmail("makeup.session.changed", recipients);
@@ -153,7 +154,7 @@ function digestRecipients(sessions: TomorrowSession[], datum: string): EmailReci
   for (const s of sessions) {
     const regs = s.registrations.filter((r) => studentActive(r.student));
     if (regs.length === 0) continue;
-    const when = `${formatTimeRange(s.startsAt, s.endsAt)}, učebna ${s.room}`;
+    const when = `${formatTimeRange(s.startsAt, s.endsAt)}, ${roomText(s.room)}`;
     add(s.teacher, `${when} (dozor):\n${regs.map((r) => `  - ${displayName(r.student)}: ${subjectsText(r)}`).join("\n")}`);
     for (const r of regs) {
       for (const x of r.subjects) {

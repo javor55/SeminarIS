@@ -106,6 +106,22 @@ export type DashboardCard = {
   // Odkaz v záhlaví karty (stránka modulu, kde se pracuje) a jeho popisek
   href?: string;
   linkLabel?: string;
+  // Nejbližší věci z této karty pro pás „Nejbližší“ nad kartami (F13): jedna věta o tom, co je nejdřív potřeba
+  highlights?: DashboardHighlight[];
+};
+
+/** Jedna „nejbližší věc“ v pásu nad kartami dashboardu učitele a admina (F13). Karty zůstávají zdrojem pravdy. */
+export type DashboardHighlight = {
+  // Jedinečné v rámci modulu; jádro ho prefixuje id modulu
+  id: string;
+  // Pořadí v pásu (nižší = dříve)
+  order: number;
+  // attention = něco se blíží / chybí, success = běží to dobře, info = jen k vědomí
+  tone: "attention" | "success" | "info";
+  icon: "clock" | "chart" | "people";
+  title: string;
+  text: string;
+  href?: string;
 };
 
 /**

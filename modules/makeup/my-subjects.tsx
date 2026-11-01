@@ -1,3 +1,4 @@
+import { roomText } from "@/lib/room";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import type { User } from "@/lib/types";
@@ -25,7 +26,7 @@ async function StudentSection({ user }: { user: User }) {
       {regs.map((r) => (
         <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2" data-testid="my-makeup-registration">
           <span>
-            <strong>{formatTimeRange(r.session.startsAt, r.session.endsAt)}</strong>, učebna {r.session.room}
+            <strong>{formatTimeRange(r.session.startsAt, r.session.endsAt)}</strong>, {roomText(r.session.room)}
             <span className="text-muted-foreground"> – {r.subjects.map((x) => x.subject.name).join(", ") || "bez předmětu"}</span>
           </span>
           {r.session.cancelledAt ? <Badge variant="destructive">termín zrušen</Badge> : <Badge variant="outline">{ATTENDANCE_LABELS[r.attendance]}</Badge>}
@@ -67,7 +68,7 @@ async function TeacherSection({ user }: { user: User }) {
                   <span>
                     {fullName(r.registration.student)}
                     {r.registration.student.classGroup ? ` (${classLabel(r.registration.student.classGroup)})` : ""}
-                    <span className="text-muted-foreground"> – {formatTimeRange(r.registration.session.startsAt, r.registration.session.endsAt)}, učebna {r.registration.session.room}</span>
+                    <span className="text-muted-foreground"> – {formatTimeRange(r.registration.session.startsAt, r.registration.session.endsAt)}, {roomText(r.registration.session.room)}</span>
                   </span>
                   <Badge variant="outline">{ATTENDANCE_LABELS[r.registration.attendance]}</Badge>
                 </li>

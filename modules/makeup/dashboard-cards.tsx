@@ -1,12 +1,15 @@
+import { roomText } from "@/lib/room";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { classLabel } from "@/lib/school";
-import { formatDateTime, formatTime, formatTimeRange, startOfSchoolDay } from "@/lib/datetime";
+import { formatDateTime, formatDayRelative, formatTime, formatTimeRange, startOfSchoolDay } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
 import type { User } from "@/lib/types";
 import { can } from "@/modules/registry";
 import type { DashboardCard } from "@/modules/server-types";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { SessionFormDialog } from "@/modules/makeup/components/SessionFormDialog";
 import { changeDeadlineOf, fullName } from "@/modules/makeup/data";
 
 // Karty dashboardu modulu Dopisování (F8): student své zápisy a volné termíny, učitel dozory a kdo mu dopisuje,
@@ -53,7 +56,7 @@ async function studentCard(user: User): Promise<DashboardCard | null> {
           <ul className="space-y-2 text-sm" data-testid="dashboard-makeup-registrations">
             {regs.map((r) => (
               <li key={r.id} className={r.session.cancelledAt ? "text-danger" : ""} data-testid="dashboard-makeup-registration">
-                <strong>{formatTimeRange(r.session.startsAt, r.session.endsAt)}</strong>, učebna {r.session.room}
+                <strong>{formatTimeRange(r.session.startsAt, r.session.endsAt)}</strong>, {roomText(r.session.room)}
                 {" – "}
                 {r.subjects.map((x) => x.subject.name).join(", ") || "bez předmětu"}
                 {r.session.cancelledAt ? (
@@ -73,32 +76,98 @@ async function studentCard(user: User): Promise<DashboardCard | null> {
   };
 }
 
-/** Učitel (i admin): moje nadcházející dozory. */
+/** Kolik studentů se u termínu ukáže přímo v kartě (zbytek je v detailu termínu). */
+const STUDENTS_SHOWN = 3;
+
+/** „6 studentů, 2 mají poznámku“ */
+function studentsSummary(count: number, withNote: number): string {
+  if (count === 0) return "zatím se nikdo nepřihlásil";
+  const base = `${count} ${plural(count, "student", "studenti", "studentů")}`;
+  if (withNote === 0) return base;
+  return `${base}, ${withNote} ${withNote === 1 ? "má poznámku" : withNote < 5 ? "mají poznámku" : "má poznámku"}`;
+}
+
+/** Učitel (i admin): moje nadcházející termíny dopisování i se jmény přihlášených, jejich předměty a poznámkami. */
 async function supervisionCard(user: User): Promise<DashboardCard | null> {
   const sessions = await prisma.makeupSession.findMany({
     where: { ...upcoming(), teacherId: user.id },
-    include: { _count: { select: { registrations: true } } },
+    include: {
+      registrations: {
+        orderBy: { createdAt: "asc" },
+        include: { student: { include: { classGroup: true } }, subjects: { include: { subject: { select: { name: true } } } } },
+      },
+    },
     orderBy: { startsAt: "asc" },
     take: 5,
   });
   if (sessions.length === 0) return null;
+  const first = sessions[0];
+  const firstNotes = first.registrations.filter((r) => r.note).length;
+  const now = new Date();
   return {
     id: "supervision",
-    title: "Moje dozory dopisování",
+    title: "Moje termíny dopisování",
     order: 10,
     size: "md",
     href: "/makeup",
-    linkLabel: "Dopisování",
+    linkLabel: "Všechny termíny",
+    highlights: [
+      {
+        id: "next-session",
+        order: 10,
+        tone: "attention",
+        icon: "clock",
+        title: `${formatDayRelative(first.startsAt, now)} ${formatTime(first.startsAt)} dopisování`,
+        text: studentsSummary(first.registrations.length, firstNotes),
+        href: `/makeup/sessions/${first.id}`,
+      },
+    ],
     content: (
-      <ul className="space-y-2 text-sm" data-testid="makeup-widget">
-        {sessions.map((s) => (
-          <li key={s.id} data-testid="dashboard-makeup-session">
-            <Link href={`/makeup/sessions/${s.id}`} className="hover:underline">
-              <strong>{formatTimeRange(s.startsAt, s.endsAt)}</strong>, učebna {s.room} – zapsáno {s._count.registrations}/{s.capacity}
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <div className="space-y-3" data-testid="makeup-widget">
+        <ul className="space-y-3 text-sm">
+          {sessions.map((s) => {
+            const shown = s.registrations.slice(0, STUDENTS_SHOWN);
+            const rest = s.registrations.length - shown.length;
+            return (
+              <li key={s.id} className="space-y-2 rounded-lg border p-3" data-testid="dashboard-makeup-session" data-session={s.id}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0 space-y-0.5">
+                    <Link href={`/makeup/sessions/${s.id}`} className="font-semibold hover:underline">
+                      {formatTimeRange(s.startsAt, s.endsAt)}
+                    </Link>
+                    <p className="text-xs text-muted-foreground">
+                      {roomText(s.room)} · přihlášeno {s.registrations.length} z {s.capacity} · uzávěrka {formatTime(changeDeadlineOf(s))}
+                    </p>
+                  </div>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/makeup/sessions/${s.id}`}>Detail</Link>
+                  </Button>
+                </div>
+                {shown.length > 0 && (
+                  <ul className="divide-y">
+                    {shown.map((r) => (
+                      <li key={r.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5" data-testid="dashboard-session-student">
+                        <span className="font-medium">{fullName(r.student)}</span>
+                        {r.student.classGroup && <span className="text-xs text-muted-foreground">{classLabel(r.student.classGroup)}</span>}
+                        {r.subjects.map((x) => (
+                          <Badge key={x.subjectId} variant="secondary" className="font-normal">{x.subject.name}</Badge>
+                        ))}
+                        {r.note && <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">{r.note}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {rest > 0 && (
+                  <Link href={`/makeup/sessions/${s.id}`} className="text-xs text-muted-foreground underline underline-offset-2">
+                    + {rest} další
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <SessionFormDialog trigger={<Button size="sm" variant="outline" data-testid="dashboard-new-session">+ Vypsat termín dopisování</Button>} />
+      </div>
     ),
   };
 }
@@ -130,7 +199,7 @@ async function whoWritesCard(user: User): Promise<DashboardCard | null> {
             {r.registration.student.classGroup ? ` (${classLabel(r.registration.student.classGroup)})` : ""}
             <span className="text-muted-foreground">
               {" "}
-              – {r.subject.name}, {formatTimeRange(r.registration.session.startsAt, r.registration.session.endsAt)}, učebna {r.registration.session.room}
+              – {r.subject.name}, {formatTimeRange(r.registration.session.startsAt, r.registration.session.endsAt)}, {roomText(r.registration.session.room)}
             </span>
           </li>
         ))}
@@ -153,6 +222,8 @@ async function todayTomorrowCard(): Promise<DashboardCard> {
     { label: "Dnes", items: sessions.filter((s) => s.startsAt < mid) },
     { label: "Zítra", items: sessions.filter((s) => s.startsAt >= mid) },
   ];
+  // Do pásu „Nejbližší“ jde první den, ve kterém nějaký termín je
+  const lead = days[0].items.length > 0 ? days[0] : days[1];
   return {
     id: "today",
     title: "Dopisování dnes a zítra",
@@ -160,6 +231,20 @@ async function todayTomorrowCard(): Promise<DashboardCard> {
     size: "md",
     href: "/makeup",
     linkLabel: "Dopisování",
+    highlights:
+      sessions.length === 0
+        ? []
+        : [
+            {
+              id: "today",
+              order: 15,
+              tone: "info",
+              icon: "clock",
+              title: `${lead.label} ${lead.items.length} ${plural(lead.items.length, "termín", "termíny", "termínů")} dopisování`,
+              text: `nejbližší ${formatTime(sessions[0].startsAt)}, ${roomText(sessions[0].room)}, zapsáno ${sessions[0]._count.registrations}/${sessions[0].capacity}`,
+              href: `/makeup/sessions/${sessions[0].id}`,
+            },
+          ],
     content: (
       <div className="space-y-3 text-sm" data-testid="dashboard-makeup-days">
         {days.map((d) => (
@@ -172,7 +257,7 @@ async function todayTomorrowCard(): Promise<DashboardCard> {
                 {d.items.map((s) => (
                   <li key={s.id} data-testid="dashboard-makeup-session">
                     <Link href={`/makeup/sessions/${s.id}`} className="hover:underline">
-                      <strong>{formatTime(s.startsAt)}–{formatTime(s.endsAt)}</strong>, učebna {s.room}, {fullName(s.teacher)} – zapsáno {s._count.registrations}/{s.capacity}
+                      <strong>{formatTime(s.startsAt)}–{formatTime(s.endsAt)}</strong>, {roomText(s.room)}, {fullName(s.teacher)} – zapsáno {s._count.registrations}/{s.capacity}
                     </Link>
                   </li>
                 ))}

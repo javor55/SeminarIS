@@ -24,7 +24,7 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F10 Opravy z procházení skutečných obrazovek (chyby, workflow, sjednocení) (PR #16)
 - [x] F11 Mobilní zobrazení: zápis a dopisování jako karty (PR #17)
 - [x] F12 Zjednodušené rozhraní pro studenta (jen Zápis seminářů a Dopisování, zápis po krocích) (PR #18)
-- [ ] F13 Učitel a administrátor ve stejném stylu (bez ztráty jakékoli funkce)
+- [x] F13 Učitel a administrátor ve stejném stylu (bez ztráty jakékoli funkce)
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,
@@ -406,3 +406,29 @@ jako“) jako checklist sem a ověřit, že každá zůstala.
 5. Nové nápady z návrhu, které dnes neexistují (ruční připomenutí e-mailem, export do Excelu,
    záložka Studenti pro učitele), **nedělat** – jen zapsat sem jako možné rozšíření.
 6. Dokumentace a E2E (stávající upravit, přidat na nové přehledy).
+
+### Inventura funkcí učitele a admina: kde to je po změně (F13, ověřeno)
+Zápisy seminářů (`/enrollments`, `/enrollments/[id]`):
+- [x] Přehled oken; zapsat / odepsat / přesunout studenta – dialog „Studenti“ u výskytu, beze změny.
+- [x] Správa oken (nové, Upravit zápis, Duplikovat, Zveřejnit, smazat), publikum a pravidla okna – hlavička detailu a `/enrollments` beze změny.
+- [x] Předčasně uzavřít / Znovu otevřít – tlačítka pod hlavičkou detailu (`close-window-early`, `reopen-window`).
+- [x] Bloky (Přidat blok, Upravit, přesun, smazat) a výskyty (Přidat předmět, Upravit, smazat, kapacita, omezení na třídy) – karty bloků beze změny, přibyl pruh obsazenosti.
+- [x] Exporty (matice, seznam studentů, obsazenost, sestavy pro učitele, chybějící zápisy) – menu „Exportovat reporty“.
+- [x] Nezapsaní, export CSV, ruční připomínka e-mailem – záložka Nezapsaní; z panelu Průběh zápisu vede tlačítko přímo na ni.
+- [x] NOVÉ jen zobrazení: Průběh zápisu (hotovo / rozpracováno / nezačali / plné semináře, Chybí dokončit).
+Dopisování (`/makeup`, `/makeup/sessions/[id]`, `/makeup/settings`):
+- [x] Nový termín, řada, filtry, Moje termíny, Kdo dopisuje moje písemky, všechny termíny – `/makeup` beze změny.
+- [x] Detail termínu: Tisk, Upravit, Zrušit (i řadu), Smazat, docházka, Přesunout, Odepsat, poznámky – beze změny (na telefonu karty), přibyl souhrn.
+- [x] Dashboard: Moje termíny (nově se studenty, předměty, poznámkami, Detail, Vypsat termín), Kdo u mě dopisuje, Dopisování dnes a zítra (admin).
+- [ ] Přidat studenta na termín učitelem – dnes **neexistuje** (student se zapisuje sám, učitel jen odebere/přesune); nezavedeno, viz rozšíření.
+Jádro a administrace:
+- [x] Předměty, úvazky, Moje předměty, Uživatelé (detail, hromadné akce, importy), třídy – beze změny.
+- [x] Administrace: všech 10 sekcí (nově ve skupinách Škola / Moduly / Provoz), K vyřízení + Nezobrazovat, ukázková data, historie, diagnostika.
+- [x] „Zobrazit jako“ – beze změny.
+Drobnost: „učebna Učebna 2.04“ opraveno (`roomText`).
+
+### Možná rozšíření (z návrhu F13, nedělá se)
+- Ruční připomínka e-mailem přímo z panelu Průběh zápisu (dnes v záložce Nezapsaní).
+- Export do Excelu (.xlsx; dnes CSV).
+- Záložka Studenti pro učitele; „Zapsat studenta ručně“ z panelu Chybí dokončit; přidání studenta na termín učitelem.
+- Počty u položek bočního menu administrace.
