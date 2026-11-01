@@ -85,13 +85,20 @@ export function getOccurrenceColumns(opts: {
     cell: ({ row }) => {
       const occ = row.original;
       if (!occ.subject) return null;
+      // Student nevidí sloupec kódu výskytu – skupinu (podkód) mu ukážeme u názvu, aby rozlišil např. Konverzace A/B
+      const isStudentView = currentUser?.role === "STUDENT" || currentUser?.role === "GUEST";
       return (
-        <a
-          href={`/subjects/${occ.subject.id}`}
-          className="font-medium hover:underline"
-        >
-          {occ.subject.name}
-        </a>
+        <span>
+          <a
+            href={`/subjects/${occ.subject.id}`}
+            className="font-medium hover:underline"
+          >
+            {occ.subject.name}
+          </a>
+          {isStudentView && occ.subCode && (
+            <span className="ml-1 text-muted-foreground" data-testid="occurrence-group">(skupina {occ.subCode})</span>
+          )}
+        </span>
       );
     },
   });
