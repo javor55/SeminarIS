@@ -30,11 +30,14 @@ const LABELS: Record<WindowPhase, string> = { DRAFT: "Koncept", PLANNED: "Naplá
 export function windowPhase(w: WindowPhaseInput, now: Date = new Date()): WindowPhaseInfo {
   const start = new Date(w.startsAt);
   const end = new Date(w.endsAt);
+  // Předčasné uzavření se ukládá vždy jako okamžik akce (nikdy do budoucna), takže nastavené = uzavřeno.
+  // Neporovnává se s `now`: klient přepočítává čas jen občas a jeho `now` by mohlo být o chvíli starší než
+  // okamžik uzavření na serveru – uzavřené okno by pak chvíli vypadalo otevřené.
   const early = w.closedEarlyAt ? new Date(w.closedEarlyAt) : null;
-  const closedEarly = !!early && early <= now && now <= end;
+  const closedEarly = !!early && now <= end;
   let phase: WindowPhase;
   if (!w.published) phase = "DRAFT";
-  else if (early && early <= now) phase = "CLOSED";
+  else if (early) phase = "CLOSED";
   else if (now < start) phase = "PLANNED";
   else if (now <= end) phase = "OPEN";
   else phase = "CLOSED";
