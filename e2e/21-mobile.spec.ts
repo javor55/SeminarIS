@@ -1,5 +1,5 @@
 import { test, expect, devices, type Page } from "@playwright/test";
-import { sql, resetDb, seedSubjects, toastText } from "./helpers";
+import { sql, resetDb, seedSubjects, toastText, waitForAppHome } from "./helpers";
 
 // F11: mobilní zobrazení (390×844). Pod breakpointem `md` jsou tabulky nahrazené kartami (vykreslí se jen jedna
 // varianta podle matchMedia, viz lib/use-is-mobile.ts), takže tu na rozdíl od ostatních specifikací hledáme `div`
@@ -23,8 +23,7 @@ async function mobileLogin(page: Page, email: string) {
   await page.fill("#email", email);
   await page.fill("#password", "password123");
   await page.click("button[type=submit]");
-  await page.waitForURL("**/dashboard", { timeout: 20_000 });
-  await page.waitForLoadState("networkidle");
+  await waitForAppHome(page);
 }
 
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -48,52 +47,61 @@ test("mobil: student se zapíše na seminář a na dopisování, nic neutíká d
   const page = await ctx.newPage();
   await mobileLogin(page, "jan.student@skola.cz");
 
-  // --- Zápis do okna: karty místo tabulky
-  await page.goto("/zapisy/" + WINDOW);
-  await page.waitForSelector("[data-occurrence]");
+  // --- Úvod: Jan má v zápisu nedokončený blok, takže po přihlášení přistane tam; dole jsou dvě záložky
+  check("mobile: lands on the enrollment", page.url().endsWith("/zapisy/" + WINDOW), page.url());
+  const nav = page.getByTestId("student-bottom-nav");
+  await expect(nav).toBeVisible();
+  check("mobile: two tabs in the bottom bar, each >= 44 px and inside the viewport", (await nav.locator("a").count()) === 2 && (await Promise.all([0, 1].map(async (i) => (await nav.locator("a").nth(i).boundingBox())!))).every((b) => b.height >= 44 && b.x >= 0 && b.x + b.width <= 390));
+  check("mobile: dot on Zápis seminářů (not finished)", (await nav.locator('a[data-tab="seminars.windows"] [data-testid=tab-attention]').count()) === 1 && (await nav.locator('a[data-tab="makeup.sessions"] [data-testid=tab-attention]').count()) === 0);
+  check("mobile: no desktop tabs in the header, account menu is a circle with initials", (await page.locator("header nav a:visible").count()) === 0 && (await page.getByTestId("account-menu").innerText()) === "JS");
   check("seminars: cards, no table", (await page.locator("main table").count()) === 0 && (await page.locator("[data-occurrence]").count()) > 0);
   check("seminars: no horizontal overflow", (await overflow(page)) <= 0, String(await overflow(page)));
-  // Jan je v bloku 1 už zapsaný (seed), zapisuje se tedy do prázdného bloku 2
-  const enroll = page.locator('[data-occurrence="occ_iot_b2"] [data-testid="enroll-button"]');
-  await enroll.scrollIntoViewIfNeeded();
-  const eb = await insideViewport(page, '[data-occurrence="occ_iot_b2"] [data-testid="enroll-button"]');
-  check("seminars: enroll button inside viewport and >= 44 px", eb.ok, JSON.stringify(eb.box));
+  // Jan je v bloku 1 už zapsaný (seed), zapisuje se tedy do bloku 2, který je právě na řadě
   const occId = "occ_iot_b2";
-  await enroll.click();
+  const sel = `[data-occurrence="${occId}"] [data-testid="enroll-button"]`;
+  await page.locator(sel).scrollIntoViewIfNeeded();
+  const eb = await insideViewport(page, sel);
+  check("seminars: enroll button inside viewport and >= 44 px", eb.ok, JSON.stringify(eb.box));
+  await page.locator(sel).click();
   const t1 = await toastText(page);
-  const card = page.locator(`[data-occurrence="${occId}"]`);
-  await expect(card.getByTestId("unenroll-button")).toBeVisible();
   check("seminars: enrolled via mobile", Number(sql(`select count(*) from "StudentEnrollment" where "subjectOccurrenceId"='${occId}' and "deletedAt" is null`)) === 1, t1);
-  check("seminars: card shows Zapsáno", (await card.innerText()).includes("Zapsáno"));
+  // hotový blok se sbalí a lepivá lišta ohlásí kompletní zápis, tečka u záložky zmizí
+  await expect(page.getByTestId("enrollment-status-bar")).toHaveAttribute("data-complete", "true");
+  check("seminars: sticky bar says the enrollment is complete", (await page.getByTestId("enrollment-status-bar").innerText()).includes("Zápis je kompletní"));
+  await expect(nav.locator('a[data-tab="seminars.windows"] [data-testid=tab-attention]')).toHaveCount(0);
+  await page.locator('[data-block="blk_2"] [data-testid=block-toggle]').click();
+  const card = page.locator(`[data-occurrence="${occId}"]`);
+  check("seminars: card shows Vybráno", (await card.innerText()).includes("Vybráno"));
   const ub = await insideViewport(page, `[data-occurrence="${occId}"] [data-testid="unenroll-button"]`);
   check("seminars: unenroll button inside viewport", ub.ok, JSON.stringify(ub.box));
   check("seminars: still no overflow", (await overflow(page)) <= 0);
 
-  // --- Dopisování: karty, zápis přes dialog
-  await page.goto("/makeup");
-  await page.waitForSelector('[data-testid="makeup-cards"]');
-  check("makeup: cards, no table", (await page.locator("main table").count()) === 0);
-  check("makeup: no horizontal overflow", (await overflow(page)) <= 0, String(await overflow(page)));
-  const reg = page.locator('[data-session="mA"]').getByRole("button", { name: "Zapsat se" });
+  // --- Dopisování přes spodní lištu: čipy předmětů, termín na kartě, zápis přes dialog s poznámkou
+  await nav.locator('a[data-tab="makeup.sessions"]').click();
+  await page.waitForSelector('[data-testid="subject-chips"]');
+  check("makeup: cards, no table, no overflow", (await page.locator("main table").count()) === 0 && (await overflow(page)) <= 0, String(await overflow(page)));
+  const chip = await insideViewport(page, '[data-subject-chip]');
+  check("makeup: subject chip >= 44 px", chip.ok, JSON.stringify(chip.box));
+  await page.locator("[data-subject-chip]", { hasText: "Matematika" }).click();
+  const reg = page.locator('[data-session="mA"]').getByRole("button", { name: "Přihlásit se" });
   await reg.scrollIntoViewIfNeeded();
-  const rb = await insideViewport(page, '[data-session="mA"] button:has-text("Zapsat se")');
+  const rb = await insideViewport(page, '[data-session="mA"] button:has-text("Přihlásit se")');
   check("makeup: register button inside viewport and >= 44 px", rb.ok, JSON.stringify(rb.box));
   const text = await page.locator('[data-session="mA"]').innerText();
-  check("makeup: card shows room, supervisor, subjects, capacity", text.includes("101") && text.includes("Učitel Petr") && text.includes("Matematika") && text.includes("Čeština") && text.includes("0/5"), text);
+  check("makeup: card shows room, supervisor, subjects, free places", text.includes("101") && text.includes("Učitel Petr") && text.includes("Matematika") && text.includes("Čeština") && text.includes("5 volných míst"), text);
   await reg.click();
-  await page.locator("#reg-subjects [data-subject=M]").check();
+  check("makeup: subject is prefilled in the dialog", await page.locator("#reg-subjects [data-subject=M]").isChecked());
   await page.fill("#reg-note", "z telefonu");
   const submit = await insideViewport(page, "[data-testid=reg-submit]");
   check("makeup: dialog submit inside viewport", submit.box !== null && submit.box.x >= 0 && submit.box.x + submit.box.width <= 390, JSON.stringify(submit.box));
   await page.click("[data-testid=reg-submit]");
   const t2 = await toastText(page);
-  const mine = page.locator('[data-session="mA"]');
-  await expect(mine).toHaveAttribute("data-registered", "true");
   check("makeup: registered via mobile", Number(sql(`select count(*) from "MakeupRegistration" where "sessionId"='mA'`)) === 1, t2);
+  const mine = page.locator('[data-registration][data-session-id="mA"]');
   const after = await mine.innerText();
-  check("makeup: registered card shows chosen subject and note", after.includes("Matematika") && after.includes("z telefonu") && after.includes("Zapsáno"), after);
-  for (const name of ["Upravit", "Přepsat", "Odhlásit"]) {
-    const b = await insideViewport(page, `[data-session="mA"] button:has-text("${name}")`);
+  check("makeup: my registration card shows chosen subject and note", after.includes("Matematika") && after.includes("z telefonu") && after.includes("Zapsáno"), after);
+  for (const name of ["Upravit", "Přepsat", "Odhlásit se"]) {
+    const b = await insideViewport(page, `[data-registration][data-session-id="mA"] button:has-text("${name}")`);
     check(`makeup: ${name} inside viewport`, b.ok, JSON.stringify(b.box));
   }
   check("makeup: still no overflow", (await overflow(page)) <= 0);

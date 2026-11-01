@@ -7,6 +7,7 @@ import { SubjectOccurrencesPanel } from "@/modules/seminars/components/subjects/
 import { getSubjectOccurrences } from "@/modules/seminars/actions/occurrences";
 import { getSubjectWindows } from "@/modules/seminars/subject-windows";
 import { getSeminarsDashboardCards } from "@/modules/seminars/dashboard-cards";
+import { getSeminarsStudentTabs } from "@/modules/seminars/student-windows";
 import { getSeminarsMySubjectsSections } from "@/modules/seminars/my-subjects";
 import { UserEnrollmentsPanel } from "@/modules/seminars/user-enrollments";
 import { seminarsBulkActions } from "@/modules/seminars/bulk-audience";
@@ -25,6 +26,10 @@ export const seminarsServer: ModuleServer = {
   getEmailEstimates: () => getSeminarsEmailEstimates(),
 
   getDashboardCards: getSeminarsDashboardCards,
+
+  // Zjednodušená navigace studenta (F12): záložka „Zápis seminářů“ jen s alespoň jedním zveřejněným oknem,
+  // které je studentovi určené (publikum) a není uzavřené. Tečka = otevřené okno s nedokončenými povinnými bloky.
+  getStudentTabs: getSeminarsStudentTabs,
 
   getMySubjectsSections: getSeminarsMySubjectsSections,
 

@@ -87,6 +87,7 @@ test("ukázková data: naplnit, stránky rolí, smazat jen vlastní, znovu napln
 
   // dashboard a stránky studenta 4. ročníku (přihlášení společným heslem)
   const ps = await login(browser, studentEmail, PASSWORD);
+  await ps.goto("/dashboard");
   await expect(ps.locator('[data-card="seminars.windows"]')).toBeVisible();
   check("student card shows the open window", (await ps.locator('[data-card="seminars.windows"]').innerText()).includes("Zápis volitelných seminářů – 4. ročník"));
   await ps.goto("/zapisy");
@@ -97,7 +98,7 @@ test("ukázková data: naplnit, stránky rolí, smazat jen vlastní, znovu napln
   check("student sees blocks and seminars", (await ps.locator("main").innerText()).includes("Seminář z fyziky") && (await ps.locator("main").innerText()).includes("Blok B"));
   await ps.goto("/makeup");
   await ps.waitForLoadState("networkidle");
-  check("student sees makeup sessions", (await ps.locator("main").innerText()).includes("Učebna"));
+  check("student sees makeup subject chips", (await ps.getByTestId("subject-chips").count()) === 1);
 
   // učitel
   const pt = await login(browser, teacherEmail, PASSWORD);

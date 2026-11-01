@@ -58,9 +58,17 @@ export async function login(browser: Browser, email: string, password = "passwor
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click("button[type=submit]");
-  await page.waitForURL("**/dashboard", { timeout: 20_000 });
-  await page.waitForLoadState("networkidle");
+  await waitForAppHome(page);
   return page;
+}
+
+/**
+ * Po přihlášení: učitel, admin a host skončí na /dashboard, student (F12) na zápisu, dopisování nebo prázdném stavu
+ * (úvod „/“ rozhodne podle jeho záložek). Čeká, až adresa není ani přihlášení, ani úvod.
+ */
+export async function waitForAppHome(page: Page) {
+  await page.waitForURL((u) => !u.pathname.startsWith("/login") && u.pathname !== "/", { timeout: 20_000 });
+  await page.waitForLoadState("networkidle");
 }
 
 /** Pokus o přihlášení bez čekání na úspěch (pro negativní testy). */
@@ -87,4 +95,33 @@ export function tmpFile(name: string, content: string) {
   const file = path.join(os.tmpdir(), `seminaris-e2e-${name}`);
   fs.writeFileSync(file, content);
   return file;
+}
+
+/**
+ * Dopisování studenta (F12): termíny se ukážou až po výběru předmětu (čip „Který předmět potřebujete dopsat?“).
+ * Čip, který je už zvolený (nebo jediný), se znovu neklikne (druhý klik by výběr zrušil).
+ */
+export async function pickSubjectChip(page: Page, name: string) {
+  const chip = page.locator("[data-subject-chip]", { hasText: name }).first();
+  await chip.waitFor();
+  if ((await chip.getAttribute("aria-pressed")) !== "true") await chip.click();
+}
+
+/**
+ * Zápis seminářů studenta (F12): výskyt je vidět jen v rozbaleném bloku (při zápisu je rozbalený jediný, který je na
+ * řadě). Najde výskyt podle textu a když v rozbaleném bloku není, postupně rozbaluje ostatní bloky.
+ */
+export async function occ(page: Page, text: string) {
+  const find = () => page.locator("[data-occurrence]", { hasText: text }).first();
+  await page.waitForSelector("[data-testid=block-toggle]");
+  if ((await find().count()) === 0) {
+    const toggles = page.locator("[data-testid=block-toggle]");
+    const n = await toggles.count();
+    for (let i = 0; i < n; i++) {
+      const toggle = toggles.nth(i);
+      if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+      if ((await find().count()) > 0) break;
+    }
+  }
+  return find();
 }

@@ -1,12 +1,13 @@
 import { test, expect, type Browser, type Page } from "@playwright/test";
-import { sql, resetDb, seedSubjects, login, navLabels, toastText } from "./helpers";
+import { sql, resetDb, seedSubjects, login, navLabels, toastText, occ } from "./helpers";
 import { IMPERSONATION_COOKIE, signImpersonation } from "../lib/impersonation-token";
 
 // „Zobrazit jako uživatel“: admin vidí aplikaci očima studenta, jen pro čtení, s pruhem nahoře.
 // Cookie se uplatní jen s platným podpisem, pro právě přihlášeného admina a neadminského cíle.
 
 const check = (name: string, ok: boolean, extra = "") => expect.soft(ok, `${name} ${extra}`).toBe(true);
-const STUDENT_NAV = ["Dashboard", "Zápisy", "Předměty", "Moje předměty", "Dopisování", "Můj profil"];
+// F12: student má jen záložky, na kterých pro něj něco je (zápis a dopisování); profil a předměty jsou v menu účtu
+const STUDENT_NAV = ["Zápis seminářů", "Dopisování písemek"];
 const ADMIN_NAV = ["Dashboard", "Zápisy", "Předměty", "Dopisování", "Uživatelé", "Administrace", "Můj profil"];
 const secret = process.env.NEXTAUTH_SECRET!;
 const inHour = () => Math.floor(Date.now() / 1000) + 3600;
@@ -29,7 +30,8 @@ test("náhled jako student: jeho data, pruh, žádná změna a žádný e-mail, 
   check("no impersonate button for another admin", (await pa.getByRole("button", { name: "Zobrazit jako Druhý Admin" }).count()) === 0);
   check("no impersonate button for self", (await pa.getByRole("button", { name: "Zobrazit jako Admin Systému" }).count()) === 0);
   await pa.getByRole("button", { name: "Zobrazit jako Jan Student" }).click();
-  await pa.waitForURL("**/dashboard");
+  // úvod studenta: zápis, kde mu chybí povinný blok
+  await pa.waitForURL("**/zapisy/**");
   await pa.waitForLoadState("networkidle");
 
   // pruh nahoře a nabídka studenta
@@ -40,12 +42,13 @@ test("náhled jako student: jeho data, pruh, žádná změna a žádný e-mail, 
   check("student nav while viewing", JSON.stringify(await navLabels(pa)) === JSON.stringify(STUDENT_NAV), JSON.stringify(await navLabels(pa)));
 
   // vidí data studenta: zápis do semináře a termín dopisování
+  await pa.goto("/dashboard");
   await expect(pa.getByTestId("makeup-widget")).toContainText("učebna 204");
   await pa.goto("/zapisy/enr_ls_2025");
-  await expect(pa.getByRole("button", { name: "Odepsat" })).toBeVisible();
+  await expect(await occ(pa, "Programování mikrokontrolérů")).toContainText("Vybráno");
   await pa.goto("/makeup");
   await pa.waitForLoadState("networkidle");
-  check("student makeup table with registration", (await pa.locator('tr[data-session="s1"]').getAttribute("data-registered")) === "true");
+  check("student makeup: my registration card", (await pa.locator('[data-registration][data-session-id="s1"]').count()) === 1);
 
   // admin-ské stránky se v náhledu chovají jako u studenta
   await pa.goto("/admin");
@@ -56,7 +59,7 @@ test("náhled jako student: jeho data, pruh, žádná změna a žádný e-mail, 
 
   // 1) odepsání ze semináře se odmítne
   await pa.goto("/zapisy/enr_ls_2025");
-  await pa.getByRole("button", { name: "Odepsat" }).click();
+  await (await occ(pa, "Programování mikrokontrolérů")).getByTestId("unenroll-button").click();
   await pa.getByRole("button", { name: "Odhlásit se" }).click();
   expect(await toastText(pa)).toContain("V režimu náhledu nelze nic měnit.");
   check("enrollment untouched", sql(`select count(*) from "StudentEnrollment" where "studentId"='usr_stud1'`) === "1");
@@ -68,7 +71,7 @@ test("náhled jako student: jeho data, pruh, žádná změna a žádný e-mail, 
   // 3) odhlášení z dopisování se odmítne
   await pa.goto("/makeup");
   await pa.waitForLoadState("networkidle");
-  await pa.locator('tr[data-session="s1"]').getByRole("button", { name: "Odhlásit" }).click();
+  await pa.locator('[data-registration][data-session-id="s1"]').getByRole("button", { name: "Odhlásit se" }).click();
   await pa.getByRole("button", { name: /^Odhlásit/ }).last().click();
   expect(await toastText(pa)).toContain("V režimu náhledu nelze nic měnit.");
   check("makeup registration untouched", sql(`select count(*) from "MakeupRegistration"`) === "1");

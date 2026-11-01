@@ -538,11 +538,39 @@ Semináří). Učitel a admin ji nemají (middleware je přesměruje na dashboar
   a výskyty zúžené na jeho ročník / třídu (`occurrencesForViewerWhere`). Řadí otevřená (podle konce), naplánovaná,
   uzavřená; u každého okna stav, termíny, zapsané předměty a **chybějící povinné bloky** (`missingBlocksFor` z
   `unenrolled.ts` – stejná logika jako seznam nezapsaných). Okna, bloky, výskyty i moje zápisy načte jeden dotaz.
-- **Detail** `/zapisy/[id]` používá dnešní zápisové UI (`EnrollmentView`: zapsat, odepsat, přepsat). Data dává
+- **Detail** `/zapisy/[id]` používá od F12 krokové UI studenta (`StudentEnrollmentView`; učitel a admin dál `EnrollmentView`). Data dává
   `getEnrollmentWindowByIdWithBlocks`, která skryté okno, koncept i okno mimo publikum vrátí jako „nenalezeno“ –
   rozhoduje server, ne UI; zápis, odepsání a přepsání navíc vynucují stejná pravidla v transakci (viz Zápisy).
 - Štítek „v zápisu“ u předmětů vede studentovi na `/zapisy/[id]`, e-maily „zápis otevřen“ a připomínka nezapsaným
   na detail okna ve `/zapisy`.
+
+### Zjednodušené rozhraní studenta (F12)
+
+Student vidí jen dvě záložky: **Zápis seminářů** a **Dopisování písemek**. Profil, Moje předměty, Katalog předmětů
+a Odhlásit se jsou v menu pod kolečkem s iniciálami (`components/student-nav.tsx`); Dashboard a Předměty z hlavní
+navigace zmizely, stránky zůstávají po URL. Učitel, admin a host mají navigaci i stránky beze změny (host: úvod
+`/dashboard`, zápis jen ke čtení).
+
+- **Viditelnost záložek se počítá na serveru** bodem rozšíření `getStudentTabs(user)` (`ModuleServer`, typ `StudentTab`;
+  sběr `collectStudentTabs`, `modules/core/student-nav.ts`). Semináře: aspoň jedno zveřejněné, studentovi určené a
+  neuzavřené okno (`listStudentWindows(user, { liveOnly })` = `windowsForViewerWhere` + `windowPhase`); tečka =
+  otevřené okno s chybějícím povinným blokem. Dopisování: budoucí nezrušený termín, nebo budoucí přihláška (i na
+  zrušený termín). Kořenový layout (`app/layout.tsx`) předá výsledek `AppShell`; po odhlášení klient server-data
+  nepoužije. Jedna záložka = bez lišty; žádná = prázdný stav „Teď tu nic nečeká“ na `/dashboard`.
+- **Úvod** `/` (server): student → záložka s tečkou, jinak první nedokončená (dopisování), jinak `/dashboard` (prázdný
+  stav); ostatní role `/dashboard`. Po přihlášení, registraci i „zobrazit jako“ se jde na `/`.
+- **`/zapisy`**: student s jediným neuzavřeným oknem jde rovnou na `/zapisy/[id]`; seznam všech oken je `/zapisy?vse=1`.
+- **Zápis po krocích** (`StudentEnrollmentView`, model `student-blocks.ts`): bloky jsou sbalitelné karty (při zápisu
+  akordeon, rozbalený je blok na řadě); hotový blok = fajfka a název vybraného. Vybrat / Vyměnit (`switchEnrollment`) /
+  Odepsat, nepovinný blok „Nechci nic z tohoto bloku“, lepivá lišta „Zbývá vybrat / Zápis je kompletní“ (telefon), panel
+  „Váš výběr“ (počítač). Pravidla vynucuje server beze změny. `data-testid`: `block-toggle`, `block-name`, `block-state`,
+  `block-progress`, `enroll-button` (`data-action` enroll/switch), `unenroll-button`, `skip-block`, `participants-button`,
+  `enrollment-status-bar`; karty mají `data-block`, `data-occurrence`.
+- **Dopisování** (`StudentMakeupView`): Moje přihlášky (`data-registration`, `data-session-id`) a čipy předmětů
+  (`data-subject-chip`); po výběru čipu karty termínů (`data-session`) s tlačítkem Přihlásit se → dialog s předvyplněným
+  předmětem a poznámkou pro vyučujícího (`MakeupRegistration.note`, bez migrace).
+- E2E: `e2e/22-student-ui.spec.ts` (navigace podle stavu, kroky zápisu, Vyměnit, nepovinný blok, dopisování s poznámkou,
+  host), mobil v `e2e/21-mobile.spec.ts`; helpery `occ`, `pickSubjectChip`, `waitForAppHome`.
 
 ## Ukázková data pro prezentaci (Administrace → Ukázková data, `/admin/demo`, F9)
 

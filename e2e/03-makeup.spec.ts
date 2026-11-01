@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { sql, resetDb, seedSubjects, login, navLabels, toastText } from "./helpers";
+import { sql, resetDb, seedSubjects, login, navLabels, toastText, pickSubjectChip } from "./helpers";
 
 // Převedeno z ručních scénářů; každá kontrola je samostatná „soft“ aserce.
 const check = (name: string, ok: boolean, extra = "") => expect.soft(ok, `${name} ${extra}`).toBe(true);
@@ -51,14 +51,15 @@ test("dopisování: termíny, řady, kolize, zápis, přepis, přesun, uzávěrk
   // 4) Jan se zapíše na s1 – matematika + poznámka
   const pj = await login(b, 'jan.student@skola.cz');
   await pj.goto('/makeup'); await pj.waitForLoadState('networkidle');
-  await pj.locator(`tr[data-session="${s1}"]`).getByRole('button', { name: 'Zapsat se' }).click();
+  await pickSubjectChip(pj, 'Matematika');
+  await pj.locator(`[data-session="${s1}"]`).getByRole('button', { name: 'Přihlásit se' }).click();
   await pj.check('#reg-subjects [data-subject="M"]').catch(() => {});
   await pj.fill('#reg-note', 'test z derivací');
   await pj.click('[data-testid=reg-submit]'); t = await toastText(pj);
   check('student registered', sql(`select count(*) from "MakeupRegistration" where "sessionId"='${s1}'`) === '1', t);
   check('subject teacher resolved from assignments', sql(`select "subjectTeacherId" from "MakeupRegistrationSubject"`) === 'usr_teacher');
   await pj.reload(); await pj.waitForLoadState('networkidle');
-  check('Jan sees my registration highlighted in the table', (await pj.locator(`tr[data-session="${s1}"]`).innerText()).includes('test z derivací') && (await pj.locator(`tr[data-session="${s1}"]`).getAttribute('data-registered')) === 'true');
+  check('Jan sees my registration with the note in Moje přihlášky', (await pj.locator(`[data-registration][data-session-id="${s1}"]`).innerText()).includes('test z derivací') && (await pj.locator(`[data-registration][data-session-id="${s1}"]`).getAttribute('data-cancelled')) === 'false');
   check('Jan dashboard widget', await (async () => { await pj.goto('/dashboard'); return (await pj.locator('[data-testid=makeup-widget]').count()) === 1; })());
   const janCard = (await pj.locator('[data-card="makeup.student"]').innerText());
   check('Jan card: registration with room and change deadline, free terms', janCard.includes('učebna 204') && janCard.includes('změny do') && janCard.includes('Volných termínů: 4'), janCard);
@@ -78,7 +79,8 @@ test("dopisování: termíny, řady, kolize, zápis, přepis, přesun, uzávěrk
   // 5) Eva vidí plno
   const pe = await login(b, 'eva.studentova@skola.cz');
   await pe.goto('/makeup'); await pe.waitForLoadState('networkidle');
-  check('full session shows plno', (await pe.locator(`tr[data-session="${s1}"]`).innerText()).includes('plno'));
+  await pickSubjectChip(pe, 'Matematika');
+  check('full session shows plno', (await pe.locator(`[data-session="${s1}"]`).innerText()).includes('plno'));
 
   // 6) Jan se přepíše na s2 (řada, učebna 205)
   await pj.goto('/makeup'); await pj.waitForLoadState('networkidle');
@@ -116,13 +118,15 @@ test("dopisování: termíny, řady, kolize, zápis, přepis, přesun, uzávěrk
   // 10) uzávěrka: termín za 20 min s uzávěrkou 30 min
   sql(`insert into "MakeupSession"(id,"teacherId","startsAt","endsAt",room,capacity,"changeDeadlineMinutes","createdById","updatedAt") values ('late','usr_teacher',now()+interval '20 min',now()+interval '60 min','301',5,30,'usr_teacher',now()); insert into "MakeupSessionSubject" values ('late','sm')`);
   await pj.goto('/makeup'); await pj.waitForLoadState('networkidle');
-  check('past deadline blocks registration', (await pj.locator('tr[data-session="late"]').innerText()).includes('po uzávěrce'));
+  await pickSubjectChip(pj, 'Matematika');
+  check('past deadline blocks registration', (await pj.locator('[data-session="late"]').innerText()).includes('Po uzávěrce'));
 
   // 11) kolize studenta: Jan zapsán na s1, překrývající termín jiného učitele (DB)
   sql(`insert into "MakeupRegistration"(id,"sessionId","studentId","createdById","updatedAt") values ('r1','${s1}','usr_stud1','usr_stud1',now()); insert into "MakeupRegistrationSubject"("registrationId","subjectId") values ('r1','sm')`);
   sql(`insert into "MakeupSession"(id,"teacherId","startsAt","endsAt",room,capacity,"changeDeadlineMinutes","createdById","updatedAt") select 'ovl','usr_admin',"startsAt"+interval '10 min',"endsAt",'401',5,0,'usr_admin',now() from "MakeupSession" where id='${s1}'; insert into "MakeupSessionSubject" values ('ovl','sm')`);
   await pj.reload(); await pj.waitForLoadState('networkidle');
-  check('student time conflict shown', (await pj.locator('tr[data-session="ovl"]').innerText()).includes('kolize'));
+  await pickSubjectChip(pj, 'Matematika');
+  check('student time conflict shown', (await pj.locator('[data-session="ovl"]').innerText()).includes('Kolize'));
 
   // 12) docházka po začátku
   sql(`insert into "MakeupSession"(id,"teacherId","startsAt","endsAt",room,capacity,"changeDeadlineMinutes","createdById","updatedAt") values ('now','usr_teacher',now()-interval '10 min',now()+interval '30 min','302',5,0,'usr_teacher',now()); insert into "MakeupSessionSubject" values ('now','scj'); insert into "MakeupRegistration"(id,"sessionId","studentId","createdById","updatedAt") values ('r2','now','usr_stud2','usr_stud2',now()); insert into "MakeupRegistrationSubject"("registrationId","subjectId") values ('r2','scj')`);

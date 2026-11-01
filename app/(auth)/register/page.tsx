@@ -50,7 +50,7 @@ export default function RegisterPage() {
   // Efekt pro přesměrování již přihlášených uživatelů
   React.useEffect(() => {
     if (user) {
-      router.replace("/dashboard");
+      router.replace("/");
     }
   }, [user, router]);
 
@@ -86,7 +86,7 @@ export default function RegisterPage() {
       }
 
       // 3. Přesměrujeme na dashboard a vynutíme refresh session
-      router.replace("/dashboard");
+      router.replace("/");
       router.refresh();
 
     } catch (err: unknown) {

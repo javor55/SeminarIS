@@ -75,7 +75,7 @@ export function RegisterDialog({
     <>
       <span onClick={() => { setSelected(defaults()); setNote(initialNote ?? ""); setOpen(true); }}>{trigger}</span>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[480px]">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
@@ -84,7 +84,7 @@ export function RegisterDialog({
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Co chcete dopisovat</Label>
+              <Label>{session.subjects.length > 1 ? "Co chcete dopisovat (můžete přidat další předměty z termínu)" : "Co chcete dopisovat"}</Label>
               <div className="space-y-1" id="reg-subjects">
                 {session.subjects.map((s) => (
                   <div key={s.id}>
@@ -104,11 +104,11 @@ export function RegisterDialog({
               </div>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="reg-note">Poznámka (nepovinná)</Label>
+              <Label htmlFor="reg-note">Poznámka pro vyučujícího (nepovinné)</Label>
               <Textarea
                 id="reg-note"
                 rows={2}
-                placeholder="např. chci dopsat test z derivací"
+                placeholder="např. písemka z 12. 10., potřebuji kalkulačku"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
               />
