@@ -23,7 +23,7 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F9 Ukázková data (naplnit / smazat) pro prezentaci (PR #15)
 - [x] F10 Opravy z procházení skutečných obrazovek (chyby, workflow, sjednocení) (PR #16)
 - [x] F11 Mobilní zobrazení: zápis a dopisování jako karty (PR #17)
-- [x] F12 Zjednodušené rozhraní pro studenta (jen Zápis seminářů a Dopisování, zápis po krocích)
+- [x] F12 Zjednodušené rozhraní pro studenta (jen Zápis seminářů a Dopisování, zápis po krocích) (PR #18)
 - [ ] F13 Učitel a administrátor ve stejném stylu (bez ztráty jakékoli funkce)
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
