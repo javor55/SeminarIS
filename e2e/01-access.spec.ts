@@ -98,7 +98,7 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   const r = await pa.goto('/subjects'); check('/subjects stays when seminars disabled', r.status() === 200, String(r.status()));
   const r2 = await pa.goto('/enrollments'); check('/enrollments 404 when disabled', r2.status() === 404, String(r2.status()));
   await pa.goto('/zapisy'); check('/zapisy leaves admin on dashboard', pa.url().endsWith('/dashboard'), pa.url());
-  await pa.goto('/dashboard'); check('dashboard empty when disabled', (await pa.content()).includes('Vítejte'));
+  await pa.goto('/dashboard'); check('dashboard empty when disabled', (await pa.content()).includes('Přehled'));
   // student: zápis přes action musí selhat → ověř přes dashboard a nav
   const ps = await login(browser, 'eva.studentova@skola.cz');
   // bez seminářů a bez termínů dopisování nemá student žádnou záložku: prázdný stav s menu účtu

@@ -87,7 +87,7 @@ export function StudentTopbar({ nav }: { nav: StudentNav }) {
                 {nav.initials}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuContent align="end" className="flex w-60 flex-col gap-0.5">
               <DropdownMenuLabel className="font-normal">
                 <div className="font-medium">{nav.name}</div>
                 <div className="truncate text-xs text-muted-foreground">{nav.email}</div>
@@ -133,7 +133,7 @@ export function StudentBottomNav({ nav }: { nav: StudentNav }) {
     <nav
       aria-label="Hlavní navigace"
       data-testid="student-bottom-nav"
-      className="print:hidden fixed inset-x-0 bottom-0 z-40 grid h-16 border-t bg-background md:hidden"
+      className="print:hidden fixed inset-x-0 bottom-0 z-40 grid h-16 gap-1 border-t bg-background px-1 md:hidden"
       style={{ gridTemplateColumns: `repeat(${nav.tabs.length}, minmax(0, 1fr))` }}
     >
       {nav.tabs.map((tab) => {
