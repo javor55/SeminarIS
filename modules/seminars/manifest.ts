@@ -35,8 +35,8 @@ export const seminarsModule = {
       key: "seminars.defaultVisibleToStudents",
       type: "boolean",
       default: false,
-      label: "Nový zápis je hned viditelný studentům",
-      description: "Výchozí hodnota při zakládání zápisového okna; v každém okně ji lze změnit.",
+      label: "Nový zápis je hned zveřejněný",
+      description: "Výchozí hodnota při zakládání zápisového okna (zveřejněno = studenti ho vidí a otevře se podle dat; jinak je to koncept). V každém okně ji lze změnit.",
       permission: "seminars.windows.manage",
     },
     {

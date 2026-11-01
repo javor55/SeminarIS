@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Chip } from "@/components/ui/chip";
+import { formatName } from "@/lib/names";
 
 
 export function EditSubjectOccurrenceDialog({
@@ -113,7 +114,7 @@ export function EditSubjectOccurrenceDialog({
               <option value="">Vyber učitele</option>
               {teachers.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.firstName} {t.lastName}
+                  {formatName(t, "list")}
                 </option>
               ))}
             </NativeSelect>

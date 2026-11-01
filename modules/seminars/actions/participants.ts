@@ -31,8 +31,7 @@ export async function getOccurrenceParticipants(occurrenceId: string): Promise<O
     const ctx = await getViewerContext(user);
     const allowed =
       ew.resultsVisibility === "NAMES" &&
-      ew.visibleToStudents &&
-      ew.status !== "DRAFT" &&
+      ew.published &&
       (await isWindowVisibleTo(ctx, ew.id)) &&
       isInOccurrenceAudience(occ, await getStudentAudienceInfo(user.id));
     if (!allowed) throw new Error("Seznam zapsaných není pro vás k dispozici.");

@@ -122,3 +122,23 @@ export function addDaysToDayKey(key: string, days: number): string {
   const t = new Date(Date.UTC(y, m - 1, d + days));
   return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
 }
+
+// === Odpočty ===
+
+/**
+ * Zbývající čas česky, bez sekund: „8 dní 23 h“, „5 h 12 min“, „12 min“, „méně než minuta“.
+ * Pro odpočty typu „Zavře se za …“ (záporná hodnota se bere jako nula).
+ */
+export function formatRemaining(ms: number): string {
+  const minutes = Math.floor(Math.max(0, ms) / 60000);
+  const d = Math.floor(minutes / 1440);
+  const h = Math.floor((minutes % 1440) / 60);
+  const m = minutes % 60;
+  if (d > 0) {
+    const days = `${d} ${d === 1 ? "den" : d < 5 ? "dny" : "dní"}`;
+    return h > 0 ? `${days} ${h} h` : days;
+  }
+  if (h > 0) return m > 0 ? `${h} h ${m} min` : `${h} h`;
+  if (m > 0) return `${m} min`;
+  return "méně než minuta";
+}

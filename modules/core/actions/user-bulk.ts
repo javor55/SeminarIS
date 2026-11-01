@@ -10,6 +10,7 @@ import { previewBulkAction, resolveSelection, runBulkAction } from "@/modules/co
 import type { BulkPreviewResult, BulkRunOutcome, BulkSelection } from "@/modules/core/bulk-runner-types";
 import { prisma } from "@/lib/prisma";
 import { studyStatusLabel } from "@/lib/school";
+import { compareNames } from "@/lib/names";
 
 // Server actions seznamu uživatelů: náhled a spuštění hromadné akce, export CSV výběru.
 
@@ -57,8 +58,8 @@ export async function exportUsersCsv(selection: BulkSelection): Promise<ActionRe
     const users = await prisma.user.findMany({
       where: { id: { in: ids } },
       include: { classGroup: true },
-      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
+    users.sort(compareNames);
     const header = ["Jméno", "Příjmení", "E-mail", "Role", "Třída", "Stav studia", "Aktivní", "Registrace", "Poslední přihlášení"];
     const rows = users.map((u) => [
       u.firstName,

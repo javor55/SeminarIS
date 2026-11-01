@@ -180,11 +180,11 @@ test("Moje předměty: učitel, student, admin bez stránky, vypnutý modul", as
   const janWindow = sql(
     `select b."enrollmentWindowId" from "StudentEnrollment" e join "SubjectOccurrence" o on o.id=e."subjectOccurrenceId" join "Block" b on b.id=o."blockId" join "Subject" s on s.id=o."subjectId" where e."studentId"='usr_stud1' and e."deletedAt" is null and s.name='Programování mikrokontrolérů' limit 1`
   );
-  sql(`update "EnrollmentWindow" set "visibleToStudents"=false where id='${janWindow}'`);
+  sql(`update "EnrollmentWindow" set published=false where id='${janWindow}'`);
   await ps.reload();
   await ps.waitForSelector("[data-testid=my-subjects]");
   check("hidden window enrollment not shown", !(await ps.locator('[data-section^="seminars."]').innerText()).includes("Programování mikrokontrolérů"));
-  sql(`update "EnrollmentWindow" set "visibleToStudents"=true where id='${janWindow}'`);
+  sql(`update "EnrollmentWindow" set published=true where id='${janWindow}'`);
   sql(`insert into "EnrollmentWindowAudience"(id,"windowId",type,"userId",key) values ('ex_jan','${janWindow}','EXCLUDE_USER','usr_stud1','EXCLUDE_USER:usr_stud1')`);
   await ps.reload();
   await ps.waitForSelector("[data-testid=my-subjects]");

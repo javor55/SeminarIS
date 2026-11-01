@@ -19,8 +19,9 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F5 Konfigurovatelné zápisy (publikum, pravidla bloků) (PR #10)
 - [x] F6 Importy s náhledem (uživatelé, úvazky) (PR #11)
 - [x] F7 Učitel v administraci, vypínač hromadného e-mailu, jednotné UI, úklid lintu (PR #12)
-- [x] F8 Dashboard jako přehled (karty z modulů) a stránka Zápisy pro studenty
-- [x] F9 Ukázková data (naplnit / smazat) pro prezentaci
+- [x] F8 Dashboard jako přehled (karty z modulů) a stránka Zápisy pro studenty (PR #14)
+- [x] F9 Ukázková data (naplnit / smazat) pro prezentaci (PR #15)
+- [x] F10 Opravy z procházení skutečných obrazovek (chyby, workflow, sjednocení)
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,
@@ -244,3 +245,54 @@ ukázková data**. Smí se smazat jen to, co ukázková data vytvořila; skuteč
   ke schválení) → smazat → zůstanou jen původní data (seed), skutečný záznam vytvořený
   nad ukázkovými daty se neztratí, pokud na nich nezávisí; druhé naplnění zablokováno;
   učitel sekci nevidí.
+
+## F10 Opravy z procházení skutečných obrazovek
+Zjištěno při focení prezentace s ukázkovými daty (1440×900).
+
+**Chyby**
+1. Detail zápisového okna (admin, `/enrollments/[id]`): tři bloky vedle sebe jsou příliš úzké –
+   názvy bloků se ořezávají („Blok …“), popisy („Vybert…“), akce u každého výskytu (Studenti,
+   Upravit, Smazat) jsou pod sebou a řádky jsou vysoké. Bloky pod sebe (celá šířka) nebo
+   nejvýš 2 vedle sebe od velké šířky, celý název a popis bloku, akce bloku i výskytu do menu „⋯“
+   (nebo kompaktní ikonová tlačítka v jednom řádku).
+2. „Kód výskytu“ zobrazuje `SMA/` – bez podkódu nesmí být koncové lomítko (kód předmětu,
+   s podkódem `KAJ/A`). Opravit všude, kde se kód skládá (UI, exporty).
+3. Řazení českých jmen: všude, kde se řadí podle jména/příjmení (seznam uživatelů – řazení na
+   serveru, nezapsaní, výběry, exporty, karty), použít českou kolaci – v SQL `COLLATE "cs-CZ-x-icu"`
+   (ověřit, že je v Postgresu dostupná; jinak `"und-x-icu"` nebo řadit v JS přes
+   `Intl.Collator("cs")`), v JS `localeCompare(…, "cs")`. Bartáček < Bartoš < Bartošová, S < Š < T.
+   Jedna sdílená pomocná funkce. E2E test na pořadí.
+4. Student v `/zapisy`: u uzavřeného okna nezobrazovat varování „Chybí zápis v bloku…“
+   (jen neutrální „nezapsáno“ / jeho zapsané semináře); varování jen u otevřeného/plánovaného.
+
+**Workflow**
+5. Dopisování pro admina (`/makeup`): osobní sekce („Moje termíny (dozor)“, „Kdo dopisuje moje
+   písemky“) zobrazit jen tomu, kdo dozoruje nebo má úvazky; seznam termínů přejmenovat
+   („Všechny termíny“ pro admina) a přidat filtry: učitel (dozor), předmět, období
+   (nadcházející / tento týden / příští týden / proběhlé / vše), jen s volnými místy; filtry v URL.
+6. Stav zápisového okna: dnes data + ruční stav (DRAFT/SCHEDULED/OPEN/CLOSED) – zmatené.
+   Nově: **Koncept** (nezveřejněno) / **Zveřejněno** (otevření a zavření podle dat) + akce
+   **Předčasně uzavřít** (a „Znovu otevřít“, pokud ještě neuplynul konec). Stav zobrazovaný
+   v UI se vždy odvozuje z dat (plánováno / otevřeno / uzavřeno). Migrace převede stávající
+   okna bez ztráty významu (ruční CLOSED před koncem → předčasně uzavřeno). Všechna místa,
+   která dnes čtou `status`, přepojit (viditelnost pro studenty, zápis, cron, e-maily, karty,
+   duplikace, ukázková data, E2E). Viditelnost pro studenty = zveřejněno (sloučit s
+   „Viditelné pro studenty“, pokud to dává smysl – jinak ponechat a popsat rozdíl).
+7. Přehled „co udělat“: počet v podtitulku musí sedět s tím, co je vidět (počítat i informační,
+   nebo je oddělit „K vyřízení: 2 · Informace: 2“); informační položky lze skrýt (admin
+   „Nezobrazovat“, uloženo v nastavení) a M365 přesunout do Diagnostiky, pokud není zapnuté.
+8. Seznam předmětů: výchozí 50 na stránku (a obecně u tabulek s malým počtem řádků).
+
+**Sjednocení**
+9. Pořadí jména: v tabulkách a seznamech „Příjmení Jméno“, v textu a pozdravech „Jméno Příjmení“;
+   jedna sdílená funkce (`formatName(u, "list" | "text")`) a použít ji všude (uživatelé, dopisování,
+   předměty, úvazky, nezapsaní, karty dashboardu, e-maily).
+10. Texty: odpočet zavření okna česky („za 8 dní 23 h“, bez sekund), stavy bez angličtiny
+    („Otevřeno (Open)“ → „Otevřeno“), vlastní české tlačítko pro výběr souboru v importu,
+    „Změny studenty do konce zápisu“ → srozumitelná věta. Projít ostatní viditelné anglické
+    zbytky.
+11. Student v zápisu nevidí sloupec „Kód výskytu“ (učitel/admin ano); jméno učitele se nemá lámat
+    zbytečně (šířky sloupců).
+
+Testy: upravit dotčené E2E, nové na řazení, filtry dopisování, stav okna (koncept → zveřejněno
+→ předčasně uzavřít → znovu otevřít), skrytí informační položky přehledu, kód výskytu bez lomítka.

@@ -1,6 +1,6 @@
 "use client";
 
-import { unwrap } from "@/lib/action-result";
+import { unwrap, type ActionResult } from "@/lib/action-result";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { Calendar, Download, ChevronDown, Users } from "lucide-react";
 
 import { EditBlockDialog } from "@/modules/seminars/components/blocks/EditBlockDialog";
-import { createBlock, duplicateEnrollmentWindow, getEnrollmentMatrixData, getEnrollmentDetails } from "@/modules/seminars/actions/windows";
+import { closeEnrollmentWindowEarly, createBlock, duplicateEnrollmentWindow, reopenEnrollmentWindow, setEnrollmentWindowPublished, getEnrollmentMatrixData, getEnrollmentDetails } from "@/modules/seminars/actions/windows";
 import { getUnenrolledView } from "@/modules/seminars/actions/unenrolled";
 import { ConfirmAction } from "@/modules/core/components/users/ConfirmAction";
 import { toast } from "sonner";
@@ -24,8 +24,10 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 
-import { computeEnrollmentStatus } from "@/lib/utils";
-import { formatDateTime } from "@/lib/datetime";
+import { windowPhase } from "@/modules/seminars/window-phase";
+import { formatDateTime, formatRemaining } from "@/lib/datetime";
+import { occurrenceCode } from "@/modules/seminars/occurrence-code";
+import { compareCs, formatName } from "@/lib/names";
 
 
 type EnrollmentHeaderProps = {
@@ -45,20 +47,15 @@ export function EnrollmentHeader({
   const [editEnrollment, setEditEnrollment] = useState<EnrollmentWindowWithBlocks | null>(null);
   const [isCreatingBlock, setIsCreatingBlock] = useState(false);
 
-  // 1) Časovač
+  // 1) Odpočet (po minutách, sekundy se nezobrazují)
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    const timer = setInterval(() => setNow(new Date()), 15000);
     return () => clearInterval(timer);
   }, []);
 
-  // 2) Stav zápisu (status)
-  const { absoluteStatus } = useMemo(() => {
-    const absStatus = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt, now);
-    
-    return {
-      absoluteStatus: absStatus,
-    };
-  }, [ew, now]);
+  // 2) Stav zápisu se odvozuje z dat okna (koncept / naplánováno / otevřeno / uzavřeno)
+  const info = useMemo(() => windowPhase(ew, now), [ew, now]);
+  const statusClass = { DRAFT: "text-muted-foreground", PLANNED: "text-info", OPEN: "text-success", CLOSED: "text-muted-foreground" }[info.phase];
 
   const isAdmin = user.role === "ADMIN";
 
@@ -96,7 +93,7 @@ export function EnrollmentHeader({
 
       const csv = [headers.map(h => `"${h}"`), ...rows].map(e => e.join(";")).join("\n");
       downloadCSV(csv, `export_matice_${ew.name.replace(/\s+/g, "_")}.csv`);
-      toast.success("Matrix export dokončen.");
+      toast.success("Export matice dokončen.");
     } catch (err: unknown) {
       const error = err as Error;
       toast.error(error.message || "Export se nezdařil.");
@@ -119,8 +116,8 @@ export function EnrollmentHeader({
               classLabels[en.studentId] || "",
               b.name,
               occ.subject.name,
-              occ.subCode || "",
-              occ.teacher ? `${occ.teacher.firstName} ${occ.teacher.lastName}` : "—",
+              occurrenceCode(occ.subject.code, occ.subCode),
+              occ.teacher ? formatName(occ.teacher, "list") : "—",
               formatDateTime(en.createdAt)
             ]);
           });
@@ -144,12 +141,12 @@ export function EnrollmentHeader({
 
       window.blocks.forEach(b => {
         b.subjectOccurrences.forEach(occ => {
-          const students = occ.studentEnrollments.map(e => `${e.student.lastName} ${e.student.firstName}`).join(", ");
+          const students = occ.studentEnrollments.map(e => formatName(e.student, "list")).join(", ");
           rows.push([
             b.name,
             occ.subject.name,
-            occ.subCode || "",
-            occ.teacher ? `${occ.teacher.firstName} ${occ.teacher.lastName}` : "—",
+            occurrenceCode(occ.subject.code, occ.subCode),
+            occ.teacher ? formatName(occ.teacher, "list") : "—",
             occ.capacity === null ? "∞" : occ.capacity.toString(),
             occ.studentEnrollments.length.toString(),
             students
@@ -174,14 +171,14 @@ export function EnrollmentHeader({
 
       window.blocks.forEach(b => {
         b.subjectOccurrences.forEach(occ => {
-          const teacherName = occ.teacher ? `${occ.teacher.firstName} ${occ.teacher.lastName}` : "NEPŘIŘAZEN";
+          const teacherName = occ.teacher ? formatName(occ.teacher, "list") : "NEPŘIŘAZEN";
           occ.studentEnrollments.forEach(en => {
             rows.push([
               teacherName,
               b.name,
               occ.subject.name,
-              occ.subCode || "",
-              `${en.student.lastName} ${en.student.firstName}`,
+              occurrenceCode(occ.subject.code, occ.subCode),
+              formatName(en.student, "list"),
               en.student.email,
               classLabels[en.studentId] || ""
             ]);
@@ -189,7 +186,7 @@ export function EnrollmentHeader({
         });
       });
       // Seřadit podle učitele
-      rows.sort((a,b) => a[0].localeCompare(b[0], 'cs'));
+      rows.sort((a, b) => compareCs(a[0], b[0]) || compareCs(a[4], b[4]));
 
       const csv = [headers.map(h => `"${h}"`), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`))].map(e => e.join(";")).join("\n");
       downloadCSV(csv, `sestavy_pro_ucitele_${ew.name.replace(/\s+/g, "_")}.csv`);
@@ -208,10 +205,20 @@ export function EnrollmentHeader({
       const rows = view.students.map((s) => [s.lastName, s.firstName, s.email, s.classLabel ?? "", s.missingBlocks.join(", ")]);
       const csv = [headers.map(h => `"${h}"`), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`))].map(e => e.join(";")).join("\n");
       downloadCSV(csv, `chybejici_zapisy_${ew.name.replace(/\s+/g, "_")}.csv`);
-      toast.success("Report nezapsaných exportován.");
+      toast.success("Seznam nezapsaných exportován.");
     } catch (err: unknown) {
       const error = err as Error;
       toast.error(error.message || "Export se nezdařil.");
+    }
+  };
+
+  const runWindowAction = async (action: () => Promise<ActionResult<unknown>>, success: string) => {
+    try {
+      unwrap(await action());
+      toast.success(success);
+      router.refresh();
+    } catch (err: unknown) {
+      toast.error((err as Error).message || "Akce se nepodařila.");
     }
   };
 
@@ -263,56 +270,45 @@ export function EnrollmentHeader({
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="window-rules-summary">
                 <span>
-                  {ew.allowSelfUnenroll === false ? "Odepsání studentem: ne" : ew.changesUntil ? `Změny studenty do ${formatDateTime(ew.changesUntil)}` : "Změny studenty do konce zápisu"}
+                  {ew.allowSelfUnenroll === false ? "Student se nemůže sám odepsat" : ew.changesUntil ? `Studenti mohou měnit zápis do ${formatDateTime(ew.changesUntil)}` : "Studenti mohou měnit zápis do konce zápisu"}
                   {" · "}
                   {ew.resultsVisibility === "NAMES" ? "studenti vidí jména zapsaných" : "studenti vidí jen počty"}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-muted-foreground" />
-                <span data-testid="window-audience">Pro: {ew.audienceView?.summary ?? "vybraní studenti"}</span>
-              </div>
+              {ew.audienceView && (
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <span data-testid="window-audience">Pro: {ew.audienceView.summary}</span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2 pl-6 border-l border-border">
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Stav</div>
-                <div
-                  className={cn(
-                    "text-2xl font-bold",
-                    absoluteStatus.className
-                  )}
-                >
-                  {absoluteStatus.label}
+                <div className={cn("text-2xl font-bold", statusClass)} data-testid="window-phase" data-phase={info.phase}>
+                  {info.label}
                 </div>
               </div>
 
-              {absoluteStatus.is === "planned" && (() => {
-                const diff = new Date(ew.startsAt).getTime() - now.getTime();
-                if (diff <= 0) return null;
-                const d = Math.floor(diff / 86400000);
-                const h = Math.floor((diff % 86400000) / 3600000);
-                const m = Math.floor((diff % 3600000) / 60000);
-                const s = Math.floor((diff % 60000) / 1000);
-                return (
-                  <div className="text-xs text-info font-medium animate-pulse">
-                    Otevře se za {d > 0 ? `${d}d ` : ""}{h}h {m}m {s}s
-                  </div>
-                );
-              })()}
-              {absoluteStatus.is === "open" && (() => {
-                const diff = new Date(ew.endsAt).getTime() - now.getTime();
-                if (diff <= 0) return null;
-                const d = Math.floor(diff / 86400000);
-                const h = Math.floor((diff % 86400000) / 3600000);
-                const m = Math.floor((diff % 3600000) / 60000);
-                const s = Math.floor((diff % 60000) / 1000);
-                return (
-                  <div className="text-xs text-success font-medium">
-                    Uzavře se za {d > 0 ? `${d}d ` : ""}{h}h {m}m {s}s
-                  </div>
-                );
-              })()}
+              {info.phase === "DRAFT" && (
+                <div className="text-xs text-muted-foreground">Studenti zápis nevidí.</div>
+              )}
+              {info.phase === "PLANNED" && (
+                <div className="text-xs text-info font-medium" data-testid="window-countdown">
+                  Otevře se za {formatRemaining(new Date(ew.startsAt).getTime() - now.getTime())}
+                </div>
+              )}
+              {info.phase === "OPEN" && (
+                <div className="text-xs text-success font-medium" data-testid="window-countdown">
+                  Zavře se za {formatRemaining(new Date(ew.endsAt).getTime() - now.getTime())}
+                </div>
+              )}
+              {info.closedEarly && ew.closedEarlyAt && (
+                <div className="text-xs text-muted-foreground" data-testid="window-closed-early">
+                  Uzavřeno {formatDateTime(ew.closedEarlyAt)} (podle plánu do {formatDateTime(ew.endsAt)})
+                </div>
+              )}
             </div>
 
           </div>
@@ -376,6 +372,33 @@ export function EnrollmentHeader({
             onConfirm={handleDuplicate}
             trigger={<Button variant="outline" data-testid="duplicate-window">Duplikovat</Button>}
           />
+          {info.phase === "DRAFT" && (
+            <ConfirmAction
+              title="Zveřejnit zápis?"
+              description="Studenti z publika zápis uvidí a zapisovat se budou moct od začátku do konce zápisu. Pokud už zápis běží, dostanou upozornění."
+              actionLabel="Zveřejnit"
+              onConfirm={() => runWindowAction(() => setEnrollmentWindowPublished(ew.id, true), "Zápis je zveřejněný.")}
+              trigger={<Button data-testid="publish-window">Zveřejnit</Button>}
+            />
+          )}
+          {info.canCloseEarly && (
+            <ConfirmAction
+              title="Předčasně uzavřít zápis?"
+              description="Studenti se přestanou moct zapisovat i odepisovat. Zápis půjde znovu otevřít, dokud neuplyne jeho plánovaný konec."
+              actionLabel="Uzavřít zápis"
+              onConfirm={() => runWindowAction(() => closeEnrollmentWindowEarly(ew.id), "Zápis je uzavřený.")}
+              trigger={<Button variant="outline" data-testid="close-window-early">Předčasně uzavřít</Button>}
+            />
+          )}
+          {info.canReopen && (
+            <ConfirmAction
+              title="Znovu otevřít zápis?"
+              description={`Studenti se budou moct zase zapisovat až do ${formatDateTime(ew.endsAt)}.`}
+              actionLabel="Znovu otevřít"
+              onConfirm={() => runWindowAction(() => reopenEnrollmentWindow(ew.id), "Zápis je znovu otevřený.")}
+              trigger={<Button variant="outline" data-testid="reopen-window">Znovu otevřít</Button>}
+            />
+          )}
           <Button variant="outline" onClick={() => setEditEnrollment(ew)}>
             Upravit zápis
           </Button>

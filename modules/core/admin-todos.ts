@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { isMicrosoftConfigured } from "@/lib/auth-settings";
 import { can } from "@/modules/registry";
 import type { User } from "@/lib/types";
 import type { AdminTodo } from "@/modules/types";
@@ -64,10 +63,9 @@ export async function getCoreAdminTodos(user: User): Promise<AdminTodo[]> {
   }
   todos.push({ id: "email-failed", label: "Neúspěšně odeslané e-maily za posledních 24 hodin", count: email.failed24h, severity: "warning", href: "/admin/notifications" });
 
+  // Microsoft 365 (nenastavené) tu už není: není to úkol, stav je v Diagnostice → Přihlášení.
+
   // Jen informativně
-  if (!isMicrosoftConfigured()) {
-    todos.push({ id: "m365", label: "Přihlášení přes Microsoft 365 není nastavené (všichni se přihlašují heslem)", count: 1, severity: "info", href: "/admin/registration" });
-  }
   todos.push(
     { id: "subjects-without-grades", label: "Předměty bez určených ročníků (platí pro všechny ročníky)", count: withoutGrades, severity: "info", href: "/subjects" },
     { id: "subjects-without-assignment", label: "Předměty bez úvazku učitele v aktuálním školním roce", count: subjectsWithoutAssignment, severity: "info", href: "/subjects" },

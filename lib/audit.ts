@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { TxClient } from "@/lib/prisma";
+import { formatName } from "@/lib/names";
 
 // Historie změn (AuditLog). Volá se ve STEJNÉ transakci jako změna samotná, aby se nemohla
 // změna zapsat bez záznamu (a naopak):
@@ -29,7 +30,7 @@ export type AuditEntry = {
   data?: Prisma.InputJsonValue;
 };
 
-export const fullName = (u: { firstName: string; lastName: string }) => `${u.lastName} ${u.firstName}`.trim();
+export const fullName = (u: { firstName: string; lastName: string }) => formatName(u, "list");
 
 export async function audit(db: TxClient, actor: AuditActor, entry: AuditEntry) {
   await db.auditLog.create({

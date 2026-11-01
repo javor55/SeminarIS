@@ -2,12 +2,12 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
-import { computeEnrollmentStatus } from "@/lib/utils";
 import type { User } from "@/lib/types";
 import { can } from "@/modules/registry";
 import type { DashboardCard } from "@/modules/server-types";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { liveWindowWhere, openWindowWhere, windowPhase, type WindowPhaseInput } from "@/modules/seminars/window-phase";
 import { computeUnenrolled } from "@/modules/seminars/unenrolled";
 import { listStudentWindows } from "@/modules/seminars/student-windows";
 import { windowDeadlineText, WindowActionButton, WindowProgress, WindowStatusBadge } from "@/modules/seminars/components/student/window-summary";
@@ -85,10 +85,10 @@ async function studentCards(user: User): Promise<DashboardCard[]> {
   ];
 }
 
-/** Okno, které se právě zapisuje nebo se blíží: stav vždy podle času, ne podle (možná zastaralého) sloupce. */
-function liveStatus(w: { status: string; startsAt: Date; endsAt: Date }): "OPEN" | "SCHEDULED" | null {
-  const c = computeEnrollmentStatus(w.status, w.startsAt, w.endsAt);
-  return c.is === "open" ? "OPEN" : c.is === "planned" ? "SCHEDULED" : null;
+/** Okno, které se právě zapisuje nebo se blíží (stav se vždy odvozuje z dat okna). */
+function liveStatus(w: WindowPhaseInput): "OPEN" | "SCHEDULED" | null {
+  const { phase } = windowPhase(w);
+  return phase === "OPEN" ? "OPEN" : phase === "PLANNED" ? "SCHEDULED" : null;
 }
 
 /** Učitel (a admin, který nějaký seminář vede): moje výskyty v otevřených a blížících se oknech. */
@@ -97,13 +97,13 @@ async function myOccurrencesCard(user: User): Promise<DashboardCard | null> {
     where: {
       teacherId: user.id,
       deletedAt: null,
-      block: { deletedAt: null, enrollmentWindow: { status: { in: ["SCHEDULED", "OPEN"] }, endsAt: { gte: new Date() } } },
+      block: { deletedAt: null, enrollmentWindow: liveWindowWhere() },
     },
     select: {
       id: true,
       capacity: true,
       subject: { select: { id: true, name: true } },
-      block: { select: { name: true, enrollmentWindow: { select: { id: true, name: true, status: true, startsAt: true, endsAt: true } } } },
+      block: { select: { name: true, enrollmentWindow: { select: { id: true, name: true, published: true, closedEarlyAt: true, startsAt: true, endsAt: true } } } },
       _count: { select: { studentEnrollments: { where: { deletedAt: null } } } },
     },
   });
@@ -167,7 +167,7 @@ async function myOccurrencesCard(user: User): Promise<DashboardCard | null> {
 /** Admin: průběh otevřených zápisů (zapsáno / nezapsaní). */
 async function progressCard(): Promise<DashboardCard | null> {
   const open = await prisma.enrollmentWindow.findMany({
-    where: { status: { in: ["SCHEDULED", "OPEN"] }, startsAt: { lte: new Date() }, endsAt: { gte: new Date() } },
+    where: openWindowWhere(),
     orderBy: { endsAt: "asc" },
     select: { id: true, name: true, endsAt: true },
   });

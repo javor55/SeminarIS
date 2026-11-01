@@ -2,13 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 import { audienceKey, hasIncludes, isInAudience, type AudienceEntry, type AudienceStudent } from "@/modules/seminars/audience";
 import { loadAudienceEntries } from "@/modules/seminars/eligibility";
+import { windowPhase } from "@/modules/seminars/window-phase";
 import type { BulkPreview, BulkUserAction, BulkUserInfo } from "@/modules/server-types";
 
 // Hromadné akce nad uživateli patřící modulu Semináře (bod rozšíření `bulkUserActions`):
 // „Přidat do publika zápisu“ a „Odebrat z publika zápisu“. Spouští je společný běh jádra
 // (modules/core/bulk-runner.ts): oprávnění, výběr, náhled, transakce a souhrnný záznam v historii.
-
-const STATUS_LABELS: Record<string, string> = { DRAFT: "koncept", SCHEDULED: "naplánováno", OPEN: "otevřeno", CLOSED: "uzavřeno" };
 
 const isActiveStudent = (u: BulkUserInfo) => u.role === "STUDENT" && u.isActive && u.studyStatus === "ACTIVE";
 
@@ -16,14 +15,14 @@ const studentsWord = (n: number) => `${n} ${n === 1 ? "student" : n >= 2 && n <=
 
 async function windowParam(actor: unknown) {
   void actor;
-  const windows = await prisma.enrollmentWindow.findMany({ orderBy: { startsAt: "desc" }, select: { id: true, name: true, status: true } });
+  const windows = await prisma.enrollmentWindow.findMany({ orderBy: { startsAt: "desc" }, select: { id: true, name: true, published: true, closedEarlyAt: true, startsAt: true, endsAt: true } });
   return [
     {
       key: "windowId",
       label: "Zápis",
       type: "select" as const,
       required: true,
-      options: windows.map((w) => ({ value: w.id, label: `${w.name} (${STATUS_LABELS[w.status] ?? w.status})` })),
+      options: windows.map((w) => ({ value: w.id, label: `${w.name} (${windowPhase(w).label.toLowerCase()})` })),
     },
   ];
 }

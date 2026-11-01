@@ -25,6 +25,7 @@ import {
 import { subjectInGrade } from "@/lib/school";
 import type { UserListRow as UserRow } from "@/modules/core/users-query";
 import { Chip } from "@/components/ui/chip";
+import { formatName } from "@/lib/names";
 
 /**
  * Uživatelé → učitel → Úvazky: předměty a třídy, které učitel učí v aktuálním školním roce.
@@ -114,7 +115,7 @@ function TeacherAssignmentsEditor({ user }: { user: UserRow }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Úvazky – {user.lastName} {user.firstName}</DialogTitle>
+            <DialogTitle>Úvazky – {formatName(user, "text")}</DialogTitle>
             <DialogDescription>
               Co a ve kterých třídách učitel učí{data ? ` v roce ${data.yearLabel}` : ""}. Změny se ukládají hned.
             </DialogDescription>

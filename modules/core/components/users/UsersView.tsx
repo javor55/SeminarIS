@@ -35,6 +35,7 @@ import {
 } from "@/modules/core/users-filter";
 import type { UserListRow } from "@/modules/core/users-query";
 import { Checkbox } from "@/components/ui/checkbox";
+import { formatName } from "@/lib/names";
 
 const STUDY_LABELS: Record<(typeof USER_STUDY_STATUSES)[number], string> = { ACTIVE: "Studuje", GRADUATED: "Absolvent", LEFT: "Ukončil studium" };
 
@@ -384,7 +385,7 @@ function UsersList({
                     <Checkbox aria-label="Vybrat stránku" data-testid="select-page" checked={pageAllChecked} onChange={togglePage} />
                   </TableHead>
                   <TableHead>
-                    <Button type="button" variant="ghost" onClick={() => sortBy("name")} className="h-auto gap-0 p-0 hover:bg-transparent">Jméno<SortIcon sort="name" /></Button>
+                    <Button type="button" variant="ghost" onClick={() => sortBy("name")} className="h-auto gap-0 p-0 hover:bg-transparent">Příjmení a jméno<SortIcon sort="name" /></Button>
                   </TableHead>
                   <TableHead>
                     <Button type="button" variant="ghost" onClick={() => sortBy("email")} className="h-auto gap-0 p-0 hover:bg-transparent">E-mail<SortIcon sort="email" /></Button>
@@ -411,14 +412,14 @@ function UsersList({
                 )}
                 {list.rows.map((u) => {
                   const isSelf = u.id === currentUser.id;
-                  const name = `${u.firstName} ${u.lastName}`;
+                  const name = formatName(u, "text");
                   return (
                     <TableRow key={u.id} data-user={u.email} data-testid="user-row">
                       <TableCell>
                         <Checkbox aria-label={`Vybrat ${name}`} checked={isChecked(u.id)} onChange={() => toggle(u.id)} />
                       </TableCell>
                       <TableCell className="font-medium">
-                        <Link href={`/users/${u.id}`} className="hover:underline" data-testid="user-link">{name}</Link>
+                        <Link href={`/users/${u.id}`} className="hover:underline" data-testid="user-link">{formatName(u, "list")}</Link>
                       </TableCell>
                       <TableCell>{u.email}</TableCell>
                       <TableCell className="whitespace-nowrap">

@@ -18,7 +18,7 @@ export async function getSubjectWindows(user: User, subjectIds?: string[]): Prom
       ...(ctx ? occurrencesForViewerWhere(ctx) : {}),
       block: {
         deletedAt: null,
-        enrollmentWindow: ctx === undefined ? {} : { visibleToStudents: true, status: { not: "DRAFT" }, ...windowsForViewerWhere(ctx) },
+        enrollmentWindow: ctx === undefined ? {} : windowsForViewerWhere(ctx),
       },
     },
     select: { subjectId: true, block: { select: { enrollmentWindow: { select: { id: true, name: true, startsAt: true } } } } },

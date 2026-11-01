@@ -93,8 +93,15 @@ export async function getViewerContext(user: User): Promise<ViewerContext | unde
 
 const INCLUDE_TYPES = ["GRADE", "CLASS", "USER"] as const;
 
-/** Prisma podmínka na EnrollmentWindow: okna, jejichž publikum zahrnuje daného diváka. */
+/**
+ * Prisma podmínka na EnrollmentWindow: zveřejněná okna (ne koncepty), jejichž publikum zahrnuje daného diváka.
+ * Každé čtení oken pro studenta a hosta prochází tudy.
+ */
 export function windowsForViewerWhere(ctx: ViewerContext): Prisma.EnrollmentWindowWhereInput {
+  return { published: true, ...audienceForViewerWhere(ctx) };
+}
+
+function audienceForViewerWhere(ctx: ViewerContext): Prisma.EnrollmentWindowWhereInput {
   const open: Prisma.EnrollmentWindowWhereInput = { audience: { none: { type: { in: [...INCLUDE_TYPES] } } } };
   if (!ctx.student) return open;
   const matches: Prisma.EnrollmentWindowAudienceWhereInput[] = [{ type: "USER", userId: ctx.student.id }];

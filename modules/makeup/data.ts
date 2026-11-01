@@ -5,6 +5,7 @@ import { classLabel } from "@/lib/school";
 import { can } from "@/modules/registry";
 import { getCurrentSchoolYear } from "@/modules/core/school";
 import type { MakeupRegistrationItem, MakeupSessionItem } from "@/modules/makeup/types";
+import { formatName } from "@/lib/names";
 
 // Interní serverové funkce modulu Dopisování (bez "use server" – nevolatelné z klienta).
 
@@ -19,7 +20,10 @@ export const sessionInclude = {
 
 type SessionRow = Prisma.MakeupSessionGetPayload<{ include: typeof sessionInclude }>;
 
-export const fullName = (u: { firstName: string; lastName: string }) => `${u.lastName} ${u.firstName}`.trim();
+/** Jméno v tabulkách a seznamech: „Příjmení Jméno“. */
+export const fullName = (u: { firstName: string; lastName: string }) => formatName(u, "list");
+/** Jméno ve větách (historie změn, e-maily): „Jméno Příjmení“. */
+export const textName = (u: { firstName: string; lastName: string }) => formatName(u, "text");
 
 export function changeDeadlineOf(s: { startsAt: Date; changeDeadlineMinutes: number }): Date {
   return new Date(s.startsAt.getTime() - s.changeDeadlineMinutes * 60_000);

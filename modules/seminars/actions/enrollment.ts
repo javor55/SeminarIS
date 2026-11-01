@@ -3,15 +3,15 @@
 import { Prisma } from "@prisma/client";
 import { prisma, type TxClient } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { computeEnrollmentStatus } from "@/lib/utils";
 import { assertNotImpersonating, requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import type { User } from "@/lib/types";
 import { can } from "@/modules/registry";
-import { syncEnrollmentWindowStatus } from "@/modules/seminars/window-status";
+import { windowPhase, type WindowPhaseInput } from "@/modules/seminars/window-phase";
 import { getStudentAudienceInfo, isStudentInWindowAudience } from "@/modules/seminars/eligibility";
 import { isInOccurrenceAudience } from "@/modules/seminars/audience";
 import { checkStudentCanChange } from "@/modules/seminars/window-rules";
+import { formatName } from "@/lib/names";
 
 // Pozn.: tyto akce nepoužívají safeAction (vracejí { success } | { error }), proto si
 // režim „zobrazit jako“ (jen pro čtení) hlídají samy.
@@ -19,7 +19,7 @@ import { checkStudentCanChange } from "@/modules/seminars/window-rules";
 // Všechna pravidla (publikum, otevřenost okna, omezení výskytu, kapacita, počet zápisů v bloku,
 // odepisování a termín změn) se vyhodnocují tady na serveru, v transakci. UI je jen zobrazuje.
 
-const fullName = (u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`.trim();
+const fullName = (u: { firstName: string; lastName: string }) => formatName(u, "text");
 
 /** Serializable transakce se při souběhu může odmítnout (P2034); pak se zkusí znovu a dostane správné výsledky kontrol. */
  
@@ -34,19 +34,13 @@ async function serializable<T>(fn: (tx: TxClient) => Promise<T>): Promise<T> {
   }
 }
 
-type EnrollmentWindowLike = { id: string; status: "DRAFT" | "SCHEDULED" | "OPEN" | "CLOSED"; startsAt: Date; endsAt: Date };
-
-/** Student (bez práva zapisovat kdykoli) smí pracovat jen s otevřeným oknem. */
-async function assertWindowOpen(ew: EnrollmentWindowLike) {
-  const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
-  // Lazy update: synchronizujeme stav v DB s reálným časem
-  await syncEnrollmentWindowStatus(ew);
-  if (computed.is === "closed") {
-    if (ew.status === "DRAFT") throw new Error("Zápis je momentálně v přípravě (Koncept).");
-    if (new Date() > new Date(ew.endsAt)) throw new Error("Zápis již byl ukončen.");
-    throw new Error("Zápis není otevřen.");
-  }
-  if (computed.is === "planned") throw new Error("Zápis ještě nebyl zahájen.");
+/** Student (bez práva zapisovat kdykoli) smí pracovat jen s otevřeným oknem; rozhoduje se tady, na serveru, z dat okna. */
+function assertWindowOpen(ew: WindowPhaseInput) {
+  const { phase, closedEarly } = windowPhase(ew);
+  if (phase === "OPEN") return;
+  if (phase === "DRAFT") throw new Error("Zápis je momentálně v přípravě (koncept).");
+  if (phase === "PLANNED") throw new Error("Zápis ještě nebyl zahájen.");
+  throw new Error(closedEarly ? "Zápis byl uzavřen před plánovaným koncem." : "Zápis již byl ukončen.");
 }
 
 /** Zápis studenta do výskytu uvnitř transakce; vyhodí chybu s českým textem, když něco nesedí. */
@@ -64,11 +58,11 @@ async function enrollInTx(tx: TxClient, user: User, studentId: string, subjectOc
   const privileged = can(user.role, "seminars.enroll.others");
 
   // 1. Okno musí být otevřené (admin smí zapisovat kdykoli)
-  if (!can(user.role, "seminars.enroll.anytime")) await assertWindowOpen(ew);
+  if (!can(user.role, "seminars.enroll.anytime")) assertWindowOpen(ew);
 
   // 2. Okno musí být pro studenty zveřejněné a okno i výskyt určeny tomuto studentovi (učitel/admin může zapsat kohokoliv)
   if (!privileged) {
-    if (!ew.visibleToStudents) throw new Error("Tento zápis není pro studenty zveřejněn.");
+    if (!ew.published) throw new Error("Tento zápis není pro studenty zveřejněn.");
     if (!(await isStudentInWindowAudience(ew.id, studentId, tx))) throw new Error("Tento zápis pro vás není určen.");
     if (!isInOccurrenceAudience(occ, await getStudentAudienceInfo(studentId, tx))) {
       throw new Error("Tento předmět není určen pro váš ročník nebo třídu.");
@@ -139,12 +133,11 @@ async function unenrollInTx(tx: TxClient, user: User, enrollmentId: string) {
   const ew = occ.block.enrollmentWindow;
   if (!canManageOthers) {
     // Okno musí být zveřejněné a určené studentovi, otevřené, student se smí odepsat a nesmí uplynout termín změn
-    if (!ew.visibleToStudents) throw new Error("Tento zápis není pro studenty zveřejněn.");
+    if (!ew.published) throw new Error("Tento zápis není pro studenty zveřejněn.");
     if (!(await isStudentInWindowAudience(ew.id, enrollment.studentId, tx))) throw new Error("Tento zápis pro vás není určen.");
-    const computed = computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt);
-    await syncEnrollmentWindowStatus(ew);
-    if (computed.is === "closed") throw new Error("Zápis je uzavřen – odepsání již není možné.");
-    if (computed.is === "planned") throw new Error("Zápis ještě nebyl zahájen.");
+    const { phase } = windowPhase(ew);
+    if (phase === "CLOSED") throw new Error("Zápis je uzavřen – odepsání již není možné.");
+    if (phase === "PLANNED") throw new Error("Zápis ještě nebyl zahájen.");
     const allowed = checkStudentCanChange(ew);
     if (!allowed.ok) throw new Error(allowed.reason ?? "Změna zápisu není možná.");
   }

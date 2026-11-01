@@ -37,7 +37,8 @@ modules/
     server.tsx          body rozšíření (karty dashboardu, štítky, záložky, todo), statistiky, úklid při mazání uživatele
     dashboard-cards.tsx karty dashboardu: student (Zápis seminářů), učitel (moje semináře v zápisu), admin (průběh zápisů)
     student-windows.ts  JEDINÉ místo, které vybírá okna pro studenta/hosta (stránka Zápisy i karty): viditelná, ne koncept, publikum, průběh
-    window-status.ts    synchronizace stavu zápisového okna s časem
+    window-phase.ts     JEDINÝ zdroj pravdy o stavu zápisového okna (koncept / plánováno / otevřeno / uzavřeno), čistá logika + Prisma podmínky
+    occurrence-code.ts  kód výskytu „KAJ/A“, bez podkódu „KAJ“ (nikdy koncové lomítko)
     audience.ts         publikum okna a omezení výskytu: typy a čistá logika (isInAudience), bez DB; audience-view.ts popisky pro UI
     eligibility.ts      JEDINÝ zdroj pravdy o způsobilosti: audienceWhere, viditelnost oken a výskytů, zápis publika
     window-rules.ts     pravidla okna (odepsání, termín změn) a bloků (min/max, povinnost), sdílená serverem i UI
@@ -67,7 +68,8 @@ lib/
   prisma.ts             Prisma klient (passwordHash se nikdy nevrací bez výslovného omit: false)
   auth.ts               NextAuth (heslo + Microsoft 365); role a aktivita se při každém ověření načtou z DB
   auth-settings.ts      nastavení přihlašování (M365 zapnuto, kdo smí heslem, zakládání účtů)
-  datetime.ts           formátování data a času v pásmu Europe/Prague
+  datetime.ts           formátování data a času v pásmu Europe/Prague, odpočty (`formatRemaining`: „8 dní 23 h“)
+  names.ts              jména osob: `formatName(u, "list"|"text")`, české řazení (`compareNames`, `sortByName`, `sortByText`)
   action-result.ts      ActionResult, unwrap – chyby server actions pro uživatele (klient)
   safe-action.ts        safeAction – obalení server action (server)
   school.ts             čisté výpočty: školní rok, označení třídy („3.A“), ročníky předmětu, popisy stavu studia
@@ -405,6 +407,38 @@ Okno (`EnrollmentWindow`) obsahuje **bloky**, blok **výskyty předmětů** a st
 (`modules/seminars/actions/enrollment.ts`, zápis v izolaci Serializable s opakováním při souběhu, takže kapacita a
 maximum v bloku platí i při současných zápisech); UI pravidla jen zobrazuje.
 
+### Stav okna (F10)
+
+V databázi jsou jen `published` (koncept / zveřejněno), `startsAt` / `endsAt` a `closedEarlyAt` (správce okno předčasně
+uzavřel). Dřívější ruční `status` (DRAFT / SCHEDULED / OPEN / CLOSED), který se rozcházel s časem a musel se
+„synchronizovat“, i příznak `visibleToStudents` zanikly. Stav **plánováno / otevřeno / uzavřeno se nikde neukládá**,
+vždy ho počítá `windowPhase()` v `modules/seminars/window-phase.ts` (server i UI stejnou funkcí):
+
+| Podmínka | Stav |
+|---|---|
+| `published = false` | Koncept (studenti okno nevidí, nelze se zapisovat, ať jsou data jakákoli) |
+| zveřejněno, `closedEarlyAt` v minulosti | Uzavřeno předčasně |
+| zveřejněno, před `startsAt` | Naplánováno |
+| zveřejněno, `startsAt` až `endsAt` | Otevřeno |
+| zveřejněno, po `endsAt` | Uzavřeno |
+
+- **Viditelnost pro studenty = zveřejněno** (jedna věc místo dvou): student vidí jen `published` okna určená jemu
+  (`windowsForViewerWhere` v `eligibility.ts` přidává `published: true` ke každému čtení pro studenta a hosta).
+- **Zápis rozhoduje server**: `assertWindowOpen` v transakci zápisu a odepsání volá `windowPhase`, takže „zastaralá“
+  stránka studenta po uzavření dostane odmítnutí. Admin (`seminars.enroll.anytime`) zapisuje vždy.
+- Akce admina na stránce okna: **Zveřejnit** (`setEnrollmentWindowPublished`), **Předčasně uzavřít**
+  (`closeEnrollmentWindowEarly`, jen otevřené okno) a **Znovu otevřít** (`reopenEnrollmentWindow`, jen předčasně
+  uzavřené okno, dokud neuplynul jeho konec; po konci se upraví konec zápisu). Audit `seminars.window.publish` /
+  `unpublish` / `close` / `reopen`. Nové okno je ve výchozím stavu koncept (výchozí hodnotu mění Administrace →
+  Semináře), duplikace vytvoří koncept.
+- Dotazy bez načtení řádků používají `openWindowWhere()` / `liveWindowWhere()` (statistiky, karty, denní úloha);
+  upozornění „zápis otevřen“ se odešle jednou za okno (`openedNotifiedAt`) při prvním čtení otevřeného okna nebo
+  denní úlohou (`notifyWindowOpenedIfOpen`).
+- **Migrace `20261031100000_zapisova_okna_zverejneni`**: `published = (status <> 'DRAFT' AND visibleToStudents)` (co
+  student dřív viděl, vidí i teď; skryté okno, které nebylo koncept, se stává konceptem), ruční `CLOSED` s koncem
+  v budoucnosti → `closedEarlyAt = LEAST(updatedAt, now())`, pak se sloupce `status`, `visibleToStudents` a typ `Status` zruší.
+  Aplikuje se na prázdnou DB i na DB s daty.
+
 ### Publikum okna (`EnrollmentWindowAudience`)
 
 Publikum = **(ročníky ∪ třídy ∪ konkrétní studenti) \ vynechaní studenti**. Položka má typ `GRADE`, `CLASS`, `USER` nebo
@@ -500,7 +534,7 @@ Semináří). Učitel a admin ji nemají (middleware je přesměruje na dashboar
 `seminars.enroll.self` (host jen čte).
 
 - **Seznam** (`listStudentWindows`, `modules/seminars/student-windows.ts`) je jediné místo, které vybírá okna pro
-  studenta: jen `visibleToStudents`, ne koncept, jen okna s publikem zahrnujícím studenta (`windowsForViewerWhere`)
+  studenta: jen zveřejněná okna (`published`, ne koncept), jen okna s publikem zahrnujícím studenta (`windowsForViewerWhere`)
   a výskyty zúžené na jeho ročník / třídu (`occurrencesForViewerWhere`). Řadí otevřená (podle konce), naplánovaná,
   uzavřená; u každého okna stav, termíny, zapsané předměty a **chybějící povinné bloky** (`missingBlocksFor` z
   `unenrolled.ts` – stejná logika jako seznam nezapsaných). Okna, bloky, výskyty i moje zápisy načte jeden dotaz.
@@ -705,9 +739,15 @@ Položky dodává jádro (`modules/core/admin-todos.ts`) a zapnuté moduly přes
 (`AdminTodo`: `id`, `label`, `count`, `severity` = `critical` / `warning` / `info`, `href`). Položky s počtem 0
 se nezobrazí, řadí se podle závažnosti. Jádro hlídá: čekající registrace, studenty bez třídy, denní úlohu
 (chybí `CRON_SECRET`, neběžela, selhala), e-maily (nenastavené, čerpání denního/měsíčního limitu, neúspěšné
-za 24 h), Microsoft 365 nenastaveno (jen informativně), předměty bez ročníků a bez úvazku, třídy bez úvazků.
+za 24 h), předměty bez ročníků a bez úvazku, třídy bez úvazků.
 Semináře přidávají nezapsané v každém otevřeném okně, Dopisování nadcházející termíny bez předmětů nebo
 s neaktivním dozorem. Nový modul přidá položku jedním voláním `getAdminTodos`.
+
+**Podtitulek** ukazuje „K vyřízení: N · Informace: M“, počty sedí s viditelnými řádky. **Informační položky** (jen
+`info`) jde skrýt tlačítkem **Nezobrazovat** (jen admin); seznam skrytých id je v nastavení systému
+(`SystemSetting` `core.admin.hiddenTodos`, `modules/core/admin-todo-hidden.ts`), platí pro všechny, pod seznamem je
+„Zobrazit skryté informace (n)“; audit `settings.todos.hide` / `settings.todos.show`. Naléhavé a ke zpracování
+se skrýt nedají. Microsoft 365 už není položka přehledu: stav je v **Diagnostice → Přihlášení**.
 
 Každá položka nese **`permission`** (výchozí `core.admin`, tj. jen admin) a `collectAdminTodos` ji filtruje podle role
 uživatele, takže učitel vidí jen to, co smí řešit: nezapsané studenty v otevřených oknech (`seminars.windows.view`)
@@ -819,6 +859,12 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
   - učebna není obsazená dvakrát,
   - student nemá dva zápisy, které se časově překrývají.
 - **Povolené předměty** termínu jsou všechny aktivní předměty (jádro).
+- **Učitel a admin** (`/makeup`): osobní sekce „Moje termíny (dozor)“ se ukáže jen tomu, kdo nějaký termín vypsal,
+  „Kdo dopisuje moje písemky“ jen tomu, kdo má úvazky v aktuálním roce (`getMakeupPersonalInfo`). Seznam termínů
+  se jmenuje **Všechny termíny** (admin, včetně vlastních) / Termíny ostatních učitelů (učitel) a má filtry: období
+  (nadcházející / tento týden / příští týden / proběhlé / vše; týden pondělí až neděle v pásmu školy), učitel (dozor),
+  předmět a „jen s volnými místy“. Filtry jsou v adrese (`?period=&teacher=&subject=&free=1`, `session-filter.ts`),
+  seznam dává `getSessions(filter)` (nejvýš 300 řádků).
 - **Student** (studující, všechny ročníky) má **jednu tabulku termínů** ve stylu zápisu seminářů:
   nadcházející nezrušené termíny a termíny, kde je zapsaný (i zrušené, zvýrazněné). Sloupce:
   termín, učebna, dozor, předměty (zvýrazněné předměty jeho ročníku a třídy), obsazenost, akce.
@@ -871,6 +917,14 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
   Pro text v červené použijte `text-danger` (`text-destructive` je v tmavém režimu příliš tmavé, `destructive`
   patří jen plným výplním tlačítek). Štítky přes `Badge` (`success`, `warning`, `info`, `danger`, `muted`
   jemné; `successSolid`, `infoSolid` plné; `default`, `secondary`, `outline`, `destructive`).
+- **Jména:** jen přes `lib/names.ts`. V tabulkách a seznamech „Příjmení Jméno“ (`formatName(u, "list")`), ve větách,
+  hláškách, historii a e-mailech „Jméno Příjmení“ (`"text"`). **Řazení jmen i českých názvů** (předměty) přes
+  `compareNames` / `sortByName` / `sortByText` (`Intl.Collator("cs")`: Bartáček < Bartoš < Bartošová, S < Š < T, H < CH),
+  nikdy `orderBy` na jméno v databázi: výchozí kolace Postgresu není česká. Lokální Postgres má `cs-CZ-x-icu`,
+  Prisma Postgres by ICU kolace mít měl, ale nespoléháme na to: seznamy načtené celé se řadí v JS po načtení a
+  stránkovaný seznam uživatelů (`queryUsers`) načte jen `id + jména` všech odpovídajících, seřadí v JS a plné řádky
+  načte pro jednu stránku (škola: stovky až tisíce uživatelů). Řazení podle e-mailu, registrace a přihlášení zůstává v DB.
+- **Tabulky (`DataTable`):** výchozí 50 řádků na stránku (10 / 25 / 50 / 100).
 - **Datum a čas:** jen přes `lib/datetime.ts` (`formatDateTime`, `formatTimeRange`, …). Pásmo
   je Europe/Prague a výstup stejný na serveru i v prohlížeči. `toLocaleString()` bez
   locale dává americký formát.
@@ -927,6 +981,9 @@ napsané všechny mutace v aplikaci. Výjimkou je zápis a odepsání semináře
   19. ukázková data (`19-demo.spec.ts`): naplnit → počty a stránky studenta, učitele a admina → smazat (zůstanou jen původní
       data a skutečné záznamy nezávislé na ukázkových) → znovu naplnit stejně, druhé naplnění zablokované, třída se skutečným
       studentem se nesmaže, učitel sekci nevidí, e-mailová vrstva přeskočí adresy `.invalid`.
+  20. opravy z procházení obrazovek (`20-opravy-obrazovek.spec.ts`, F10): stav okna (koncept → zveřejněno → předčasně
+      uzavřít, server odmítne zápis → znovu otevřít), kód výskytu bez lomítka a bez sloupce pro studenta, české řazení,
+      uzavřené okno bez varování, filtry a osobní sekce dopisování, K vyřízení / Informace a Nezobrazovat.
 
   Vypnutí modulu Semináře (test 1) ověřuje, že z detailu i seznamu předmětů zmizí jeho panel a štítek.
 - **Kontraktový test modulů** (`npm run test:contract`, `scripts/contract-test.ts`, bez DB a buildu, běží

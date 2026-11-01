@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { classLabel, compareClasses } from "@/lib/school";
 import { audienceSummary, draftFromEntries, type AudienceView } from "@/modules/seminars/audience";
+import { formatName } from "@/lib/names";
 
 // Publikum okna pro zobrazení (jen pro učitele a adminy): s popisky tříd a jmény studentů.
 
@@ -22,7 +23,7 @@ export function buildAudienceView(rows: readonly AudienceRow[]): AudienceView {
     .map((r) => r.classGroup!)
     .sort(compareClasses)
     .map((c) => ({ id: c.id, label: classLabel(c) }));
-  const person = (r: AudienceRow) => ({ id: r.user!.id, name: `${r.user!.firstName} ${r.user!.lastName}`.trim(), email: r.user!.email });
+  const person = (r: AudienceRow) => ({ id: r.user!.id, name: formatName(r.user!, "list"), email: r.user!.email });
   const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, "cs");
   const users = rows.filter((r) => r.type === "USER" && r.user).map(person).sort(byName);
   const excluded = rows.filter((r) => r.type === "EXCLUDE_USER" && r.user).map(person).sort(byName);

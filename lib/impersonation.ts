@@ -9,6 +9,7 @@ import {
   type ImpersonationPayload,
 } from "@/lib/impersonation-token";
 import type { Role, User } from "@/lib/types";
+import { formatName } from "@/lib/names";
 
 // „Zobrazit jako uživatel“ (jen pro čtení). Server (session callback v lib/auth.ts) zamění
 // přihlášeného admina za cílového uživatele jen tehdy, když
@@ -62,7 +63,7 @@ export async function resolveImpersonation(real: {
     role: target.role,
     isActive: target.isActive,
     classLabel: target.role === "STUDENT" && target.classGroup ? classLabel(target.classGroup) : null,
-    impersonatedBy: { id: real.id, name: `${real.lastName} ${real.firstName}`.trim() },
+    impersonatedBy: { id: real.id, name: formatName(real, "text") },
   };
 }
 

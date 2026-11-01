@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/datetime";
+import { getAuthSettings } from "@/lib/auth-settings";
 import { PerformanceBenchmarks } from "@/modules/core/components/admin/PerformanceBenchmarks";
 import { getCronStatus, getDatabaseStatus, getDeploymentInfo, getEmailDiagnostics, getMigrationStatus } from "@/modules/core/system-status";
 
@@ -24,7 +25,7 @@ const Warn = ({ children }: { children: ReactNode }) => <Badge variant="warning"
 
 export default async function DiagnosticsPage() {
   await requirePagePermission("core.admin");
-  const [db, migrations, cron, email] = await Promise.all([getDatabaseStatus(), getMigrationStatus(), getCronStatus(), getEmailDiagnostics()]);
+  const [db, migrations, cron, email, auth] = await Promise.all([getDatabaseStatus(), getMigrationStatus(), getCronStatus(), getEmailDiagnostics(), getAuthSettings()]);
   const deployment = getDeploymentInfo();
 
   return (
@@ -98,6 +99,22 @@ export default async function DiagnosticsPage() {
             <Row label="Dnes odesláno">{email.usage.today} / {email.usage.dailyLimit}</Row>
             <Row label="Tento měsíc odesláno">{email.usage.month} / {email.usage.monthlyLimit}</Row>
             <Row label="Neúspěšné za 24 h">{email.failed24h === 0 ? <Ok>0</Ok> : <Bad>{email.failed24h}</Bad>}</Row>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm" data-testid="diag-auth">
+          <CardHeader>
+            <CardTitle>Přihlášení</CardTitle>
+            <CardDescription>Přihlášení přes Microsoft 365 (nastavení najdete v sekci Registrace a přihlášení).</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Row label="Microsoft 365" testId="diag-m365">
+              {auth.microsoftConfigured ? (
+                auth.microsoftEnabled ? <Ok>zapnuto</Ok> : <Warn>nastaveno, ale vypnuto správcem</Warn>
+              ) : (
+                <span className="text-muted-foreground">nenastaveno (přihlašuje se heslem; chybí AZURE_AD_*)</span>
+              )}
+            </Row>
           </CardContent>
         </Card>
 

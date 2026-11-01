@@ -2,11 +2,12 @@ import { prisma } from "@/lib/prisma";
 import type { User } from "@/lib/types";
 import { classLabel, compareClasses, subjectInGrade } from "@/lib/school";
 import { getCurrentSchoolYear } from "@/modules/core/school";
+import { formatName, sortByText } from "@/lib/names";
 
 // Data stránky „Moje předměty“ (jádro): učitel – úvazky, student – předměty ročníku a jejich vyučující.
 // Části modulů (semináře, dopisování) dodávají body rozšíření getMySubjectsSections.
 
-const fullName = (u: { firstName: string; lastName: string }) => `${u.lastName} ${u.firstName}`.trim();
+const fullName = (u: { firstName: string; lastName: string }) => formatName(u, "list");
 
 export type MyTeachingSubject = { id: string; name: string; code: string | null; isActive: boolean; classes: string[] };
 export type MyGradeSubject = { id: string; name: string; code: string | null; teachers: string[] };
@@ -39,7 +40,7 @@ export async function getMyGradeSubjects(user: User): Promise<{ classLabel: stri
   if (!student?.classGroup || student.studyStatus !== "ACTIVE") return { classLabel: null, subjects: [] };
   const year = await getCurrentSchoolYear();
   const [subjects, assignments] = await Promise.all([
-    prisma.subject.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.subject.findMany({ where: { isActive: true } }),
     year.id
       ? prisma.teachingAssignment.findMany({
           where: { classGroupId: student.classGroup.id, schoolYearId: year.id },
@@ -49,7 +50,7 @@ export async function getMyGradeSubjects(user: User): Promise<{ classLabel: stri
   ]);
   return {
     classLabel: classLabel(student.classGroup),
-    subjects: subjects
+    subjects: sortByText(subjects, (s) => s.name)
       .filter((s) => subjectInGrade(s.grades, student.classGroup!.grade))
       .map((s) => ({
         id: s.id,

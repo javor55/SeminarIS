@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { classLabel, parseClassLabel, studyStatusLabel } from "@/lib/school";
+import { compareNames } from "@/lib/names";
 import type { UserFilter, UserListQuery } from "@/modules/core/users-filter";
 
 // Dotazy nad seznamem uživatelů (server). Filtr z URL se převádí na `where` jedním místem,
@@ -72,6 +73,8 @@ export type UserListRow = {
 /** Jedna stránka seznamu uživatelů a celkový počet odpovídající filtru. */
 export async function queryUsers(query: UserListQuery): Promise<{ rows: UserListRow[]; total: number; page: number; pages: number }> {
   const where = userFilterWhere(query);
+  const byName = query.sort !== "email" && query.sort !== "created" && query.sort !== "login";
+  if (byName) return queryUsersByName(query, where);
   const total = await prisma.user.count({ where });
   const pages = Math.max(1, Math.ceil(total / USERS_PAGE_SIZE));
   // stránka za koncem (např. po zúžení filtru) se přesune na poslední
@@ -86,12 +89,30 @@ export async function queryUsers(query: UserListQuery): Promise<{ rows: UserList
   return { total, pages, page: page + 1, rows: users.map(toRow) };
 }
 
+/**
+ * Řazení podle jména: česká kolace (Bartoš < Bartošová, S < Š < T, H < CH) se dělá v JS přes `Intl.Collator("cs")`
+ * (lib/names.ts) nad úzkým výběrem všech odpovídajících (id + jména), takže nezáleží na tom, jaké kolace má databáze.
+ * Plné řádky se pak načtou jen pro jednu stránku.
+ */
+async function queryUsersByName(query: UserListQuery, where: Prisma.UserWhereInput) {
+  const names = await prisma.user.findMany({ where, select: { id: true, firstName: true, lastName: true } });
+  names.sort((a, b) => compareNames(a, b) || (a.id < b.id ? -1 : 1));
+  if (query.dir === "desc") names.reverse();
+  const total = names.length;
+  const pages = Math.max(1, Math.ceil(total / USERS_PAGE_SIZE));
+  const page = Math.min(Math.max(0, (query.page ?? 1) - 1), pages - 1);
+  const ids = names.slice(page * USERS_PAGE_SIZE, (page + 1) * USERS_PAGE_SIZE).map((n) => n.id);
+  const users = await prisma.user.findMany({ where: { id: { in: ids } }, include: rowInclude });
+  const byId = new Map(users.map((u) => [u.id, u]));
+  return { total, pages, page: page + 1, rows: ids.map((id) => toRow(byId.get(id)!)) };
+}
+
 const rowInclude = {
   classGroup: true,
   _count: { select: { teachingAssignments: { where: { schoolYear: { isCurrent: true } } } } },
 } satisfies Prisma.UserInclude;
 
-type RowUser = Prisma.UserGetPayload<{ include: typeof rowInclude }>;
+type RowUser = Omit<Prisma.UserGetPayload<{ include: typeof rowInclude }>, "passwordHash">;
 
 function toRow(u: RowUser): UserListRow {
   return {

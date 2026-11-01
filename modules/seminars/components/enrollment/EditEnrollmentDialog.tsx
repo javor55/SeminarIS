@@ -32,22 +32,12 @@ import {
 import { updateEnrollmentWindow, createEnrollmentWindow, deleteEnrollmentWindow } from "@/modules/seminars/actions/windows";
 import { NativeSelect } from "@/components/ui/native-select";
 import { AudiencePicker, emptyAudienceState, type AudienceState } from "@/modules/seminars/components/audience/AudiencePicker";
-import { EnrollmentStatus, EnrollmentWindowWithBlocks } from "@/lib/types";
+import { EnrollmentWindowWithBlocks } from "@/lib/types";
 
 type EditEnrollmentDialogProps = {
-  enrollment: Partial<EnrollmentWindowWithBlocks> & { id?: string; name?: string; description?: string | null; status?: EnrollmentStatus; startsAt?: string | Date; endsAt?: string | Date; visibleToStudents?: boolean; reminderDaysBefore?: number | null };
+  enrollment: Partial<EnrollmentWindowWithBlocks> & { id?: string; name?: string; description?: string | null; startsAt?: string | Date; endsAt?: string | Date; published?: boolean; reminderDaysBefore?: number | null };
   onOpenChange: (open: boolean) => void;
 };
-
-function guessStatus(en: Partial<EnrollmentWindowWithBlocks>) {
-  const now = new Date();
-  if (!en.startsAt || !en.endsAt) return "DRAFT" as EnrollmentStatus;
-  const s = new Date(en.startsAt);
-  const e = new Date(en.endsAt);
-  if (now < s) return "SCHEDULED" as EnrollmentStatus;
-  if (now >= s && now <= e) return "OPEN" as EnrollmentStatus;
-  return "CLOSED" as EnrollmentStatus;
-}
 
 export function EditEnrollmentDialog({
   enrollment,
@@ -58,12 +48,7 @@ export function EditEnrollmentDialog({
   const [description, setDescription] = React.useState(
     enrollment.description ?? ""
   );
-  const [status, setStatus] = React.useState<EnrollmentStatus>(
-    (enrollment.status as EnrollmentStatus) ?? guessStatus(enrollment)
-  );
-  const [visibleToStudents, setVisibleToStudents] = React.useState(
-    enrollment.visibleToStudents ?? false
-  );
+  const [published, setPublished] = React.useState(enrollment.published ?? false);
   // Publikum; prázdné = všichni aktivní studenti
   const [audience, setAudience] = React.useState<AudienceState>(() => {
     const v = enrollment.audienceView;
@@ -97,8 +82,7 @@ export function EditEnrollmentDialog({
       const data = {
         name,
         description,
-        status,
-        visibleToStudents,
+        published,
         audience: audience.draft,
         allowSelfUnenroll,
         changesUntil: customDeadline ? changesUntil.toISOString() : null,
@@ -151,7 +135,7 @@ export function EditEnrollmentDialog({
           </DialogTitle>
           <DialogDescription>
             {isExisting
-              ? "Změňte název, popis, stav a časové rozmezí zápisového období."
+              ? "Změňte název, popis, zveřejnění a časové rozmezí zápisového období."
               : "Vytvořte nové zápisové období."
             }
           </DialogDescription>
@@ -179,33 +163,18 @@ export function EditEnrollmentDialog({
               rows={3}
             />
           </div>
-          <div className="space-y-1">
-            <Label className="text-sm font-medium" htmlFor="status">
-              Stav
-            </Label>
-            <NativeSelect id="status" value={status} onChange={(e) => setStatus(e.target.value as EnrollmentStatus)}>
-              <option value="DRAFT">Koncept (Draft)</option>
-              <option value="SCHEDULED">Naplánováno (Scheduled)</option>
-              <option value="OPEN">Otevřeno (Open)</option>
-              <option value="CLOSED">Uzavřeno (Closed)</option>
-            </NativeSelect>
-            <p className="text-xs text-muted-foreground">
-              Tip: Stavy &quot;Otevřeno&quot; a &quot;Uzavřeno&quot; lze nastavit i ručně pro vynucení stavu bez ohledu na čas (např. předčasné uzavření).
+          <div className="space-y-1 pt-2">
+            <div className="flex items-center space-x-2">
+              <Switch id="published" checked={published} onCheckedChange={setPublished} />
+              <Label htmlFor="published" className="text-sm font-medium">
+                Zveřejnit studentům
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground" data-testid="published-hint">
+              {published
+                ? "Zveřejněno: studenti zápis vidí a otevře i zavře se podle začátku a konce níže. Předčasně ho jde uzavřít na stránce zápisu."
+                : "Koncept: studenti zápis nevidí a nelze se do něj zapisovat, ať je začátek a konec jakýkoli."}
             </p>
-
-          </div>
-          <div className="flex items-center space-x-2 pt-2">
-            <Switch
-              id="visibleToStudents"
-              checked={visibleToStudents}
-              onCheckedChange={setVisibleToStudents}
-            />
-            <Label
-              htmlFor="visibleToStudents"
-              className="text-sm font-medium"
-            >
-              Viditelné pro studenty
-            </Label>
           </div>
           <AudiencePicker value={audience} onChange={setAudience} />
           <div className="space-y-3 rounded-md border p-3" data-testid="window-rules">

@@ -34,6 +34,8 @@ import { ParticipantsDialog } from "@/modules/seminars/components/occurrences/Pa
 import { checkStudentCanChange } from "@/modules/seminars/window-rules";
 import { classLabel, compareClasses } from "@/lib/school";
 import { updateSubjectOccurrence, deleteSubjectOccurrence } from "@/modules/seminars/actions/windows";
+import { occurrenceCode } from "@/modules/seminars/occurrence-code";
+import { formatName } from "@/lib/names";
 
 type BlockWithOccurrences = Block & { occurrences: (SubjectOccurrence & { subject: Subject, teacher?: User | null, enrollments: StudentEnrollment[], enrolledCount?: number })[] };
 
@@ -115,7 +117,7 @@ export function EnrollmentBlockCard({
           (e) => e.studentId === currentUser.id && !e.deletedAt
         );
         if (already) {
-          const occCode = occ.subject.code ? `${occ.subject.code}/${occ.subCode ?? ""}` : occ.subCode ?? "—";
+          const occCode = occurrenceCode(occ.subject.code, occ.subCode) || "—";
           return {
             subjectName: occ.subject.name,
             blockName: b.name,
@@ -207,12 +209,10 @@ export function EnrollmentBlockCard({
         occ.capacity != null && enrolledCount >= occ.capacity;
 
       const teacherName = occ.teacher
-        ? `${occ.teacher.firstName} ${occ.teacher.lastName}`
+        ? formatName(occ.teacher, "list")
         : "";
 
-      const fullCode = occ.subject?.code
-        ? `${occ.subject.code}/${occ.subCode ?? ""}`
-        : occ.subCode ?? "—";
+      const fullCode = occurrenceCode(occ.subject?.code, occ.subCode) || "—";
 
       const capacityText =
         occ.capacity == null
@@ -380,14 +380,8 @@ export function EnrollmentBlockCard({
 
                 if (!from || !to) return null;
 
-                const fromCode =
-                  from.subject?.code
-                    ? `${from.subject.code}/${from.subCode ?? ""}`
-                    : from.subCode ?? "—";
-                const toCode =
-                  to.subject?.code
-                    ? `${to.subject.code}/${to.subCode ?? ""}`
-                    : to.subCode ?? "—";
+                const fromCode = occurrenceCode(from.subject?.code, from.subCode) || "—";
+                const toCode = occurrenceCode(to.subject?.code, to.subCode) || "—";
 
                 return (
                   <div className="text-sm text-muted-foreground space-y-2">

@@ -85,7 +85,7 @@ export function DataTable<T>({
   selectFilters = [],
   dateFilters = [],
   bulkPopoverRender,
-  initialPageSize = 10,
+  initialPageSize = 50,
   // 🔥 NOVÉ PROPS
   hideToolbar = false,
   hideFooter = false,
@@ -424,6 +424,7 @@ export function DataTable<T>({
                 <option value="10">10</option>
                 <option value="25">25</option>
                 <option value="50">50</option>
+                <option value="100">100</option>
               </NativeSelect>
             </div>
 

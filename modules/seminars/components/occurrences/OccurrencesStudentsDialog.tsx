@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { NativeSelect } from "@/components/ui/native-select";
 import { formatDateTime } from "@/lib/datetime";
+import { formatName } from "@/lib/names";
 
 export type OccurrenceForDialog = SubjectOccurrence & {
   subject?: {
@@ -120,7 +121,7 @@ export function OccurrencesStudentsDialog({
                     <option value="" disabled>Vyberte studenta...</option>
                     {enrollableStudents.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.firstName} {s.lastName} ({s.email})
+                        {formatName(s, "list")} ({s.email})
                       </option>
                     ))}
                   </NativeSelect>
@@ -178,7 +179,7 @@ export function OccurrencesStudentsDialog({
                   >
                     <div>
                       <p className="font-medium">
-                        {u ? `${u.firstName} ${u.lastName}` : enr.studentId}
+                        {u ? formatName(u, "list") : enr.studentId}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {u?.email ?? ""}

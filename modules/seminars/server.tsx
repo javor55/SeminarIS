@@ -12,6 +12,7 @@ import { UserEnrollmentsPanel } from "@/modules/seminars/user-enrollments";
 import { seminarsBulkActions } from "@/modules/seminars/bulk-audience";
 import { getSeminarsEmailEstimates, runSeminarsDailyJob } from "@/modules/seminars/notifications";
 
+import { openWindowWhere } from "@/modules/seminars/window-phase";
 import { seminarsDemoData } from "@/modules/seminars/demo-data";
 
 export const seminarsServer: ModuleServer = {
@@ -88,7 +89,7 @@ export const seminarsServer: ModuleServer = {
   // Přehled „co udělat“: otevřená okna, ve kterých ještě nemají zapsáno všichni studenti
   async getAdminTodos(user) {
     if (!can(user.role, "seminars.windows.view")) return [];
-    const open = await prisma.enrollmentWindow.findMany({ where: { status: "OPEN" }, orderBy: { endsAt: "asc" }, select: { id: true, name: true } });
+    const open = await prisma.enrollmentWindow.findMany({ where: openWindowWhere(), orderBy: { endsAt: "asc" }, select: { id: true, name: true } });
     const todos = await Promise.all(
       open.map(async (w) => ({
         id: `unenrolled.${w.id}`,
@@ -105,7 +106,7 @@ export const seminarsServer: ModuleServer = {
   async getAdminStats() {
     const [subjectCount, activeEnrollmentCount] = await Promise.all([
       prisma.subject.count({ where: { isActive: true } }),
-      prisma.enrollmentWindow.count({ where: { status: "OPEN" } }),
+      prisma.enrollmentWindow.count({ where: openWindowWhere() }),
     ]);
     return [
       { label: "Aktivní předměty", value: subjectCount, hint: "Nabízené v aktuálním katalogu", icon: "book" as const },

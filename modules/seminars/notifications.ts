@@ -3,15 +3,15 @@ import { addDaysToDayKey, formatDateTime, schoolDayKey } from "@/lib/datetime";
 import { appUrl, sendEventEmail } from "@/lib/email";
 import { isEmailEventActive } from "@/lib/email/settings";
 import { isImpersonating } from "@/lib/session";
-import { computeEnrollmentStatus } from "@/lib/utils";
 import type { EmailEventId } from "@/lib/email/events";
 import type { DailyJobStep } from "@/modules/server-types";
+import { liveWindowWhere, windowPhase, type WindowPhaseInput } from "@/modules/seminars/window-phase";
 import { audienceWhereForWindow } from "@/modules/seminars/eligibility";
 import { computeUnenrolled, sendUnenrolledReminder } from "@/modules/seminars/unenrolled";
 
 // E-maily modulu Semináře: „zápis otevřen“ a připomínky nezapsaným.
 
-type WindowLike = { id: string; status: string; startsAt: Date | string; endsAt: Date | string };
+type WindowLike = WindowPhaseInput & { id: string; openedNotifiedAt?: Date | string | null };
 
 /**
  * Upozornění „zápis otevřen“ – jednou za okno. Okno se označí jako oznámené vždy
@@ -56,18 +56,18 @@ export async function notifyWindowOpened(windowId: string) {
 
 /** Zavolá notifyWindowOpened, pokud je okno podle času právě otevřené. */
 export async function notifyWindowOpenedIfOpen(ew: WindowLike) {
-  if (ew.status === "DRAFT") return;
-  if (computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt).is === "open") await notifyWindowOpened(ew.id);
+  if (ew.openedNotifiedAt) return;
+  if (windowPhase(ew).phase === "OPEN") await notifyWindowOpened(ew.id);
 }
 
 export async function getSeminarsEmailEstimates(now = new Date()): Promise<Partial<Record<EmailEventId, number>>> {
-  const windows = await prisma.enrollmentWindow.findMany({ where: { status: { not: "DRAFT" }, endsAt: { gte: now } } });
+  const windows = await prisma.enrollmentWindow.findMany({ where: liveWindowWhere(now) });
   let opened = 0;
   let reminder = 0;
   const today = schoolDayKey(now);
   for (const ew of windows) {
     if (!ew.openedNotifiedAt) opened += await prisma.user.count({ where: await audienceWhereForWindow(ew.id) });
-    if (ew.reminderDaysBefore != null && !ew.reminderSentOn && computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt, now).is !== "closed") {
+    if (ew.reminderDaysBefore != null && !ew.reminderSentOn && windowPhase(ew, now).phase !== "CLOSED") {
       const dueFrom = addDaysToDayKey(schoolDayKey(ew.endsAt), -ew.reminderDaysBefore);
       // odhad jen pro okna, kterým připomínka brzy přijde (nejpozději zítra)
       if (addDaysToDayKey(today, 1) >= dueFrom) reminder += (await computeUnenrolled(ew.id))?.students.length ?? 0;
@@ -83,12 +83,12 @@ export async function getSeminarsEmailEstimates(now = new Date()): Promise<Parti
  */
 export async function runSeminarsDailyJob(now: Date): Promise<DailyJobStep[]> {
   const steps: DailyJobStep[] = [];
-  const windows = await prisma.enrollmentWindow.findMany({ where: { status: { not: "DRAFT" }, endsAt: { gte: now } }, orderBy: { startsAt: "asc" } });
+  const windows = await prisma.enrollmentWindow.findMany({ where: liveWindowWhere(now), orderBy: { startsAt: "asc" } });
 
   try {
     let opened = 0;
     for (const ew of windows) {
-      if (computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt, now).is !== "open") continue;
+      if (windowPhase(ew, now).phase !== "OPEN") continue;
       if (!ew.openedNotifiedAt) {
         await notifyWindowOpened(ew.id);
         opened++;
@@ -108,7 +108,7 @@ export async function runSeminarsDailyJob(now: Date): Promise<DailyJobStep[]> {
       let sent = 0;
       for (const ew of windows) {
         if (ew.reminderDaysBefore == null || ew.reminderSentOn) continue;
-        if (computeEnrollmentStatus(ew.status, ew.startsAt, ew.endsAt, now).is !== "open") continue;
+        if (windowPhase(ew, now).phase !== "OPEN") continue;
         if (today < addDaysToDayKey(schoolDayKey(ew.endsAt), -ew.reminderDaysBefore)) continue;
         // označit dřív, než se začne posílat: druhé spuštění nic neposílá znovu
         const claimed = await prisma.enrollmentWindow.updateMany({ where: { id: ew.id, reminderSentOn: null }, data: { reminderSentOn: today } });

@@ -11,6 +11,8 @@ import {
   StudentEnrollment,
 } from "@/lib/types";
 import React from "react";
+import { MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 // typ řádku – univerzální, volitelná metadata
 export type OccurrenceRow = SubjectOccurrence & {
@@ -83,13 +85,20 @@ export function getOccurrenceColumns(opts: {
     cell: ({ row }) => {
       const occ = row.original;
       if (!occ.subject) return null;
+      // Student nevidí sloupec kódu výskytu – skupinu (podkód) mu ukážeme u názvu, aby rozlišil např. Konverzace A/B
+      const isStudentView = currentUser?.role === "STUDENT" || currentUser?.role === "GUEST";
       return (
-        <a
-          href={`/subjects/${occ.subject.id}`}
-          className="font-medium hover:underline"
-        >
-          {occ.subject.name}
-        </a>
+        <span>
+          <a
+            href={`/subjects/${occ.subject.id}`}
+            className="font-medium hover:underline"
+          >
+            {occ.subject.name}
+          </a>
+          {isStudentView && occ.subCode && (
+            <span className="ml-1 text-muted-foreground" data-testid="occurrence-group">(skupina {occ.subCode})</span>
+          )}
+        </span>
       );
     },
   });
@@ -127,8 +136,8 @@ export function getOccurrenceColumns(opts: {
     });
   }
 
-  // KÓD VÝSKYTU
-  cols.push({
+  // KÓD VÝSKYTU (interní údaj: student ho nevidí, učitel a admin ano)
+  if (currentUser?.role !== "STUDENT" && currentUser?.role !== "GUEST") cols.push({
     accessorKey: "fullCode",
     header: "Kód výskytu",
     cell: ({ row: _row }) => (
@@ -149,7 +158,7 @@ export function getOccurrenceColumns(opts: {
   cols.push({
     accessorKey: "teacherName",
     header: "Učitel",
-    cell: ({ row: _row }) => _row.original.teacherName ?? "",
+    cell: ({ row: _row }) => <span className="whitespace-nowrap">{_row.original.teacherName ?? ""}</span>,
   });
 
   // OBSAZENOST
@@ -174,7 +183,7 @@ export function getOccurrenceColumns(opts: {
       const isFull = occ.isFull ?? false;
 
       return (
-        <div className="flex gap-2 justify-end flex-wrap">
+        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
           {/* STUDENT – zápis / odepsání */}
           {currentUser?.role === "STUDENT" && (
             <>
@@ -220,26 +229,21 @@ export function getOccurrenceColumns(opts: {
             </Button>
           )}
 
-          {/* ADMIN pouze */}
+          {/* ADMIN pouze: další akce v menu, aby řádek zůstal nízký */}
           {currentUser?.role === "ADMIN" && (
-            <>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => onEdit(occ)}
-              >
-                Upravit
-              </Button>
-
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={hasStudents}
-                onClick={() => onDelete(occ)}
-              >
-                Smazat
-              </Button>
-            </>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label={`Akce výskytu ${occ.subject?.name ?? ""}`} data-testid="occurrence-menu">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => onEdit(occ)}>Upravit</DropdownMenuItem>
+                <DropdownMenuItem className="text-danger" disabled={hasStudents} onSelect={() => onDelete(occ)}>
+                  {hasStudents ? "Smazat (nejdřív odepište studenty)" : "Smazat"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       );

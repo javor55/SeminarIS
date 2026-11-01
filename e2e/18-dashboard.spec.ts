@@ -52,7 +52,7 @@ test("student: karta Zápisy, stránka Zápisy a zápis, skrytá okna se nikde n
   seedSubjects();
   const week = `now() + interval '7 days'`;
   // naplánované okno (vidět), skryté, koncept a okno jen pro 3.B (Jan je ve 3.A)
-  sql(`insert into "EnrollmentWindow"(id,name,status,"startsAt","endsAt","visibleToStudents","createdById","updatedAt") values ('w_plan','Naplánovaný zápis','SCHEDULED',now()+interval '3 days',${week},true,'usr_admin',now()),('w_hid','Skrytý zápis','OPEN',now()-interval '1 hour',${week},false,'usr_admin',now()),('w_draft','Koncept zápisu','DRAFT',now()-interval '1 hour',${week},true,'usr_admin',now()),('w_3b','Zápis jen pro 3.B','OPEN',now()-interval '1 hour',${week},true,'usr_admin',now())`);
+  sql(`insert into "EnrollmentWindow"(id,name,"startsAt","endsAt",published,"createdById","updatedAt") values ('w_plan','Naplánovaný zápis',now()+interval '3 days',${week},true,'usr_admin',now()),('w_hid','Skrytý zápis',now()-interval '1 hour',${week},false,'usr_admin',now()),('w_draft','Koncept zápisu',now()-interval '1 hour',${week},false,'usr_admin',now()),('w_3b','Zápis jen pro 3.B',now()-interval '1 hour',${week},true,'usr_admin',now())`);
   sql(`insert into "EnrollmentWindowAudience"(id,"windowId",type,"classGroupId",key) select 'aud_3b','w_3b','CLASS',id,'CLASS:'||id from "ClassGroup" where grade=3 and letter='B'`);
 
   const pj = await login(browser, "jan.student@skola.cz");
@@ -91,19 +91,19 @@ test("student: karta Zápisy, stránka Zápisy a zápis, skrytá okna se nikde n
 
   // po uzavření vidí své zapsané semináře
   sql(`delete from "EnrollmentWindow" where id in ('w_plan','w_hid','w_draft','w_3b')`);
-  sql(`update "EnrollmentWindow" set status='CLOSED', "startsAt"=now()-interval '3 days', "endsAt"=now()-interval '1 day' where id='${WINDOW}'`);
+  sql(`update "EnrollmentWindow" set "startsAt"=now()-interval '3 days', "endsAt"=now()-interval '1 day' where id='${WINDOW}'`);
   await pj.goto("/dashboard");
   await pj.waitForLoadState("networkidle");
   const closed = await pj.getByTestId("dashboard-closed-window").innerText();
   check("closed window shows my enrolled seminars", closed.includes("Programování mikrokontrolérů") && closed.includes("Základy IoT") && closed.includes("Uzavřeno"), closed);
 
   // host: vidí okno bez omezení publika, jen ke čtení; bez oken žádná karta
-  sql(`update "EnrollmentWindow" set status='OPEN', "startsAt"=now()-interval '1 hour', "endsAt"=now()+interval '7 days' where id='${WINDOW}'`);
+  sql(`update "EnrollmentWindow" set "startsAt"=now()-interval '1 hour', "endsAt"=now()+interval '7 days' where id='${WINDOW}'`);
   sql(`update "User" set role='GUEST' where id='usr_stud2'`);
   const pg = await login(browser, "eva.studentova@skola.cz");
   const gcard = await pg.locator('[data-card="seminars.windows"]').innerText();
   check("guest sees the open window read-only", gcard.includes("Zápis LS 2025") && !gcard.includes("Chybí") && !gcard.includes("Zapsat se") && gcard.includes("Zobrazit"), gcard);
-  sql(`update "EnrollmentWindow" set "visibleToStudents"=false where id='${WINDOW}'`);
+  sql(`update "EnrollmentWindow" set published=false where id='${WINDOW}'`);
   await pg.goto("/dashboard");
   await pg.waitForLoadState("networkidle");
   check("hidden window disappears from the guest dashboard", (await pg.locator('[data-card^="seminars."]').count()) === 0 && !(await pg.content()).includes("Zápis LS 2025"));

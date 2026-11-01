@@ -11,13 +11,8 @@ export function EnrollmentBlocks({
   currentUser: User;
 }) {
   return (
-    <div
-      className="
-        grid gap-4
-        grid-cols-1
-        md:[grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]
-      "
-    >
+    // Bloky pod sebou přes celou šířku: tabulka výskytů potřebuje místo na název, kód, učitele a akce
+    <div className="grid grid-cols-1 gap-4" data-testid="enrollment-blocks">
       {/* Vykreslení karet bloků */}
       {enrollment.blocks.map((block, index) => (
         <EnrollmentBlockCard
@@ -27,7 +22,7 @@ export function EnrollmentBlocks({
           index={index}
           total={enrollment.blocks.length}
           currentUser={currentUser}
-          isWindowOpen={enrollment.status === "OPEN"}
+          isWindowOpen={enrollment.phase === "OPEN"}
           rules={{
             allowSelfUnenroll: enrollment.allowSelfUnenroll ?? true,
             changesUntil: enrollment.changesUntil ?? null,
