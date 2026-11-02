@@ -51,14 +51,14 @@ export function HistoryView({ userId }: { userId?: string }) {
           <CardDescription>Nejnovější nahoře. U změn provedených v režimu „zobrazit jako“ je uveden i admin, který jednal.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
             <div className="space-y-1">
               <Label htmlFor="h-actor">Kdo</Label>
-              <Input id="h-actor" className="w-[180px]" placeholder="jméno" value={actor} onChange={(e) => reset(setActor)(e.target.value)} />
+              <Input id="h-actor" className="w-full sm:w-[180px]" placeholder="jméno" value={actor} onChange={(e) => reset(setActor)(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label htmlFor="h-area">Oblast</Label>
-              <NativeSelect id="h-area" className="w-[200px]" value={area} onChange={(e) => reset(setArea)(e.target.value)}>
+              <NativeSelect id="h-area" className="w-full sm:w-[200px]" value={area} onChange={(e) => reset(setArea)(e.target.value)}>
                 <option value="">Všechny oblasti</option>
                 {Object.entries(AUDIT_AREAS).map(([k, label]) => (
                   <option key={k} value={k}>{label}</option>
@@ -67,15 +67,15 @@ export function HistoryView({ userId }: { userId?: string }) {
             </div>
             <div className="space-y-1">
               <Label htmlFor="h-from">Od</Label>
-              <Input id="h-from" type="date" className="w-[150px]" value={from} onChange={(e) => reset(setFrom)(e.target.value)} />
+              <Input id="h-from" type="date" className="w-full sm:w-[150px]" value={from} onChange={(e) => reset(setFrom)(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label htmlFor="h-to">Do</Label>
-              <Input id="h-to" type="date" className="w-[150px]" value={to} onChange={(e) => reset(setTo)(e.target.value)} />
+              <Input id="h-to" type="date" className="w-full sm:w-[150px]" value={to} onChange={(e) => reset(setTo)(e.target.value)} />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 col-span-2 sm:col-span-1">
               <Label htmlFor="h-search">Hledat v popisu</Label>
-              <Input id="h-search" className="w-[220px]" value={search} onChange={(e) => reset(setSearch)(e.target.value)} />
+              <Input id="h-search" className="w-full sm:w-[220px]" value={search} onChange={(e) => reset(setSearch)(e.target.value)} />
             </div>
           </div>
 

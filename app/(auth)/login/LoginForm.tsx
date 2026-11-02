@@ -52,7 +52,7 @@ export function LoginForm({ microsoftEnabled, passwordNote, errorCode }: LoginFo
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
-      <div className="w-full max-w-md space-y-6 rounded-lg border bg-card p-6 shadow-sm">
+      <div className="w-full max-w-md space-y-6 rounded-xl border bg-card p-6 shadow-sm">
         <div>
           <h1 className="text-xl font-semibold">Přihlášení</h1>
           <p className="text-sm text-muted-foreground">

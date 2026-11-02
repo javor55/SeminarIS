@@ -1,5 +1,7 @@
 "use client";
 
+import { ResponsiveView } from "@/components/ui/mobile-card";
+import { StatTile } from "@/components/ui/stat-tile";
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -377,7 +379,9 @@ function UsersList({
             </div>
           )}
 
-          <div className="rounded-md border">
+          <ResponsiveView
+            desktop={
+          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
             <Table data-testid="users-table">
               <TableHeader>
                 <TableRow>
@@ -457,6 +461,61 @@ function UsersList({
               </TableBody>
             </Table>
           </div>
+            }
+            mobile={(
+                <div className="space-y-3" data-testid="users-cards">
+                  <div className="flex items-center gap-2 px-1">
+                    <Checkbox aria-label="Vybrat stránku" data-testid="select-page" checked={pageAllChecked} onChange={togglePage} label="Vybrat stránku" />
+                  </div>
+                  {list.rows.length === 0 && (
+                    <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground" data-testid="no-users">
+                      Filtru neodpovídá žádný uživatel.
+                    </div>
+                  )}
+                  {list.rows.map((u) => {
+                    const isSelf = u.id === currentUser.id;
+                    const name = formatName(u, "text");
+                    return (
+                      <div key={u.id} data-user={u.email} data-testid="user-row" className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+                        <div className="flex items-start gap-3">
+                          <Checkbox aria-label={`Vybrat ${name}`} checked={isChecked(u.id)} onChange={() => toggle(u.id)} />
+                          <div className="min-w-0 flex-1">
+                            <Link href={`/users/${u.id}`} className="font-medium hover:underline" data-testid="user-link">{formatName(u, "list")}</Link>
+                            <p className="break-all text-xs text-muted-foreground">{u.email}</p>
+                          </div>
+                          <span className="shrink-0 text-sm text-muted-foreground">
+                            {u.classLabel || "—"}
+                            {u.studyLabel && <span className="ml-1 text-xs">· {u.studyLabel}</span>}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Registrace {formatDateTime(u.createdAt)} · přihlášení {u.lastLoginAt ? formatDateTime(u.lastLoginAt) : "nikdy"}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <RoleCell user={u} canEdit={can(currentUser.role, "core.users.manage") && !isSelf} />
+                          <ActiveCell user={u} canEdit={can(currentUser.role, "core.users.manage") && !isSelf} isSelf={isSelf} />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                          <Button asChild variant="outline" size="sm" className="h-10 gap-2">
+                            <Link href={`/users/${u.id}`} aria-label={`Detail – ${name}`} data-testid="user-detail-link">
+                              <Eye className="h-4 w-4 text-success" /> Detail
+                            </Link>
+                          </Button>
+                          {can(currentUser.role, "core.admin") && (
+                            <Button asChild variant="outline" size="sm" className="h-10 gap-2">
+                              <Link href={`/admin/history?user=${u.id}`} data-testid="user-history" aria-label={`Historie – ${name}`}>
+                                <History className="h-4 w-4" /> Historie
+                              </Link>
+                            </Button>
+                          )}
+                          {canImpersonate && !isSelf && u.role !== "ADMIN" && u.isActive && <ImpersonateButton userId={u.id} name={name} />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+          />
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground" data-testid="pagination">
             <span>
@@ -496,14 +555,7 @@ function stripPaging(q: UserListQuery): UserFilter {
   return { q: q.q, role: q.role, class: q.class, grade: q.grade, study: q.study, active: q.active, pending: q.pending, noClass: q.noClass };
 }
 
-function Tile({ label, value, href, tone }: { label: string; value: number; href: string; tone?: string }) {
-  return (
-    <Link href={href} className="rounded-lg border bg-card p-3 hover:bg-accent/50">
-      <p className={`text-2xl font-bold ${tone ?? ""}`}>{value}</p>
-      <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>
-    </Link>
-  );
-}
+const Tile = StatTile;
 
  
 function FilterSelect({ label, id, value, onChange, children }: { label: string; id: string; value: string; onChange: (v: string) => void; children: React.ReactNode }) {
