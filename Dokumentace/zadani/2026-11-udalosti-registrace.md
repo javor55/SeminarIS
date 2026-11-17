@@ -1,6 +1,7 @@
 # Zadání: modul Události (registrace na akce pro veřejnost)
 
-Stav: **návrh k odsouhlasení**. Otázky k rozhodnutí jsou na konci.
+Stav: **odsouhlaseno** (rozhodnutí v sekci 14). Plán implementace po ticketech je v
+`Dokumentace/zadani/2026-11-udalosti-plan.md`.
 
 ## 1. Cíl
 Škola občas pořádá akce pro veřejnost, například den otevřených dveří, informační schůzku pro
@@ -164,3 +165,40 @@ Datový model je obecný. „Termín“ je **položka**, která *může* mít č
 5. Tvar odkazu: `/akce/den-otevrenych-dveri-2027`, nebo náhodný kód?
 6. Jak dlouho držet osobní údaje po skončení akce?
 7. Pro velké akce: je možné přejít na placený tarif Resend, nebo omezit e-maily jen na potvrzení?
+
+## 14. Rozhodnutí majitele (17. 11. 2026)
+1. Události smí vytvářet **i učitel** (svoje), admin všechny.
+2. Organizátor může kdykoli cokoli měnit, včetně odebrání („vyhození“) účastníka z termínu
+   a přesunu mezi termíny. Uzávěrky platí jen pro účastníka, ne pro organizátora.
+3. **E-mail je vždy povinný.**
+4. **Žádná externí captcha.** Ochrana proti robotům musí být součástí aplikace, bez účtu u třetí strany:
+   - samostatná výpočetní zkouška (proof-of-work) ve stylu ALTCHA: prohlížeč na pozadí spočítá
+     úlohu podepsanou serverem, uživatel nic neopisuje;
+   - tajný klíč se vygeneruje sám a uloží do `SystemSetting`;
+   - k tomu honeypot, minimální doba vyplnění a limity na IP adresu a e-mail.
+5. **Obrázky ukládat do databáze, bez další služby.** Musí to být příjemné pro uživatele:
+   - přetažení nebo výběr souboru, náhled, ořez 16:9;
+   - prohlížeč obrázek zmenší (max. 1600 px, WebP, cíl do 300 kB) ještě před nahráním;
+   - obrázek se uloží do vlastní tabulky a vydává se přes route s dlouhou cache.
+6. **Osobní údaje se smažou nebo anonymizují 90 dní po skončení akce.**
+7. **E-maily nerozšiřovat**, hlídání limitu zůstává:
+   - Každý typ e-mailu z modulu (potvrzení, změna, připomínka, zrušení organizátorem, hromadný)
+     jde zapnout nebo vypnout ve stávajících Upozorněních.
+   - U každého typu je vidět, kolik e-mailů za posledních 30 dní odešlo.
+   - Každá událost má nastavení **„Potvrzení registrace“**, které určuje, kde účastník dostane
+     odkaz a kód:
+     - e-mailem i na obrazovce (výchozí),
+     - jen na obrazovce (bez e-mailu; účastník si odkaz a kód uloží, zkopíruje nebo stáhne),
+     - jen e-mailem.
+   - Když je denní limit vyčerpaný, registrace projde a účastník dostane odkaz a kód na obrazovce.
+     Varování uvidí jen organizátor; účastníkovi se ukáže jen to, co potřebuje.
+8. **Cookies:** cookie lišta s potvrzováním **není potřeba**. Souhlas v EU (ePrivacy/GDPR) se vyžaduje
+   jen pro nepovinné cookies (analytika, reklama). Aplikace používá:
+   - jen nezbytné cookies (přihlášení, režim „zobrazit jako“);
+   - Vercel Analytics, které cookies nepoužívá;
+   - písma, která jsou součástí aplikace.
+
+   Potřeba je ale stránka **„Zpracování osobních údajů“** (kdo údaje zpracovává, k jakému účelu,
+   jak dlouho a jaká má účastník práva). Odkaz na ni bude u souhlasu ve formuláři a v patičce
+   veřejných stránek. **Pokud se později přidá cokoli, co cookies nebo sledování používá, lišta
+   potřeba bude.**
