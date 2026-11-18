@@ -6,22 +6,15 @@ import { prisma, type TxClient } from "@/lib/prisma";
 import { safeAction } from "@/lib/safe-action";
 import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
-import type { User } from "@/lib/types";
 import { audienceKey, entriesFromDraft } from "@/modules/core/audience";
 import { cleanAudienceDraft } from "@/modules/core/audience-db";
-import { canManageEvent } from "@/modules/events/access";
+import { loadManaged } from "@/modules/events/manage";
+import { ensureFixedFields } from "@/modules/events/fields-db";
 import { cleanEventSettings, type EventSettingsInput } from "@/modules/events/settings";
 import { EVENT_STATUS_LABEL, canChangeStatus, type EventStatusValue } from "@/modules/events/status";
 import { randomSlug, slugify, uniqueSlug } from "@/modules/events/slug";
 
 const SLUG_TAKEN = "Tento odkaz už používá jiná událost, zvolte jiný.";
-
-/** Událost, kterou smí uživatel spravovat; jinak chyba (cizí událost se tváří, že neexistuje). */
-async function loadManaged(tx: TxClient, user: User, id: string) {
-  const event = await tx.event.findUnique({ where: { id }, include: { organizers: { select: { userId: true } } } });
-  if (!event || !canManageEvent(user, event)) throw new Error("Událost neexistuje nebo k ní nemáte přístup.");
-  return event;
-}
 
 const slugExists = (tx: TxClient, exceptId?: string) => async (slug: string) =>
   !!(await tx.event.findFirst({ where: { slug, ...(exceptId ? { id: { not: exceptId } } : {}) }, select: { id: true } }));
@@ -96,6 +89,7 @@ export async function createEvent(input: EventSettingsInput) {
         });
         await replaceOrganizers(tx, event.id, user.id, data.organizerIds);
         await replaceEventAudience(tx, event.id, data.visibility, data.audience);
+        await ensureFixedFields(tx, event.id);
         await audit(tx, user, { action: "events.event.create", entityType: "event", entityId: event.id, summary: `Založena událost „${event.title}“ (/akce/${event.slug})` });
         return { id: event.id, slug: event.slug };
       });

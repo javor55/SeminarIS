@@ -49,15 +49,21 @@ test("rozložení: nic se nepřekrývá ani nepřetéká (student, učitel, admi
   const png = fs.readFileSync(path.join(__dirname, "fixtures", "maly.png"));
   sql(`insert into "EventImage"(id,data,mime,width,height,size,"createdById") values ('imA',decode('${png.toString("hex")}','hex'),'image/png',400,225,${png.length},'usr_teacher')`);
   sql(`update "Event" set "imageId"='imA',"imageAlt"='Budova školy',"descriptionHtml"='<h2>Program</h2><p>Prohlídka <a href="https://example.com">školy</a> a laboratoří.</p>' where id='evA'`);
+  // U5/U6: termíny (s časem i bez) a vlastní pole formuláře u první události
+  sql(
+    `insert into "EventItem"(id,"eventId","startsAt","endsAt",capacity,"order") values ('itA1','evA',now()+interval '5 days',now()+interval '5 days 30 min',20,0),('itA2','evA',now()+interval '5 days 30 min',now()+interval '5 days 1 hour',20,1)`
+  );
+  sql(`insert into "EventItem"(id,"eventId",label,note,"order") values ('itA3','evA','Individuální termín','Po domluvě s organizátorem',2)`);
+  sql(`insert into "EventField"(id,"eventId",key,type,label,mode,options,"order",builtin) values ('efA1','evA','custom_1','SELECT','Oblíbený předmět','REQUIRED',ARRAY['Matematika','Fyzika'],10,false)`);
   sql(`insert into "EventAudience"(id,"eventId",type,grade,key,"createdAt") values ('eaA','evA','GRADE',3,'GRADE:3',now())`);
   const pages: Record<string, string[]> = {
     "jan.student@skola.cz": ["/zapisy/enr_ls_2025", "/makeup", "/profile"],
-    "teacher@skola.cz": ["/dashboard", "/enrollments", "/enrollments/enr_ls_2025", "/makeup", "/makeup/sessions/mA", "/events", "/events/new", "/events/evA", "/subjects/mine", "/users", "/profile"],
+    "teacher@skola.cz": ["/dashboard", "/enrollments", "/enrollments/enr_ls_2025", "/makeup", "/makeup/sessions/mA", "/events", "/events/new", "/events/evA", "/events/evA?tab=items", "/events/evA?tab=form", "/subjects/mine", "/users", "/profile"],
     "admin@skola.cz": [
       "/dashboard", "/admin", "/enrollments/enr_ls_2025", "/users", "/subjects", "/makeup",
       // F15: zbytek aplikace
       "/subjects/sm", "/users/usr_stud1", "/users?tab=approvals", "/enrollments", "/enrollments/settings", "/makeup/settings", "/profile",
-      "/admin/school-year", "/admin/registration", "/admin/modules", "/admin/notifications", "/admin/history", "/admin/diagnostics", "/admin/demo", "/ochrana-udaju", "/events", "/events/new", "/events/evA", "/events/settings",
+      "/admin/school-year", "/admin/registration", "/admin/modules", "/admin/notifications", "/admin/history", "/admin/diagnostics", "/admin/demo", "/ochrana-udaju", "/events", "/events/new", "/events/evA", "/events/evA?tab=items", "/events/evA?tab=form", "/events/settings",
     ],
   };
   for (const [vname, viewport] of Object.entries(VIEWPORTS)) {
@@ -108,6 +114,10 @@ test("rozložení: přihlášení, registrace a dialogy (telefon i počítač)",
     for (const [url, button] of [
       ["/enrollments", "Vytvořit nový zápis"],
       ["/makeup", "Nový termín"],
+      // U5/U6: dialogy záložek Termíny a Formulář události
+      ["/events/evA?tab=items", "Přidat termín"],
+      ["/events/evA?tab=items", "Vygenerovat řadu"],
+      ["/events/evA?tab=form", "Přidat vlastní pole"],
     ] as const) {
       await page.goto(url);
       await page.waitForLoadState("networkidle");

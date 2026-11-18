@@ -5,6 +5,7 @@ import { draftFromEntries } from "@/modules/core/audience";
 import type { AudienceState } from "@/modules/core/components/audience/AudiencePicker";
 import { canManageEvent, eventsVisibleWhere } from "@/modules/events/access";
 import type { EventStatusValue } from "@/modules/events/status";
+import { ensureFixedFields } from "@/modules/events/fields-db";
 
 // Čtení dat pro stránky modulu. Do klienta jdou jen prosté (serializovatelné) hodnoty.
 
@@ -99,4 +100,63 @@ export async function loadEvent(user: User, id: string) {
 export async function listTeachers() {
   const teachers = await prisma.user.findMany({ where: { role: "TEACHER", isActive: true }, select: { id: true, firstName: true, lastName: true } });
   return sortByName(teachers).map((t) => ({ id: t.id, name: formatName(t, "list") }));
+}
+
+export type EventItemRow = {
+  id: string;
+  label: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  capacity: number | null;
+  note: string | null;
+  order: number;
+  cancelled: boolean;
+  /** Počet aktivních (nezrušených) registrací na termín */
+  taken: number;
+  /** Počet všech registrací vč. zrušených (smazat jde jen termín bez nich) */
+  registrations: number;
+};
+
+/** Termíny události s obsazeností (zrušené registrace se nepočítají). */
+export async function loadEventItems(eventId: string): Promise<EventItemRow[]> {
+  const rows = await prisma.eventItem.findMany({
+    where: { eventId },
+    orderBy: [{ order: "asc" }, { startsAt: "asc" }],
+    include: { _count: { select: { registrations: true } } },
+  });
+  const taken = await prisma.eventRegistrationItem.groupBy({
+    by: ["itemId"],
+    where: { item: { eventId }, registration: { status: { not: "CANCELLED" } } },
+    _count: { _all: true },
+  });
+  const takenBy = new Map(taken.map((t) => [t.itemId, t._count._all]));
+  return rows.map((i) => ({
+    id: i.id,
+    label: i.label,
+    startsAt: i.startsAt?.toISOString() ?? null,
+    endsAt: i.endsAt?.toISOString() ?? null,
+    capacity: i.capacity,
+    note: i.note,
+    order: i.order,
+    cancelled: !!i.cancelledAt,
+    taken: takenBy.get(i.id) ?? 0,
+    registrations: i._count.registrations,
+  }));
+}
+
+export type EventFieldRow = {
+  id: string;
+  key: string;
+  type: "TEXT" | "TEXTAREA" | "SELECT" | "CHECKBOX";
+  label: string;
+  mode: "REQUIRED" | "OPTIONAL" | "HIDDEN";
+  options: string[];
+  builtin: boolean;
+};
+
+/** Pole formuláře; chybějící pevná pole se doplní (u událostí vzniklých před U6). */
+export async function loadEventFields(eventId: string): Promise<EventFieldRow[]> {
+  await ensureFixedFields(prisma, eventId);
+  const rows = await prisma.eventField.findMany({ where: { eventId }, orderBy: [{ order: "asc" }, { key: "asc" }] });
+  return rows.map((f) => ({ id: f.id, key: f.key, type: f.type, label: f.label, mode: f.mode, options: f.options, builtin: f.builtin }));
 }

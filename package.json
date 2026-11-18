@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "new-module": "node scripts/new-module.mjs",
     "test:contract": "node --experimental-strip-types --no-warnings scripts/contract-test.ts",
-    "test:html": "node --experimental-strip-types --no-warnings scripts/html-test.ts"
+    "test:html": "node --experimental-strip-types --no-warnings scripts/html-test.ts",
+    "test:events": "node --experimental-strip-types --no-warnings scripts/events-form-test.ts"
   },
   "dependencies": {
     "@next/third-parties": "^16.2.3",

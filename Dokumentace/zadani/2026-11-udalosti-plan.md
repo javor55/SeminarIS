@@ -16,12 +16,12 @@ psané tak, aby je zvládl i levnější model: obsahují přesné soubory, krok
 Vlna A – základ (bez veřejné části):
 - [x] U1 Bezpečné HTML a stránka „Zpracování osobních údajů“ (PR #22)
 - [x] U2 Datový model a kostra modulu `events` (PR #22)
-- [x] U3 Seznam událostí a základní nastavení události
-- [x] U4 Obrázky (nahrání, ořez, uložení v DB) a popis v editoru
+- [x] U3 Seznam událostí a základní nastavení události (PR #23)
+- [x] U4 Obrázky (nahrání, ořez, uložení v DB) a popis v editoru (PR #23)
 
 Vlna B – termíny a formulář:
-- [ ] U5 Termíny (položky), generátor, pravidla registrace
-- [ ] U6 Formulář účastníka (pevná a vlastní pole)
+- [x] U5 Termíny (položky), generátor, pravidla registrace
+- [x] U6 Formulář účastníka (pevná a vlastní pole)
 
 Vlna C – veřejná registrace:
 - [ ] U7 Veřejná stránka události (zobrazení, bez odeslání)
@@ -346,6 +346,10 @@ DRAFT / před otevřením / otevřeno / uzavřeno a viditelnost USERS je E2E.
 (ověř Playwrightem bez test módu).
 
 ## U9 Odeslání registrace, potvrzení na obrazovce a e-mailem
+**Poznámky z U6 (zapracovat):** (a) ověř povinný souhlas na serveru (`validateAnswers` ho zatím
+nekontroluje); (b) pevné pole „Jméno“ může být skryté – registrace i přehledy musí fungovat bez jména
+(zobrazit e-mail); (c) klíč vlastního pole `custom_<n>` se po smazání může znovu použít – jakmile má pole
+odpovědi, mazání zakaž (nabídni „skrýt“), aby se staré odpovědi nepřiřadily novému poli.
 **Cíl:** funkční registrace.
 
 **Udělej:**
