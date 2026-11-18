@@ -1198,3 +1198,28 @@ Test bez DB: `npm run test:html` (CI). Veřejná stránka `/ochrana-udaju` bere 
   `crypto.subtle`; výpočet řádově stovky ms, nejhorší případ 100 000 pokusů do ~0,5 s). `ANTIBOT_TEST_MODE=1` (E2E a CI, ne
   v ostrém provozu) přijme řešení `test`. Testy: `scripts/antibot-test.ts` (v `test:events`), `scripts/antibot-db-test.ts`
   (pouští E2E `37`).
+
+## Správa registrace účastníkem (U10)
+
+- **`/akce/[slug]/r/[token]`** (`app/akce/[slug]/r/[token]/page.tsx`): bez přihlášení, oprávněním je token z odkazu. Registrace
+  se hledá přes `hashToken(token)` (v databázi je jen SHA-256), slug v adrese musí sedět na událost, jinak 404. Stránka
+  nikam neloguje token, má `no-store`, `Referrer-Policy: no-referrer`, `noindex` (hlavičky v `next.config.mjs`, `metadata`).
+  Souhrn, údaje, akce Změnit termín / Upravit údaje / Zrušit (klientská `ManageRegistration`, token jde jen serverovým akcím),
+  odkaz a kód (`ConfirmationActions`). Zrušená registrace ukáže jen informaci.
+- **Uzávěrka změn** (`changeWindow` v `modules/events/manage-core.ts`): do `changeDeadlineMinutes` před začátkem prvního
+  vybraného termínu; jen termíny bez času = do uzavření registrace; koncept, uzavřená a archivovaná událost: bez změn.
+  Na nový termín nejde přejít, když by pro něj uzávěrka už uplynula. Organizátor uzávěrkou vázaný není (U11).
+- **Akce** (`modules/events/actions/manage.ts`, veřejné, bez `requirePermission`): `changeRegistrationItems`,
+  `updateRegistrationAnswers` (`validateAnswers`; e-mail se nemění, hodnoty skrytých polí zůstanou, víc osob se kontroluje na
+  kapacitu), `cancelRegistration` (CANCELLED + `cancelledAt`), `recoverRegistration`. Změny jedou v serializable transakci
+  (`lib/serializable.ts`) s kontrolou kapacity včetně doprovodu a s auditem veřejného aktéra (`PUBLIC_ACTOR`, bez osobních údajů
+  a bez tokenu).
+- **„Už jste registrovaní?“** (`RecoverRegistration` na stránce události): kód (`normalizeCode`) + e-mail, limit 5 pokusů za
+  15 minut na IP (`rec:ip:<hash>` v `EventRateLimit`, počítá se každý pokus), při neshodě (i u zrušené registrace) vždy stejná
+  hláška. Při shodě se vystaví **nový token a starý přestane platit** (odkaz z potvrzovacího e-mailu tím přestane fungovat;
+  formulář na to upozorňuje).
+- **`.ics`**: `buildIcs(event, items)` v `modules/events/ics.ts` (čistá funkce; VTIMEZONE Europe/Prague, CRLF, zalomení na 75
+  oktetů, escapování, UID `<eventId>-<itemId>@seminaris`, termín bez konce trvá 1 h, termíny bez času se vynechají). Route
+  `/akce/[slug]/r/[token]/kalendar.ics`. Testy: `scripts/events-manage-test.ts` (v `test:events`) a E2E `39`.
+- **E-mail** `events.registration.changed` (změna termínu, úprava údajů, zrušení účastníkem): přes `sendEventEmail`, limity i
+  vypínač v Upozorněních platí; u události s potvrzením „jen na obrazovce“ se neposílá.

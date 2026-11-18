@@ -137,7 +137,7 @@ export default async function RegistrationDonePage({ params, searchParams }: Par
             <div className="text-sm text-muted-foreground">Odkaz na správu (změna termínu, zrušení)</div>
             <a href={link} className="block break-all text-sm text-primary underline" data-testid="manage-link">{link}</a>
           </div>
-          <ConfirmationActions link={link} code={reg.code} icsHref={`/akce/${event.slug}/r/${t}/kalendar.ics`} fileText={fileText} fileName={`registrace-${reg.code}.txt`} />
+          <ConfirmationActions link={link} code={reg.code} icsHref={items.some((i) => i.startsAt) ? `/akce/${event.slug}/r/${t}/kalendar.ics` : null} fileText={fileText} fileName={`registrace-${reg.code}.txt`} />
         </section>
       )}
 

@@ -14,6 +14,10 @@ export const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 export const IP_LIMIT = 10;
 export const IP_WINDOW_SECONDS = 3600;
 
+/** Obnova registrace přes kód a e-mail: nejvýše 5 pokusů za 15 minut z jedné IP adresy */
+export const RECOVER_LIMIT = 5;
+export const RECOVER_WINDOW_SECONDS = 900;
+
 /** Nový tajný token (jen v odkazu; v databázi je jen jeho hash). */
 export function generateToken(): string {
   return randomBytes(32).toString("base64url");
