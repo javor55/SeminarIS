@@ -16,8 +16,8 @@ psané tak, aby je zvládl i levnější model: obsahují přesné soubory, krok
 Vlna A – základ (bez veřejné části):
 - [x] U1 Bezpečné HTML a stránka „Zpracování osobních údajů“ (PR #22)
 - [x] U2 Datový model a kostra modulu `events` (PR #22)
-- [ ] U3 Seznam událostí a základní nastavení události
-- [ ] U4 Obrázky (nahrání, ořez, uložení v DB) a popis v editoru
+- [x] U3 Seznam událostí a základní nastavení události
+- [x] U4 Obrázky (nahrání, ořez, uložení v DB) a popis v editoru
 
 Vlna B – termíny a formulář:
 - [ ] U5 Termíny (položky), generátor, pravidla registrace
