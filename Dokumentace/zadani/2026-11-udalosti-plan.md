@@ -20,8 +20,8 @@ Vlna A – základ (bez veřejné části):
 - [x] U4 Obrázky (nahrání, ořez, uložení v DB) a popis v editoru (PR #23)
 
 Vlna B – termíny a formulář:
-- [ ] U5 Termíny (položky), generátor, pravidla registrace
-- [ ] U6 Formulář účastníka (pevná a vlastní pole)
+- [x] U5 Termíny (položky), generátor, pravidla registrace
+- [x] U6 Formulář účastníka (pevná a vlastní pole)
 
 Vlna C – veřejná registrace:
 - [ ] U7 Veřejná stránka události (zobrazení, bez odeslání)
