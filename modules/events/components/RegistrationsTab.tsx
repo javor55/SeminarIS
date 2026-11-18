@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRightLeft, Download, MoreHorizontal, Pencil, UserMinus, UserPlus, XCircle } from "lucide-react";
+import { ArrowRightLeft, Download, Mail, MoreHorizontal, Pencil, UserMinus, UserPlus, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { StatTile } from "@/components/ui/stat-tile";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateTime } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
+import { BulkEmailDialog } from "@/modules/events/components/BulkEmailDialog";
 import { CopyLinkButton } from "@/modules/events/components/CopyLinkButton";
 import { CancelDialog, MoveDialog, RegistrationFormDialog, RemoveDialog, type DialogState } from "@/modules/events/components/RegistrationDialogs";
 import { itemFullLabel } from "@/modules/events/format";
@@ -146,6 +147,9 @@ export function RegistrationsTab({ data, readOnly }: { data: RegistrationsData; 
           {!readOnly && (
             <Button type="button" onClick={() => setDialog({ kind: "add" })} data-testid="add-registration" className="min-h-11 md:min-h-9"><UserPlus /> Přidat registraci</Button>
           )}
+          {!readOnly && (
+            <Button type="button" variant="outline" onClick={() => setDialog({ kind: "bulk" })} data-testid="bulk-email" className="min-h-11 md:min-h-9"><Mail /> E-mail účastníkům</Button>
+          )}
           <Button asChild variant="outline" className="min-h-11 md:min-h-9"><a href={`/api/events/${data.event.id}/export`} data-testid="export-csv"><Download /> Export CSV</a></Button>
         </div>
 
@@ -212,6 +216,7 @@ export function RegistrationsTab({ data, readOnly }: { data: RegistrationsData; 
         )}
       </div>
 
+      {dialog?.kind === "bulk" && <BulkEmailDialog eventId={data.event.id} items={data.items} initialItemId={itemFilter} onClose={close} onDone={refresh} />}
       {dialog?.kind === "add" && <RegistrationFormDialog data={data} onClose={close} onDone={refresh} />}
       {dialog?.kind === "edit" && <RegistrationFormDialog key={dialog.reg.id} data={data} reg={dialog.reg} onClose={close} onDone={refresh} />}
       {dialog?.kind === "move" && <MoveDialog key={dialog.reg.id} data={data} reg={dialog.reg} onClose={close} onDone={refresh} />}

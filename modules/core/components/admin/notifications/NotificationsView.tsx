@@ -10,17 +10,32 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Meter } from "@/components/ui/meter";
 import {
   getNotificationsOverview,
   saveNotificationEvent,
   saveNotificationSettings,
   sendTestEmailToMe,
+  type EmailForecastDay,
   type NotificationEventView,
   type NotificationsOverview,
 } from "@/modules/core/actions/notifications";
 import { EmailLogTable } from "@/modules/core/components/admin/notifications/EmailLogTable";
 
 const nf = new Intl.NumberFormat("cs-CZ");
+
+type Stats = NotificationEventView["stats"];
+const sumStats = (list: Stats[]): Stats => list.reduce((a, s) => ({ today: a.today + s.today, last30: a.last30 + s.last30, skippedLimit30: a.skippedLimit30 + s.skippedLimit30 }), { today: 0, last30: 0, skippedLimit30: 0 });
+
+/** Odesláno dnes a za posledních 30 dní (z EmailLog). */
+function StatsLine({ stats, days, testId }: { stats: Stats; days: number; testId: string }) {
+  return (
+    <span data-testid={testId} data-today={stats.today} data-last30={stats.last30}>
+      Odesláno: dnes <strong>{nf.format(stats.today)}</strong> · za {days} dní <strong>{nf.format(stats.last30)}</strong>
+      {stats.skippedLimit30 > 0 && <span> · kvůli limitu přeskočeno {nf.format(stats.skippedLimit30)}</span>}
+    </span>
+  );
+}
 
 export function NotificationsView() {
   const [data, setData] = useState<NotificationsOverview | null>(null);
@@ -44,6 +59,7 @@ export function NotificationsView() {
 
   return (
     <div className="space-y-6">
+      <UsageCard data={data} />
       <SettingsCard data={data} onChange={load} />
 
       <Card className="shadow-sm" data-testid="events-card">
@@ -56,17 +72,38 @@ export function NotificationsView() {
         </CardHeader>
         <CardContent className="space-y-6">
           {groups.map((group) => (
-            <div key={group} className="space-y-3">
-              <div className="text-sm font-semibold">{group}</div>
+            <div key={group} className="space-y-3" data-testid={`group-${group}`}>
+              <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
+                <div className="text-sm font-semibold">{group}</div>
+                <div className="text-xs text-muted-foreground">
+                  <StatsLine stats={sumStats(data.events.filter((e) => e.group === group).map((e) => e.stats))} days={data.statsDays} testId={`group-stats-${group}`} />
+                </div>
+              </div>
               <div className="divide-y rounded-md border">
                 {data.events
                   .filter((e) => e.group === group)
                   .map((e) => (
-                    <EventRow key={e.id} event={e} onChange={load} />
+                    <EventRow key={e.id} event={e} statsDays={data.statsDays} onChange={load} />
                   ))}
               </div>
             </div>
           ))}
+          <div className="space-y-2" data-testid="manual-stats">
+            <div className="text-sm font-semibold">Ruční e-maily</div>
+            <p className="text-xs text-muted-foreground">
+              Bez vlastního přepínače. Hromadné e-maily z detailu události, ze seznamu uživatelů a ze zápisů se zapisují jako „Hromadný e-mail správce“; všechny se počítají do limitů.
+            </p>
+            <div className="divide-y rounded-md border text-sm">
+              {data.manualStats.map((m) => (
+                <div key={m.id} className="flex flex-col gap-0.5 p-3 sm:flex-row sm:items-baseline sm:justify-between" data-testid={`manual-${m.id}`}>
+                  <span className="font-medium">{m.label}</span>
+                  <span className="text-xs text-muted-foreground">
+                    <StatsLine stats={m.stats} days={data.statsDays} testId={`stats-${m.id}`} />
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -83,6 +120,92 @@ export function NotificationsView() {
   );
 }
 
+/** Čerpání denního a měsíčního limitu s odhadem na nejbližší dny (nahoře na stránce). */
+function UsageCard({ data }: { data: NotificationsOverview }) {
+  const { usage } = data;
+  const dailyReached = usage.today >= usage.dailyLimit;
+  const monthlyReached = usage.month >= usage.monthlyLimit;
+  const monthLeft = Math.max(0, usage.monthlyLimit - usage.month);
+  return (
+    <Card className="shadow-sm" data-testid="email-usage-card">
+      <CardHeader>
+        <CardTitle>Čerpání limitů</CardTitle>
+        <CardDescription>Do limitů se počítají odeslané e-maily všech typů. Co se nevejde, se neodešle a zapíše se jako přeskočené.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="space-y-4" data-testid="email-usage">
+          <div className="space-y-1.5" data-testid="meter-daily">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
+              <span>Dnes <strong>{nf.format(usage.today)} / {nf.format(usage.dailyLimit)}</strong></span>
+              <span className="text-xs text-muted-foreground">zbývá {nf.format(Math.max(0, usage.dailyLimit - usage.today))}</span>
+            </div>
+            <Meter value={usage.today} max={usage.dailyLimit} label={`Denní limit: odesláno ${usage.today} z ${usage.dailyLimit}`} />
+          </div>
+          <div className="space-y-1.5" data-testid="meter-monthly">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
+              <span>Tento měsíc <strong>{nf.format(usage.month)} / {nf.format(usage.monthlyLimit)}</strong></span>
+              <span className="text-xs text-muted-foreground">zbývá {nf.format(monthLeft)}</span>
+            </div>
+            <Meter value={usage.month} max={usage.monthlyLimit} label={`Měsíční limit: odesláno ${usage.month} z ${usage.monthlyLimit}`} />
+          </div>
+          {(dailyReached || monthlyReached) && (
+            <p className="text-sm text-danger" data-testid="limit-warning">
+              {monthlyReached ? "Měsíční" : "Denní"} limit je vyčerpán, další e-maily se neodesílají
+              {usage.skippedToday > 0 ? ` (dnes přeskočeno ${nf.format(usage.skippedToday)})` : ""}.
+            </p>
+          )}
+          {!dailyReached && !monthlyReached && usage.skippedMonth > 0 && (
+            <p className="text-xs text-muted-foreground">Tento měsíc se kvůli limitu přeskočilo {nf.format(usage.skippedMonth)} e-mailů.</p>
+          )}
+        </div>
+
+        <div className="space-y-2 border-t pt-4" data-testid="email-forecast">
+          <div className="text-sm font-semibold">Odhad na nejbližší dny</div>
+          <p className="text-xs text-muted-foreground">
+            Co odejde při denní úloze (např. připomínky účastníkům událostí den předem). Počítají se jen zapnuté typy; vypnuté jsou uvedené zvlášť.
+          </p>
+          <ul className="space-y-3">
+            {data.forecast.map((d, i) => (
+              <ForecastRow key={i} day={d} index={i} dailyLimit={usage.dailyLimit} monthLeft={monthLeft} />
+            ))}
+          </ul>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ForecastRow({ day, index, dailyLimit, monthLeft }: { day: EmailForecastDay; index: number; dailyLimit: number; monthLeft: number }) {
+  const total = day.alreadySent + day.planned;
+  const over = total > dailyLimit || day.planned > monthLeft;
+  const off = day.items.filter((x) => !x.enabled);
+  return (
+    <li className="space-y-1" data-testid={`forecast-${index}`} data-planned={day.planned} data-over={over ? "1" : "0"}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
+        <span className="font-medium">{day.label}</span>
+        <span className="text-xs text-muted-foreground">
+          {day.alreadySent > 0 ? `už odesláno ${nf.format(day.alreadySent)}, ` : ""}
+          naplánováno <strong>{nf.format(day.planned)}</strong> z {nf.format(dailyLimit)}
+        </span>
+      </div>
+      <Meter value={total} max={dailyLimit} label={`${day.label}: odhad ${total} z denního limitu ${dailyLimit}`} />
+      {day.items.filter((x) => x.enabled).map((x) => (
+        <p key={x.id} className="text-xs text-muted-foreground">{x.label}: {nf.format(x.count)}</p>
+      ))}
+      {off.map((x) => (
+        <p key={x.id} className="text-xs text-muted-foreground" data-testid={`forecast-off-${x.id}`}>
+          {x.label} je vypnuté; po zapnutí by odešlo {nf.format(x.count)}.
+        </p>
+      ))}
+      {over && (
+        <p className="text-xs text-danger" data-testid="forecast-over">
+          Limit nestačí: {nf.format(Math.max(total - dailyLimit, day.planned - monthLeft, 1))} e-mailů by se přeskočilo. Zvyšte limit, nebo některý typ vypněte.
+        </p>
+      )}
+    </li>
+  );
+}
+
 function SettingsCard({ data, onChange }: { data: NotificationsOverview; onChange: () => Promise<void> }) {
   const s = data.settings;
   const [enabled, setEnabled] = useState(s.enabled);
@@ -93,7 +216,7 @@ function SettingsCard({ data, onChange }: { data: NotificationsOverview; onChang
   const [retention, setRetention] = useState(String(s.logRetentionDays));
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const { status, usage } = data;
+  const { status } = data;
 
   async function save() {
     setSaving(true);
@@ -130,9 +253,6 @@ function SettingsCard({ data, onChange }: { data: NotificationsOverview; onChang
     }
   }
 
-  const dailyReached = usage.today >= usage.dailyLimit;
-  const monthlyReached = usage.month >= usage.monthlyLimit;
-
   return (
     <Card className="shadow-sm" data-testid="email-card">
       <CardHeader>
@@ -160,22 +280,6 @@ function SettingsCard({ data, onChange }: { data: NotificationsOverview; onChang
             )}
           </div>
         )}
-
-        <div className="rounded-md border p-3 space-y-1" data-testid="email-usage">
-          <div className="text-sm">
-            Dnes <strong>{nf.format(usage.today)} / {nf.format(usage.dailyLimit)}</strong>
-            {" · "}tento měsíc <strong>{nf.format(usage.month)} / {nf.format(usage.monthlyLimit)}</strong>
-          </div>
-          {(dailyReached || monthlyReached) && (
-            <p className="text-sm text-danger" data-testid="limit-warning">
-              {monthlyReached ? "Měsíční" : "Denní"} limit je vyčerpán, další e-maily se neodesílají
-              {usage.skippedToday > 0 ? ` (dnes přeskočeno ${nf.format(usage.skippedToday)})` : ""}.
-            </p>
-          )}
-          {!dailyReached && !monthlyReached && usage.skippedMonth > 0 && (
-            <p className="text-xs text-muted-foreground">Tento měsíc se kvůli limitu přeskočilo {nf.format(usage.skippedMonth)} e-mailů.</p>
-          )}
-        </div>
 
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -224,7 +328,7 @@ function SettingsCard({ data, onChange }: { data: NotificationsOverview; onChang
   );
 }
 
-function EventRow({ event: e, onChange }: { event: NotificationEventView; onChange: () => Promise<void> }) {
+function EventRow({ event: e, statsDays, onChange }: { event: NotificationEventView; statsDays: number; onChange: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [subject, setSubject] = useState(e.subject);
   const [body, setBody] = useState(e.body);
@@ -272,6 +376,7 @@ function EventRow({ event: e, onChange }: { event: NotificationEventView; onChan
             {!e.moduleEnabled && <Badge variant="warning">modul je vypnutý</Badge>}
           </div>
           <p className="text-xs text-muted-foreground">{e.description}</p>
+          <p className="text-xs text-muted-foreground"><StatsLine stats={e.stats} days={statsDays} testId={`stats-${e.id}`} /></p>
           {e.estimate != null && (
             <p className="text-xs text-muted-foreground" data-testid={`estimate-${e.id}`}>
               Odhad příjemců při příštím spuštění: <strong>{nf.format(e.estimate)}</strong>

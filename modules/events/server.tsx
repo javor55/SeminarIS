@@ -1,5 +1,5 @@
 import type { ModuleServer } from "@/modules/server-types";
-import { getEventsEmailEstimates, runEventsDailyJob } from "@/modules/events/daily";
+import { getEventsEmailEstimates, getEventsEmailForecast, runEventsDailyJob } from "@/modules/events/daily";
 import { getEventsAdminTodos, getEventsDashboardCards } from "@/modules/events/dashboard";
 import { eventsDemoData } from "@/modules/events/demo-data";
 
@@ -11,6 +11,7 @@ export const eventsServer: ModuleServer = {
 
   runDailyJob: runEventsDailyJob,
   getEmailEstimates: () => getEventsEmailEstimates(),
+  getEmailForecast: (days) => getEventsEmailForecast(days),
 
   getDashboardCards: getEventsDashboardCards,
   getAdminTodos: getEventsAdminTodos,
