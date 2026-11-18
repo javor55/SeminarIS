@@ -2,7 +2,8 @@ import { loadEventTextDefaults } from "@/modules/events/text-defaults";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Mail, TriangleAlert } from "lucide-react";
+import QRCode from "qrcode";
+import { CheckCircle2, Hourglass, Mail, TriangleAlert } from "lucide-react";
 import { appUrl } from "@/lib/email";
 import { isModuleEnabled } from "@/lib/modules";
 import { prisma } from "@/lib/prisma";
@@ -41,6 +42,9 @@ export default async function RegistrationDonePage({ params, searchParams }: Par
   const link = appUrl(`/akce/${event.slug}/r/${t}`);
   const items = reg.items.map((r) => r.item).sort((a, b) => (a.startsAt?.getTime() ?? 0) - (b.startsAt?.getTime() ?? 0) || a.order - b.order);
   const cancelled = reg.status === "CANCELLED";
+  const waiting = reg.status === "WAITLIST";
+  // QR kód odkazu na správu (vzniká na serveru, token nikam neodchází); organizátor ho při příchodu načte a označí příchod
+  const qr = !cancelled && !waiting ? await QRCode.toDataURL(link, { margin: 2, width: 288, errorCorrectionLevel: "M" }) : null;
 
   // Co účastník na obrazovce potřebuje: odkaz a kód, pokud nejdou e-mailem (nebo e-mail neodešel; důvod se mu neukazuje)
   const emailOnly = event.confirmChannel === "EMAIL_ONLY";
@@ -58,7 +62,7 @@ export default async function RegistrationDonePage({ params, searchParams }: Par
   ];
 
   const fileText = [
-    `Potvrzení registrace: ${event.title}`,
+    `${waiting ? "Čekací listina" : "Potvrzení registrace"}: ${event.title}`,
     "",
     "Termíny:",
     ...items.map((i) => `- ${itemFullLabel(i)}`),
@@ -76,19 +80,27 @@ export default async function RegistrationDonePage({ params, searchParams }: Par
         <div className="flex items-start gap-3">
           {cancelled ? (
             <TriangleAlert className="mt-1 h-6 w-6 shrink-0 text-warning" aria-hidden="true" />
+          ) : waiting ? (
+            <Hourglass className="mt-1 h-6 w-6 shrink-0 text-info" aria-hidden="true" />
           ) : (
             <CheckCircle2 className="mt-1 h-6 w-6 shrink-0 text-success" aria-hidden="true" />
           )}
           <div className="min-w-0">
             <h1 className="text-2xl font-bold leading-tight tracking-tight" data-testid="done-title">
-              {cancelled ? "Registrace byla zrušena" : "Registrace je potvrzená"}
+              {cancelled ? "Registrace byla zrušena" : waiting ? "Jste na čekací listině" : "Registrace je potvrzená"}
             </h1>
             <p className="break-words text-muted-foreground">{event.title}</p>
           </div>
         </div>
       </header>
 
-      {!cancelled && confirmationText && (
+      {waiting && (
+        <p className="rounded-xl border bg-card p-4 text-sm" data-testid="waitlist-info">
+          Termín je zatím plný, proto jste na čekací listině. Místo vám nedržíme; jakmile se nějaké uvolní, registrace se potvrdí automaticky a pošleme vám e-mail. Odkaz a kód si uložte, abyste mohli registraci zrušit, kdyby se vám termín přestal hodit.
+        </p>
+      )}
+
+      {!cancelled && !waiting && confirmationText && (
         <p className="whitespace-pre-line break-words rounded-xl border bg-card p-4 text-sm" data-testid="confirmation-text">
           {confirmationText}
         </p>
@@ -139,7 +151,15 @@ export default async function RegistrationDonePage({ params, searchParams }: Par
             <div className="text-sm text-muted-foreground">Odkaz na správu (změna termínu, zrušení)</div>
             <a href={link} className="block break-all text-sm text-primary underline" data-testid="manage-link">{link}</a>
           </div>
-          <ConfirmationActions link={link} code={reg.code} icsHref={items.some((i) => i.startsAt) ? `/akce/${event.slug}/r/${t}/kalendar.ics` : null} fileText={fileText} fileName={`registrace-${reg.code}.txt`} />
+          {qr && (
+            <div className="space-y-1" data-testid="qr-block">
+              <div className="text-sm text-muted-foreground">QR kód pro příchod</div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qr} alt="QR kód s odkazem na správu vaší registrace" width={144} height={144} className="h-36 w-36 rounded-md border bg-white" data-testid="qr-image" />
+              <p className="text-xs text-muted-foreground">Při příchodu ho ukažte organizátorovi, označí váš příchod. Je to stejný odkaz jako výše, nikomu jinému ho neposílejte.</p>
+            </div>
+          )}
+          <ConfirmationActions link={link} code={reg.code} icsHref={!waiting && items.some((i) => i.startsAt) ? `/akce/${event.slug}/r/${t}/kalendar.ics` : null} fileText={fileText} fileName={`registrace-${reg.code}.txt`} />
         </section>
       )}
 

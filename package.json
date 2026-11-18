@@ -17,7 +17,7 @@
     "new-module": "node scripts/new-module.mjs",
     "test:contract": "node --experimental-strip-types --no-warnings scripts/contract-test.ts",
     "test:html": "node --experimental-strip-types --no-warnings scripts/html-test.ts",
-    "test:events": "node --experimental-strip-types --no-warnings scripts/events-form-test.ts && node --experimental-strip-types --no-warnings scripts/antibot-test.ts && node --experimental-strip-types --no-warnings scripts/events-registration-test.ts && node --experimental-strip-types --no-warnings scripts/events-manage-test.ts && node --experimental-strip-types --no-warnings scripts/events-organizer-test.ts && node --experimental-strip-types --no-warnings scripts/events-bulk-test.ts"
+    "test:events": "node --experimental-strip-types --no-warnings scripts/events-form-test.ts && node --experimental-strip-types --no-warnings scripts/antibot-test.ts && node --experimental-strip-types --no-warnings scripts/events-registration-test.ts && node --experimental-strip-types --no-warnings scripts/events-manage-test.ts && node --experimental-strip-types --no-warnings scripts/events-organizer-test.ts && node --experimental-strip-types --no-warnings scripts/events-bulk-test.ts && node --experimental-strip-types --no-warnings scripts/events-waitlist-test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",

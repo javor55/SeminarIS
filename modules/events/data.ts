@@ -87,6 +87,7 @@ export async function loadEvent(user: User, id: string) {
     maxItemsPerRegistration: event.maxItemsPerRegistration,
     allowGuests: event.allowGuests,
     maxGuests: event.maxGuests,
+    waitlistEnabled: event.waitlistEnabled,
     changeDeadlineMinutes: event.changeDeadlineMinutes,
     maxRegistrationsPerEmail: event.maxRegistrationsPerEmail,
     confirmChannel: event.confirmChannel,

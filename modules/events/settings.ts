@@ -34,6 +34,8 @@ export type EventSettingsInput = {
   /** Uzávěrka změn pro účastníka: minuty před začátkem prvního termínu. */
   changeDeadlineMinutes: number;
   maxRegistrationsPerEmail: number;
+  /** Plný termín nabídne zápis na čekací listinu. */
+  waitlistEnabled: boolean;
   confirmChannel: EventConfirmChannelValue;
   confirmationText: string;
   consentText: string;
@@ -62,6 +64,7 @@ export type CleanEventSettings = {
   maxGuests: number;
   changeDeadlineMinutes: number;
   maxRegistrationsPerEmail: number;
+  waitlistEnabled: boolean;
   confirmChannel: EventConfirmChannelValue;
   confirmationText: string | null;
   consentText: string | null;
@@ -145,6 +148,7 @@ export function cleanEventSettings(input: EventSettingsInput): CleanEventSetting
     maxGuests,
     changeDeadlineMinutes: int(input.changeDeadlineMinutes, 0, 60 * 24 * 365, "Uzávěrka změn"),
     maxRegistrationsPerEmail: int(input.maxRegistrationsPerEmail, 1, 20, "Nejvíce registrací na e-mail"),
+    waitlistEnabled: !!input.waitlistEnabled,
     confirmChannel: input.confirmChannel,
     confirmationText: text(input.confirmationText, 5000, "Text potvrzení"),
     consentText: text(input.consentText, 5000, "Text souhlasu"),

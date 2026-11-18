@@ -18,7 +18,7 @@ export async function GET(_req: Request, { params }: { params: { slug: string; t
     where: { tokenHash: hashToken(token) },
     include: { event: { select: { id: true, slug: true, title: true, place: true, status: true } }, items: { include: { item: true } } },
   });
-  if (!reg || reg.event.slug !== slug || reg.event.status === "DRAFT" || reg.status === "CANCELLED") return notFound();
+  if (!reg || reg.event.slug !== slug || reg.event.status === "DRAFT" || reg.status === "CANCELLED" || reg.status === "WAITLIST") return notFound();
   const items = reg.items.map((r) => r.item).filter((i) => i.startsAt && !i.cancelledAt);
   if (items.length === 0) return notFound();
 

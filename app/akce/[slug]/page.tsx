@@ -139,6 +139,7 @@ export default async function PublicEventPage({ params, searchParams }: Params) 
               maxItems={event.maxItemsPerRegistration}
               allowGuests={event.allowGuests}
               maxGuests={event.maxGuests}
+              waitlist={event.waitlistEnabled}
               fields={event.fields}
               consentText={event.consentText}
               renderToken={renderToken}

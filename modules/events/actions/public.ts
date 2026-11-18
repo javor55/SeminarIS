@@ -16,6 +16,7 @@ import { effectiveFields, validateAnswers } from "@/modules/events/form";
 import { itemFullLabel } from "@/modules/events/format";
 import { loadStudentAudienceInfo, loadTakenByItem, mergeFields } from "@/modules/events/public-data";
 import { registrationPhase } from "@/modules/events/public-state";
+import { waitlistImpossible } from "@/modules/events/waitlist-core";
 import {
   IP_LIMIT,
   IP_WINDOW_SECONDS,
@@ -39,6 +40,8 @@ export type RegisterInput = {
   /** Hodnoty formuláře podle klíče pole (`email`, `name`, `custom_1`…) */
   values: Record<string, unknown>;
   consent: boolean;
+  /** Účastník výslovně chce na čekací listinu (jen u plného termínu události, která ji povoluje) */
+  waitlist?: boolean;
   /** Řešení výzvy proti robotům (pole `altcha`) */
   solution: string | null;
   /** Honeypot (pole `website`); vyplněné = robot */
@@ -121,8 +124,15 @@ export async function registerForEvent(slug: string, input: RegisterInput) {
       }
 
       // Obsazenost se počítá znovu uvnitř transakce; souběžná registrace na poslední místo se tak nepřidělí dvakrát
+      // Plný termín: jen s výslovnou volbou a povolenou čekací listinou účastník skončí ve stavu WAITLIST (nedrží místo)
       const full = capacityError(itemIds, ev.items, await loadTakenByItem(ev.id, tx), guests);
-      if (full) throw new Error(full);
+      let status: "CONFIRMED" | "WAITLIST" = "CONFIRMED";
+      if (full) {
+        if (!ev.waitlistEnabled || input.waitlist !== true) throw new Error(full);
+        const never = waitlistImpossible(itemIds, ev.items, guests);
+        if (never) throw new Error(never);
+        status = "WAITLIST";
+      }
 
       let code = generateCode();
       for (let i = 0; i < 20 && (await tx.eventRegistration.findFirst({ where: { eventId: ev.id, code }, select: { id: true } })); i++) code = generateCode();
@@ -134,7 +144,7 @@ export async function registerForEvent(slug: string, input: RegisterInput) {
           name,
           guests,
           answers: answersToStore(result.values),
-          status: "CONFIRMED",
+          status,
           tokenHash: hashToken(token),
           code,
           consentAt: new Date(),
@@ -147,15 +157,16 @@ export async function registerForEvent(slug: string, input: RegisterInput) {
         action: "events.registration.create",
         entityType: "event",
         entityId: ev.id,
-        summary: `Událost „${ev.title}“: nová registrace ${code} (termínů: ${itemIds.length}, osob: ${1 + guests})`,
+        summary: `Událost „${ev.title}“: nová registrace ${code} (termínů: ${itemIds.length}, osob: ${1 + guests}${status === "WAITLIST" ? ", čekací listina" : ""})`,
         data: { registrationId: registration.id, itemIds: itemIds },
       });
       return { registration, event: ev, items: ev.items.filter((i) => itemIds.includes(i.id)) };
     });
 
     // 6. Potvrzovací e-mail až po commitu. Když neodejde (limit, vypnuto, chyba), registrace platí a odkaz s kódem je na obrazovce.
+    const waiting = created.registration.status === "WAITLIST";
     if (created.event.confirmChannel !== "SCREEN_ONLY") {
-      const sent = await sendEventEmail("events.registration.confirmed", [
+      const sent = await sendEventEmail(waiting ? "events.waitlist.joined" : "events.registration.confirmed", [
         {
           email,
           userId: user?.id ?? null,

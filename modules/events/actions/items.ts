@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { serializable } from "@/lib/serializable";
 import { safeAction } from "@/lib/safe-action";
 import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
@@ -10,6 +11,8 @@ import { formatDate } from "@/lib/datetime";
 import { itemLabel } from "@/modules/events/format";
 import { cleanCapacity, cleanItemInput, generateSlots, type GeneratorInput, type ItemInput } from "@/modules/events/items";
 import { assertEditable, loadManaged } from "@/modules/events/manage";
+import { HOLDING_STATUSES } from "@/modules/events/public-data";
+import { notifyPromoted, promoteFromWaitlist } from "@/modules/events/waitlist";
 
 type Tx = Parameters<typeof loadManaged>[0];
 
@@ -46,15 +49,19 @@ export async function updateItem(eventId: string, itemId: string, input: ItemInp
   return safeAction(async () => {
     const user = await requirePermission("events.manage.own");
     const data = cleanItemInput(input);
-    await prisma.$transaction(async (tx) => {
+    const promoted = await serializable(async (tx) => {
       const event = await loadManaged(tx, user, eventId);
       assertEditable(event);
       const before = await loadItem(tx, eventId, itemId);
-      const active = await tx.eventRegistrationItem.count({ where: { itemId, registration: { status: { not: "CANCELLED" } } } });
+      // Čekající místo nedrží, kapacitu omezují jen registrace, které místo drží
+      const active = await tx.eventRegistrationItem.count({ where: { itemId, registration: { status: { in: [...HOLDING_STATUSES] } } } });
       if (data.capacity !== null && data.capacity < active) throw new Error(`Na termín je zaregistrováno ${active}, kapacitu nejde snížit pod tento počet.`);
       const after = await tx.eventItem.update({ where: { id: itemId }, data });
       await audit(tx, user, { action: "events.item.update", entityType: "event", entityId: eventId, summary: `Událost „${event.title}“: upraven termín ${itemLabel(before)} → ${itemLabel(after)}, kapacita ${before.capacity ?? "bez omezení"} → ${after.capacity ?? "bez omezení"}` });
+      // Víc míst posune čekající (kapacita může být i zvýšená na „bez omezení“)
+      return promoteFromWaitlist(tx, [itemId], user);
     });
+    await notifyPromoted(promoted);
     refresh(eventId);
   });
 }

@@ -6,6 +6,7 @@ import { loadEventTextDefaults } from "@/modules/events/text-defaults";
 import { loadEvent, loadEventFields, loadEventItems, listTeachers } from "@/modules/events/data";
 import { RegistrationsTab } from "@/modules/events/components/RegistrationsTab";
 import { loadRegistrations } from "@/modules/events/registrations-data";
+import { DuplicateEventButton } from "@/modules/events/components/DuplicateEventButton";
 import { CopyLinkButton } from "@/modules/events/components/CopyLinkButton";
 import { EventSettingsForm } from "@/modules/events/components/EventSettingsForm";
 import { EventFormTab } from "@/modules/events/components/EventFormTab";
@@ -45,6 +46,7 @@ export default async function EventDetailPage({ params, searchParams }: { params
           <>
             <EventStatusActions eventId={event.id} status={event.status} />
             <CopyLinkButton slug={event.slug} />
+            {!(await isImpersonating()) && <DuplicateEventButton eventId={event.id} title={event.title} />}
           </>
         }
       />

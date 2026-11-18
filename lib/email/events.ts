@@ -19,6 +19,8 @@ export type EmailEventId =
   | "events.registration.changed"
   | "events.registration.moved"
   | "events.registration.removed"
+  | "events.waitlist.joined"
+  | "events.waitlist.promoted"
   | "events.reminder"
   | "manual.bulk"
   | "test";
@@ -334,6 +336,50 @@ export const EMAIL_EVENTS: readonly EmailEventDef[] = [
     defaultSubject: "Změna registrace: {{akce}}",
     defaultBody:
       "Dobrý den, {{jmeno}},\n\norganizátor změnil vaši registraci na událost „{{akce}}“.\n\n{{zmena}}\n\nZbývající termíny:\n{{terminy}}\n\nMísto: {{misto}}\n\nKód registrace: {{kod}}\nStránka události: {{odkaz}}",
+  },
+  {
+    id: "events.waitlist.joined",
+    module: "events",
+    group: "Události",
+    label: "Zapsání na čekací listinu",
+    description:
+      "Účastníkovi, který se zapsal na čekací listinu plného termínu: odkaz na správu registrace a kód. Neposílá se u událostí s potvrzením „jen na obrazovce“.",
+    defaultEnabled: true,
+    mandatory: true,
+    bulk: false,
+    variables: [
+      JMENO,
+      { name: "akce", description: "název události" },
+      { name: "terminy", description: "termíny, na které čeká (jeden na řádek)" },
+      { name: "odkaz", description: "odkaz na správu registrace" },
+      { name: "kod", description: "kód registrace" },
+      { name: "misto", description: "místo konání" },
+    ],
+    defaultSubject: "Jste na čekací listině: {{akce}}",
+    defaultBody:
+      "Dobrý den, {{jmeno}},\n\ntermín události „{{akce}}“ je zatím plný, proto jsme vás zapsali na čekací listinu. Místo vám nedržíme; jakmile se nějaké uvolní, dostanete další e-mail a registrace se potvrdí automaticky.\n\nTermíny:\n{{terminy}}\n\nMísto: {{misto}}\n\nRegistraci můžete zobrazit nebo zrušit zde:\n{{odkaz}}\n\nKód registrace: {{kod}}",
+  },
+  {
+    id: "events.waitlist.promoted",
+    module: "events",
+    group: "Události",
+    label: "Posun z čekací listiny",
+    description:
+      "Účastníkovi, který čekal na místo, když se uvolnilo a registrace se potvrdila. Posílá se vždy, i u událostí s potvrzením „jen na obrazovce“ (jinak by se o místě nedozvěděl).",
+    defaultEnabled: true,
+    mandatory: true,
+    bulk: false,
+    variables: [
+      JMENO,
+      { name: "akce", description: "název události" },
+      { name: "terminy", description: "potvrzené termíny (jeden na řádek)" },
+      { name: "kod", description: "kód registrace" },
+      { name: "odkaz", description: "stránka události (registraci najdete přes kód a e-mail)" },
+      { name: "misto", description: "místo konání" },
+    ],
+    defaultSubject: "Uvolnilo se místo: {{akce}}",
+    defaultBody:
+      "Dobrý den, {{jmeno}},\n\nuvolnilo se místo a vaše registrace na událost „{{akce}}“ je nyní potvrzená.\n\nTermíny:\n{{terminy}}\n\nMísto: {{misto}}\n\nKód registrace: {{kod}}\nRegistraci můžete zobrazit nebo zrušit na {{odkaz}} v části „Už jste registrovaní?“ (kód a váš e-mail). Pokud vám termín už nevyhovuje, zrušte ho prosím, aby místo mohl dostat další.",
   },
   {
     id: "events.reminder",
