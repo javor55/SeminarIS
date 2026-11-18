@@ -36,6 +36,8 @@ jobs:
       - run: npm run lint
       - name: Test bezpečného HTML
         run: npm run test:html
+      - name: Test formuláře a termínů událostí
+        run: npm run test:events
       - name: Kontraktový test modulů
         run: npm run test:contract
       - run: npm run build

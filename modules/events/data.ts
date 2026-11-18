@@ -5,6 +5,7 @@ import { draftFromEntries } from "@/modules/core/audience";
 import type { AudienceState } from "@/modules/core/components/audience/AudiencePicker";
 import { canManageEvent, eventsVisibleWhere } from "@/modules/events/access";
 import type { EventStatusValue } from "@/modules/events/status";
+import { ensureFixedFields } from "@/modules/events/fields-db";
 
 // Čtení dat pro stránky modulu. Do klienta jdou jen prosté (serializovatelné) hodnoty.
 
@@ -141,4 +142,21 @@ export async function loadEventItems(eventId: string): Promise<EventItemRow[]> {
     taken: takenBy.get(i.id) ?? 0,
     registrations: i._count.registrations,
   }));
+}
+
+export type EventFieldRow = {
+  id: string;
+  key: string;
+  type: "TEXT" | "TEXTAREA" | "SELECT" | "CHECKBOX";
+  label: string;
+  mode: "REQUIRED" | "OPTIONAL" | "HIDDEN";
+  options: string[];
+  builtin: boolean;
+};
+
+/** Pole formuláře; chybějící pevná pole se doplní (u událostí vzniklých před U6). */
+export async function loadEventFields(eventId: string): Promise<EventFieldRow[]> {
+  await ensureFixedFields(prisma, eventId);
+  const rows = await prisma.eventField.findMany({ where: { eventId }, orderBy: [{ order: "asc" }, { key: "asc" }] });
+  return rows.map((f) => ({ id: f.id, key: f.key, type: f.type, label: f.label, mode: f.mode, options: f.options, builtin: f.builtin }));
 }

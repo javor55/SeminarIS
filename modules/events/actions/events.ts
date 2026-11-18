@@ -9,6 +9,7 @@ import { audit } from "@/lib/audit";
 import { audienceKey, entriesFromDraft } from "@/modules/core/audience";
 import { cleanAudienceDraft } from "@/modules/core/audience-db";
 import { loadManaged } from "@/modules/events/manage";
+import { ensureFixedFields } from "@/modules/events/fields-db";
 import { cleanEventSettings, type EventSettingsInput } from "@/modules/events/settings";
 import { EVENT_STATUS_LABEL, canChangeStatus, type EventStatusValue } from "@/modules/events/status";
 import { randomSlug, slugify, uniqueSlug } from "@/modules/events/slug";
@@ -88,6 +89,7 @@ export async function createEvent(input: EventSettingsInput) {
         });
         await replaceOrganizers(tx, event.id, user.id, data.organizerIds);
         await replaceEventAudience(tx, event.id, data.visibility, data.audience);
+        await ensureFixedFields(tx, event.id);
         await audit(tx, user, { action: "events.event.create", entityType: "event", entityId: event.id, summary: `Založena událost „${event.title}“ (/akce/${event.slug})` });
         return { id: event.id, slug: event.slug };
       });

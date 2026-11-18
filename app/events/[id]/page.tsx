@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { TabLinks } from "@/components/tab-links";
 import { requirePagePermission } from "@/lib/session";
-import { loadEvent, loadEventItems, listTeachers } from "@/modules/events/data";
+import { loadEvent, loadEventFields, loadEventItems, listTeachers } from "@/modules/events/data";
 import { CopyLinkButton } from "@/modules/events/components/CopyLinkButton";
 import { EventSettingsForm } from "@/modules/events/components/EventSettingsForm";
+import { EventFormTab } from "@/modules/events/components/EventFormTab";
 import { EventItemsTab } from "@/modules/events/components/EventItemsTab";
 import { EventStatusActions } from "@/modules/events/components/EventStatusActions";
 import { EventStatusBadge } from "@/modules/events/components/EventStatusBadge";
@@ -17,7 +18,6 @@ const TABS = [
 ];
 
 const PLACEHOLDERS: Record<string, string> = {
-  form: "Nastavení formuláře účastníka přibude v další verzi.",
   registrations: "Seznam registrací přibude v další verzi.",
 };
 
@@ -59,6 +59,15 @@ export default async function EventDetailPage({ params, searchParams }: { params
         />
       ) : activeTab === "items" ? (
         <EventItemsTab eventId={event.id} items={await loadEventItems(event.id)} readOnly={event.status === "ARCHIVED"} />
+      ) : activeTab === "form" ? (
+        <EventFormTab
+          eventId={event.id}
+          fields={await loadEventFields(event.id)}
+          allowGuests={event.allowGuests}
+          maxGuests={event.maxGuests}
+          consentText={event.consentText}
+          readOnly={event.status === "ARCHIVED"}
+        />
       ) : (
         <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground" data-testid="tab-placeholder">
           {PLACEHOLDERS[activeTab]}
