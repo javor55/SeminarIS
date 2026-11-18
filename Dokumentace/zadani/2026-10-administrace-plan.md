@@ -25,8 +25,8 @@ než začne další. Díky tomu jde kdykoli přerušit a pokračovat (i v nové 
 - [x] F11 Mobilní zobrazení: zápis a dopisování jako karty (PR #17)
 - [x] F12 Zjednodušené rozhraní pro studenta (jen Zápis seminářů a Dopisování, zápis po krocích) (PR #18)
 - [x] F13 Učitel a administrátor ve stejném stylu (bez ztráty jakékoli funkce) (PR #19)
-- [x] F14 Kompaktnější zápis, bez uvítání, opravy překrývání
-- [x] F15 Zbytek aplikace ve stejném stylu
+- [x] F14 Kompaktnější zápis, bez uvítání, opravy překrývání (PR #20)
+- [x] F15 Zbytek aplikace ve stejném stylu (PR #21)
 
 Společná pravidla pro všechny fáze: konvence z `Dokumentace/architektura-moduly.md`
 (`safeAction`/`unwrap`, `requirePermission`/`can`, audit `audit(tx, …)` ve stejné transakci,

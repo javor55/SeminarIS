@@ -24,7 +24,7 @@ env:
 jobs:
   checks:
     name: Typecheck, lint, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,13 +34,15 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      - name: Test bezpečného HTML
+        run: npm run test:html
       - name: Kontraktový test modulů
         run: npm run test:contract
       - run: npm run build
 
   e2e:
     name: E2E testy (Playwright + PostgreSQL)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: checks
     services:
       postgres:

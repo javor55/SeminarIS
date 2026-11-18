@@ -174,6 +174,7 @@ export type SettingField = {
   max?: number;
   maxLength?: number;
   placeholder?: string;
+  multiline?: boolean;
   value: SettingValue;
   // Smí aktuální uživatel hodnotu měnit?
   canEdit: boolean;
@@ -193,6 +194,7 @@ export async function describeSettings(user: User, filter: (decl: RegisteredSett
     max: d.max,
     maxLength: d.maxLength,
     placeholder: d.placeholder,
+    multiline: d.multiline,
     value: values[d.key],
     canEdit: can(user.role, (d.permission ?? "core.admin") as Permission),
   }));

@@ -1,5 +1,6 @@
 "use server";
 
+import { sanitizeRichHtml } from "@/lib/html";
 import { safeAction } from "@/lib/safe-action";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -175,7 +176,7 @@ function cleanInput(data: SubjectInput) {
     // zkratka je nepovinná, ale jedinečná
     code: data.code?.trim().toUpperCase() || null,
     description: data.description?.trim() || null,
-    syllabus: data.syllabus?.trim() || null,
+    syllabus: data.syllabus?.trim() ? sanitizeRichHtml(data.syllabus.trim()) || null : null,
     grades: sanitizeGrades(data.grades),
   };
 }

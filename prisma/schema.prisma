@@ -91,6 +91,12 @@ model User {
   makeupRegistrations      MakeupRegistration[]        @relation("MakeupRegistrationStudent")
   makeupSubjectsTaught     MakeupRegistrationSubject[] @relation("MakeupSubjectTeacher")
 
+  // Modul Události
+  eventsCreated      Event[]             @relation("EventCreatedBy")
+  eventsOrganized    EventOrganizer[]
+  eventAudiences     EventAudience[]     @relation("EventAudienceUser")
+  eventRegistrations EventRegistration[]
+
   // ====== zpětné relace ======
   // Subject
   subjectsCreated Subject[] @relation("SubjectCreatedBy")
@@ -124,16 +130,16 @@ model User {
 // =====================================================================
 
 model EnrollmentWindow {
-  id                String   @id @default(cuid())
-  name              String
-  description       String?
-  startsAt          DateTime
-  endsAt            DateTime
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  startsAt      DateTime
+  endsAt        DateTime
   // Zveřejněno studentům (false = koncept, studenti okno nevidí). Otevření a zavření řídí data `startsAt` a `endsAt`;
   // stav „plánováno / otevřeno / uzavřeno“ se z nich vždy odvozuje (modules/seminars/window-phase.ts), neukládá se.
-  published         Boolean  @default(false)
+  published     Boolean   @default(false)
   // Předčasně uzavřeno správcem (kdy); null = běží podle dat. „Znovu otevřít“ ho smaže (dokud neuplynul konec).
-  closedEarlyAt     DateTime?
+  closedEarlyAt DateTime?
 
   // Publikum: sjednocení ročníků, tříd a konkrétních studentů minus vynechaní; prázdné = všichni aktivní studenti
   audience EnrollmentWindowAudience[]
@@ -378,6 +384,7 @@ model ClassGroup {
   classMemberships      ClassMembership[]
   // zápisy seminářů: publika oken a omezení výskytů, ve kterých je třída uvedena
   enrollmentAudiences   EnrollmentWindowAudience[]
+  eventAudiences        EventAudience[]
   restrictedOccurrences SubjectOccurrence[]        @relation("OccurrenceClasses")
 
   createdAt DateTime @default(now())
@@ -570,4 +577,242 @@ model DemoRecord {
   createdAt DateTime @default(now())
 
   @@unique([model, recordId])
+}
+
+// ============================================================
+// Modul Události (registrace na akce pro veřejnost)
+// ============================================================
+
+enum EventStatus {
+  DRAFT // koncept, veřejnosti neviditelný
+  PUBLISHED // zveřejněno
+  CLOSED // registrace uzavřena
+  ARCHIVED // archiv
+}
+
+// Kdo smí událost vidět a registrovat se
+enum EventVisibility {
+  PUBLIC // kdokoli s odkazem
+  USERS // jen přihlášení z publika události
+}
+
+// Kde účastník dostane odkaz na správu registrace a kód
+enum EventConfirmChannel {
+  EMAIL_AND_SCREEN
+  SCREEN_ONLY
+  EMAIL_ONLY
+}
+
+enum EventFieldType {
+  TEXT
+  TEXTAREA
+  SELECT
+  CHECKBOX
+}
+
+enum EventFieldMode {
+  REQUIRED
+  OPTIONAL
+  HIDDEN
+}
+
+enum EventRegistrationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  WAITLIST
+}
+
+model Event {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  title    String
+  subtitle String?
+  place    String?
+  contact  String?
+
+  descriptionHtml String      @default("")
+  imageId         String?
+  image           EventImage? @relation(fields: [imageId], references: [id], onDelete: SetNull)
+  imageAlt        String?
+
+  status     EventStatus     @default(DRAFT)
+  visibility EventVisibility @default(PUBLIC)
+
+  registrationOpensAt  DateTime?
+  registrationClosesAt DateTime?
+
+  // Pravidla registrace
+  maxItemsPerRegistration  Int     @default(1)
+  allowGuests              Boolean @default(false)
+  maxGuests                Int     @default(0)
+  // Účastník smí měnit a rušit nejpozději tolik minut před začátkem prvního termínu
+  changeDeadlineMinutes    Int     @default(1440)
+  maxRegistrationsPerEmail Int     @default(1)
+
+  confirmChannel   EventConfirmChannel @default(EMAIL_AND_SCREEN)
+  confirmationText String?
+  consentText      String?
+
+  createdById String
+  createdBy   User      @relation("EventCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  archivedAt  DateTime?
+  // Kdy byly smazány osobní údaje účastníků
+  purgedAt    DateTime?
+
+  organizers    EventOrganizer[]
+  audience      EventAudience[]
+  items         EventItem[]
+  fields        EventField[]
+  registrations EventRegistration[]
+
+  @@index([status])
+  @@index([createdById])
+}
+
+// Spoluorganizátor události (autor je v `Event.createdById`)
+model EventOrganizer {
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, userId])
+  @@index([userId])
+}
+
+// Publikum události s viditelností USERS; stejný tvar jako EnrollmentWindowAudience
+model EventAudience {
+  id String @id @default(cuid())
+
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  type AudienceType
+
+  grade        Int?
+  classGroupId String?
+  classGroup   ClassGroup? @relation(fields: [classGroupId], references: [id], onDelete: Cascade)
+  userId       String?
+  user         User?       @relation("EventAudienceUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Jedinečnost položky v události: "GRADE:3", "CLASS:<id>", "USER:<id>", "EXCLUDE_USER:<id>"
+  key String
+
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, key])
+  @@index([userId])
+  @@index([classGroupId])
+}
+
+// Titulní obrázek (a obrázky v popisu) uložené v databázi
+model EventImage {
+  id String @id @default(cuid())
+
+  data   Bytes
+  mime   String
+  width  Int
+  height Int
+  size   Int
+
+  // Kdo obrázek nahrál (bez relace – historie, ne vazba)
+  createdById String
+  createdAt   DateTime @default(now())
+
+  events Event[]
+}
+
+// Termín (položka), na který se dá registrovat
+model EventItem {
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  label    String?
+  startsAt DateTime?
+  endsAt   DateTime?
+  // null = bez omezení
+  capacity Int?
+  note     String?
+  order    Int       @default(0)
+
+  cancelledAt DateTime?
+
+  registrations EventRegistrationItem[]
+
+  @@index([eventId, order])
+}
+
+// Pole formuláře účastníka. E-mail v ní není (je vždy povinný a vždy první).
+model EventField {
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  // Pevná pole: name, phone, guests, note, school, grade; vlastní pole: custom_<n>
+  key     String
+  type    EventFieldType
+  label   String
+  mode    EventFieldMode @default(OPTIONAL)
+  options String[]
+  order   Int            @default(0)
+  builtin Boolean        @default(false)
+
+  @@unique([eventId, key])
+  @@index([eventId, order])
+}
+
+model EventRegistration {
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  email   String
+  name    String?
+  guests  Int     @default(0)
+  answers Json    @default("{}")
+
+  status    EventRegistrationStatus @default(CONFIRMED)
+  // Odkaz na správu: v databázi jen SHA-256 hash tokenu
+  tokenHash String                  @unique
+  // Kód ve tvaru XXX-XXXX, jedinečný v rámci události
+  code      String
+
+  consentAt  DateTime
+  // Přihlášený uživatel, který se registroval (nepovinné)
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  attendedAt DateTime?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  cancelledAt DateTime?
+
+  items EventRegistrationItem[]
+
+  @@unique([eventId, code])
+  @@index([eventId, email])
+  @@index([userId])
+}
+
+model EventRegistrationItem {
+  registrationId String
+  registration   EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  itemId         String
+  item           EventItem         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([registrationId, itemId])
+  @@index([itemId])
+}
+
+// Počítadla pro ochranu proti zneužití (limity, jednorázová řešení výzev)
+model EventRateLimit {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
 }

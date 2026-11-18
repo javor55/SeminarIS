@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { saveSettingsAction } from "@/modules/core/actions/settings";
 import type { SettingField } from "@/lib/settings-registry";
@@ -88,7 +89,23 @@ export function SettingsForm({
                 ))}
               </NativeSelect>
             )}
-            {(f.type === "number" || f.type === "string") && (
+            {f.type === "string" && f.multiline && (
+              <div className="flex w-full flex-col gap-2 sm:max-w-xl">
+                <Textarea
+                  id={id}
+                  rows={12}
+                  maxLength={f.maxLength}
+                  placeholder={f.placeholder}
+                  value={String(values[f.key])}
+                  disabled={disabled}
+                  onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                />
+                <Button className="self-end" variant="outline" disabled={disabled || !dirty} onClick={() => save(f, values[f.key])}>
+                  Uložit
+                </Button>
+              </div>
+            )}
+            {(f.type === "number" || (f.type === "string" && !f.multiline)) && (
               <div className="flex gap-2">
                 <Input
                   id={id}

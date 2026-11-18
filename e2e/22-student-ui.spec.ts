@@ -85,7 +85,7 @@ test("navigace studenta podle stavu: záložky počítá server, úvod „/“ v
 
   // učitel a admin: navigace beze změny
   const pt = await login(browser, "teacher@skola.cz");
-  check("teacher keeps the old navigation", (await navLabels(pt)).join(",") === "Dashboard,Zápisy,Předměty,Moje předměty,Dopisování,Uživatelé,Administrace,Můj profil", (await navLabels(pt)).join(","));
+  check("teacher keeps the old navigation", (await navLabels(pt)).join(",") === "Dashboard,Zápisy,Předměty,Moje předměty,Dopisování,Události,Uživatelé,Administrace,Můj profil", (await navLabels(pt)).join(","));
   check("teacher has no student account menu", (await pt.getByTestId("account-menu").count()) === 0);
 });
 

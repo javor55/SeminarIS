@@ -35,7 +35,8 @@
         "no-restricted-imports": ["error", {
           "patterns": [
             { "group": ["@/modules/seminars", "@/modules/seminars/**", "**/modules/seminars/**"], "message": "Jádro nesmí importovat modul Semináře. Použijte bod rozšíření (modules/server-types.ts, modules/core/extensions.ts)." },
-            { "group": ["@/modules/makeup", "@/modules/makeup/**", "**/modules/makeup/**"], "message": "Jádro nesmí importovat modul Dopisování. Použijte bod rozšíření (modules/server-types.ts, modules/core/extensions.ts)." }
+            { "group": ["@/modules/makeup", "@/modules/makeup/**", "**/modules/makeup/**"], "message": "Jádro nesmí importovat modul Dopisování. Použijte bod rozšíření (modules/server-types.ts, modules/core/extensions.ts)." },
+            { "group": ["@/modules/events", "@/modules/events/**", "**/modules/events/**"], "message": "Jádro nesmí importovat modul Události. Použijte bod rozšíření (modules/server-types.ts, modules/core/extensions.ts)." }
           ]
         }]
       }
@@ -46,7 +47,8 @@
       "rules": {
         "no-restricted-imports": ["error", {
           "patterns": [
-            { "group": ["@/modules/makeup", "@/modules/makeup/**", "**/modules/makeup/**"], "message": "Modul Semináře nesmí importovat modul Dopisování. Sdílené věci patří do jádra." }
+            { "group": ["@/modules/makeup", "@/modules/makeup/**", "**/modules/makeup/**"], "message": "Modul Semináře nesmí importovat modul Dopisování. Sdílené věci patří do jádra." },
+            { "group": ["@/modules/events", "@/modules/events/**", "**/modules/events/**"], "message": "Modul Semináře nesmí importovat modul Události. Sdílené věci patří do jádra." }
           ]
         }]
       }
@@ -56,7 +58,19 @@
       "rules": {
         "no-restricted-imports": ["error", {
           "patterns": [
-            { "group": ["@/modules/seminars", "@/modules/seminars/**", "**/modules/seminars/**"], "message": "Modul Dopisování nesmí importovat modul Semináře. Sdílené věci patří do jádra." }
+            { "group": ["@/modules/seminars", "@/modules/seminars/**", "**/modules/seminars/**"], "message": "Modul Dopisování nesmí importovat modul Semináře. Sdílené věci patří do jádra." },
+            { "group": ["@/modules/events", "@/modules/events/**", "**/modules/events/**"], "message": "Modul Dopisování nesmí importovat modul Události. Sdílené věci patří do jádra." }
+          ]
+        }]
+      }
+    },
+    {
+      "files": ["modules/events/**/*.{ts,tsx}", "app/events/**/*.{ts,tsx}", "app/akce/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": ["error", {
+          "patterns": [
+            { "group": ["@/modules/seminars", "@/modules/seminars/**", "**/modules/seminars/**"], "message": "Modul Události nesmí importovat modul Semináře. Sdílené věci patří do jádra." },
+            { "group": ["@/modules/makeup", "@/modules/makeup/**", "**/modules/makeup/**"], "message": "Modul Události nesmí importovat modul Dopisování. Sdílené věci patří do jádra." }
           ]
         }]
       }

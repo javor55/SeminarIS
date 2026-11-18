@@ -55,6 +55,7 @@ export const AUDIT_AREAS: Record<string, string> = {
   subjects: "Předměty a úvazky",
   seminars: "Zápisy seminářů",
   makeup: "Dopisování",
+  events: "Události",
   impersonation: "Náhled jako uživatel",
   system: "Systém",
 };

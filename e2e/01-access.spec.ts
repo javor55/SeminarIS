@@ -55,7 +55,7 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
 
   // --- Teacher ---
   p = await login(browser, 'teacher@skola.cz');
-  check('teacher nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Moje předměty', 'Dopisování', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(p)));
+  check('teacher nav', JSON.stringify(await navLabels(p)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Moje předměty', 'Dopisování', 'Události', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(p)));
   await p.goto('/admin/registration'); check('teacher /admin/registration redirected', p.url().endsWith('/dashboard'), p.url());
   await p.goto('/zapisy'); check('teacher /zapisy redirected', p.url().endsWith('/dashboard'), p.url());
   await p.goto('/zapisy/' + sql(`select id from "EnrollmentWindow" limit 1`)); check('teacher /zapisy/id redirected', p.url().endsWith('/dashboard'), p.url());
@@ -64,7 +64,7 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
 
   // --- Admin ---
   const pa = await login(browser, 'admin@skola.cz');
-  check('admin nav', JSON.stringify(await navLabels(pa)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Dopisování', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(pa)));
+  check('admin nav', JSON.stringify(await navLabels(pa)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Dopisování', 'Události', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(pa)));
   await pa.goto('/admin'); await pa.waitForSelector('[data-testid=admin-stats]');
   const text = await pa.locator('main').innerText();
   check('admin stats', text.includes('Uživatelé celkem') && text.includes('Aktivní předměty') && text.includes('Otevřené zápisy'));
@@ -82,7 +82,7 @@ test("role, oprávnění, moduly, okamžitá změna role", async ({ browser }) =
   // vypnout semináře
   await pa.click('#module-seminars'); await pa.waitForTimeout(2500);
   check('setting stored', sql(`select value from "SystemSetting" where key='module.seminars.enabled'`) === 'false');
-  check('admin nav without seminars', JSON.stringify(await navLabels(pa)) === JSON.stringify(['Dashboard', 'Předměty', 'Dopisování', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(pa)));
+  check('admin nav without seminars', JSON.stringify(await navLabels(pa)) === JSON.stringify(['Dashboard', 'Předměty', 'Dopisování', 'Události', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(pa)));
   await pa.goto('/admin'); await pa.waitForSelector('[data-testid=admin-stats]');
   const text2 = await pa.locator('main').innerText();
   check('stats without seminars', !text2.includes('Aktivní předměty'));

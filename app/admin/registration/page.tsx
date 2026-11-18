@@ -5,13 +5,15 @@ import { isMicrosoftConfigured } from "@/lib/auth-settings";
 import { SettingsForm } from "@/modules/core/components/admin/SettingsForm";
 
 const REGISTRATION_KEYS = ["registration_enabled", "default_user_role", "registration_class_mode"];
+const PRIVACY_KEYS = ["privacy.controller", "privacy.text"];
 const AUTH_KEYS = ["auth.microsoft.enabled", "auth.microsoft.autoCreate", "auth.password.scope"];
 
 export default async function RegistrationSettingsPage() {
   const user = await requirePagePermission("core.admin");
-  const [registration, auth] = await Promise.all([
+  const [registration, auth, privacy] = await Promise.all([
     describeSettings(user, (d) => REGISTRATION_KEYS.includes(d.key)),
     describeSettings(user, (d) => AUTH_KEYS.includes(d.key)),
+    describeSettings(user, (d) => PRIVACY_KEYS.includes(d.key)),
   ]);
   const microsoftConfigured = isMicrosoftConfigured();
 
@@ -39,6 +41,12 @@ export default async function RegistrationSettingsPage() {
             </p>
           )
         }
+      />
+      <SettingsForm
+        title="Zpracování osobních údajů"
+        description="Text veřejné stránky /ochrana-udaju, na kterou vedou odkazy z přihlášení a registrace."
+        fields={privacy}
+        testId="privacy-card"
       />
     </div>
   );
