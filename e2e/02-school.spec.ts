@@ -19,7 +19,7 @@ test("třídy, předměty, import se třídou, přesun mezi třídami, cílení 
   check('no microsoft button when not configured', (await p0.locator('[data-testid=microsoft-login]').count()) === 0);
 
   const pa = await login(b, 'admin@skola.cz');
-  check('admin nav (no Škola)', JSON.stringify(await navLabels(pa)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Dopisování', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(pa)));
+  check('admin nav (no Škola)', JSON.stringify(await navLabels(pa)) === JSON.stringify(['Dashboard', 'Zápisy', 'Předměty', 'Dopisování', 'Události', 'Uživatelé', 'Administrace', 'Můj profil']), JSON.stringify(await navLabels(pa)));
   check('/school is gone', (await pa.goto('/school')).status() === 404);
 
   // školní rok je v Administraci
