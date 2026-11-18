@@ -17,6 +17,8 @@ export type EmailEventId =
   | "seminars.window.reminder"
   | "events.registration.confirmed"
   | "events.registration.changed"
+  | "events.registration.moved"
+  | "events.registration.removed"
   | "manual.bulk"
   | "test";
 
@@ -284,6 +286,53 @@ export const EMAIL_EVENTS: readonly EmailEventDef[] = [
     defaultSubject: "Změna registrace: {{akce}}",
     defaultBody:
       "Dobrý den, {{jmeno}},\n\nvaše registrace na událost „{{akce}}“ se změnila.\n\n{{zmena}}\n\nAktuální termíny:\n{{terminy}}\n\nMísto: {{misto}}\n\nOdkaz: {{odkaz}}",
+  },
+  {
+    id: "events.registration.moved",
+    module: "events",
+    group: "Události",
+    label: "Přesun registrace organizátorem",
+    description:
+      "Účastníkovi, když ho organizátor přesune na jiný termín a nechá zaškrtnuté „Poslat účastníkovi e-mail“. Posílá se i u událostí s potvrzením „jen na obrazovce“ (organizátor se rozhodl výslovně).",
+    defaultEnabled: true,
+    mandatory: true,
+    bulk: false,
+    variables: [
+      JMENO,
+      { name: "akce", description: "název události" },
+      { name: "puvodni", description: "původní termín" },
+      { name: "novy", description: "nový termín" },
+      { name: "terminy", description: "aktuální termíny registrace (jeden na řádek)" },
+      { name: "kod", description: "kód registrace" },
+      { name: "odkaz", description: "stránka události (registraci najdete přes kód a e-mail)" },
+      { name: "misto", description: "místo konání" },
+    ],
+    defaultSubject: "Váš termín se změnil: {{akce}}",
+    defaultBody:
+      "Dobrý den, {{jmeno}},\n\norganizátor vás na události „{{akce}}“ přesunul na jiný termín.\n\nPůvodní termín: {{puvodni}}\nNový termín: {{novy}}\n\nVaše termíny:\n{{terminy}}\n\nMísto: {{misto}}\n\nKód registrace: {{kod}}\nRegistraci najdete na {{odkaz}} v části „Už jste registrovaní?“ (kód a váš e-mail).",
+  },
+  {
+    id: "events.registration.removed",
+    module: "events",
+    group: "Události",
+    label: "Odebrání z termínu nebo zrušení organizátorem",
+    description:
+      "Účastníkovi, když ho organizátor odebere z termínu nebo zruší celou registraci a nechá zaškrtnuté „Poslat účastníkovi e-mail“. Posílá se i u událostí s potvrzením „jen na obrazovce“.",
+    defaultEnabled: true,
+    mandatory: true,
+    bulk: false,
+    variables: [
+      JMENO,
+      { name: "akce", description: "název události" },
+      { name: "zmena", description: "co se stalo (odebrání z termínu, zrušení registrace)" },
+      { name: "terminy", description: "zbývající termíny (jeden na řádek), po zrušení „—“" },
+      { name: "kod", description: "kód registrace" },
+      { name: "odkaz", description: "stránka události" },
+      { name: "misto", description: "místo konání" },
+    ],
+    defaultSubject: "Změna registrace: {{akce}}",
+    defaultBody:
+      "Dobrý den, {{jmeno}},\n\norganizátor změnil vaši registraci na událost „{{akce}}“.\n\n{{zmena}}\n\nZbývající termíny:\n{{terminy}}\n\nMísto: {{misto}}\n\nKód registrace: {{kod}}\nStránka události: {{odkaz}}",
   },
   {
     id: "test",

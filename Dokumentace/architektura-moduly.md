@@ -1223,3 +1223,26 @@ Test bez DB: `npm run test:html` (CI). Veřejná stránka `/ochrana-udaju` bere 
   `/akce/[slug]/r/[token]/kalendar.ics`. Testy: `scripts/events-manage-test.ts` (v `test:events`) a E2E `39`.
 - **E-mail** `events.registration.changed` (změna termínu, úprava údajů, zrušení účastníkem): přes `sendEventEmail`, limity i
   vypínač v Upozorněních platí; u události s potvrzením „jen na obrazovce“ se neposílá.
+
+### Události: nástroje organizátora (U11)
+
+- **Záložka Registrace** v `/events/[id]` (`RegistrationsTab`, data `registrations-data.ts`): souhrn (`stat-tile`), obsazenost
+  termínů (`meter`; obsazeno = místa včetně doprovodu), seznam (na telefonu karty), hledání (jméno, e-mail, telefon, kód,
+  poznámka; bez diakritiky) a filtr podle termínu, zrušené registrace za přepínačem. Cizí událost: `loadRegistrations` vrátí
+  `null` a stránka je 404. Archivovaná událost a režim „zobrazit jako“ jsou jen pro čtení (bez tlačítek).
+- **Akce** (`actions/organizer.ts`, `requirePermission("events.manage.own")` + `loadManaged` = `canManageEvent`, `safeAction`):
+  `addRegistration` (bez antibotu, uzávěrek a limitu na e-mail; token a kód jako veřejná registrace; povinná pole jsou pro
+  organizátora volitelná, e-mail ne; volitelné potvrzení `events.registration.confirmed`), `updateRegistration`,
+  `moveRegistration`, `removeFromItem` (jediný termín se neodebírá, registraci je třeba zrušit),
+  `cancelRegistrationByOrganizer`. Kapacitu server hlídá a organizátor ji smí přeskočit parametrem `force` (UI: varování a
+  zaškrtnutí „Přesto … nad kapacitu“). Audit ve stejné transakci pod jménem organizátora (`events.registration.create_manual`,
+  `update_manual`, `move`, `remove_item`, `cancel_manual`), bez osobních údajů. Archivovaná událost se neupravuje.
+- **E-maily** `events.registration.moved` a `events.registration.removed` (odebrání z termínu i zrušení): volba „Poslat
+  účastníkovi e-mail“ (výchozí zapnuto), přes `sendEventEmail` (limity, vypínač v Upozorněních); posílají se i u potvrzení „jen na
+  obrazovce“, protože je organizátor zvolil výslovně. Odkaz na správu v nich není (token je jen hash), účastník najde registraci
+  přes kód a e-mail; neodeslaný e-mail se ukáže jako varování.
+- **Export CSV** `/api/events/[id]/export` (`organizer-core.ts` → `buildRegistrationsCsv`, `lib/csv.ts`): kód, stav, jméno, e-mail,
+  pole formuláře (skrytá jen s daty), počet osob, termíny, čas registrace a zrušení; buňky začínající `=`, `+`, `-`, `@` se
+  neutralizují. Zapisuje se do historie (mimo náhled).
+- **QR kód** `/api/events/[id]/qr?format=png|svg&download=1` (knihovna `qrcode`, generuje server, jen `canManageEvent`, jinak 404).
+- Testy: `scripts/events-organizer-test.ts` (v `test:events`), E2E `40-events-organizer.spec.ts`.
