@@ -5,6 +5,7 @@ import { FIXED_FIELDS } from "@/modules/events/form";
 import { placesOf } from "@/modules/events/public-state";
 import type { AudienceEntry, AudienceStudent } from "@/modules/core/audience";
 import type { User } from "@/lib/types";
+import { loadEventTextDefaults } from "@/modules/events/text-defaults";
 
 // Čtení dat pro veřejnou stránku události. Do klienta jdou jen prosté hodnoty.
 
@@ -58,7 +59,7 @@ export async function loadPublicEvent(slug: string) {
     },
   });
   if (!event) return null;
-  const takenBy = await loadTakenByItem(event.id);
+  const [takenBy, defaults] = await Promise.all([loadTakenByItem(event.id), loadEventTextDefaults()]);
 
   const fields = mergeFields(event.fields);
 
@@ -90,7 +91,8 @@ export async function loadPublicEvent(slug: string) {
     maxItemsPerRegistration: event.maxItemsPerRegistration,
     allowGuests: event.allowGuests,
     maxGuests: event.maxGuests,
-    consentText: event.consentText,
+    // Prázdný vlastní text = výchozí z nastavení modulu (prázdné = vestavěný text)
+    consentText: event.consentText?.trim() || defaults.consentText || null,
     createdById: event.createdById,
     organizers: event.organizers,
     audienceRoles: event.audienceRoles as string[],

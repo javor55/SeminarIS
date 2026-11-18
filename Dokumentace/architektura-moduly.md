@@ -50,7 +50,8 @@ modules/
     demo-data.ts        ukázková data modulu (zápisová okna, bloky, výskyty, zápisy)
     subject-windows.ts  „v zápisu“: ve kterých oknech je předmět nabízen (podklad pro štítky předmětů)
   events/               události: registrace veřejnosti na akce (zatím kostra – U2; plán v Dokumentace/zadani/2026-11-udalosti-plan.md)
-    manifest.ts, server.tsx (onUserDelete), access.ts (canManageEvent: admin, autor, spoluorganizátor)
+    manifest.ts (včetně nastavení modulu), server.tsx (body rozšíření), access.ts (canManageEvent: admin, autor, spoluorganizátor)
+    daily.ts (denní úloha), dashboard.tsx (karta přehledu, úkol), demo-data.ts (ukázková data), text-defaults.ts (výchozí texty a lhůta)
     stránky: app/events (seznam, nastavení modulu /events/settings); veřejná stránka události app/akce/[slug] (U7)
   makeup/               dopisování písemek (termíny, zápisy, docházka)
     manifest.ts, server.tsx, data.ts (interní dotazy), types.ts, notifications.ts (e-maily a denní úloha), demo-data.ts (ukázková data)
@@ -1246,3 +1247,30 @@ Test bez DB: `npm run test:html` (CI). Veřejná stránka `/ochrana-udaju` bere 
   neutralizují. Zapisuje se do historie (mimo náhled).
 - **QR kód** `/api/events/[id]/qr?format=png|svg&download=1` (knihovna `qrcode`, generuje server, jen `canManageEvent`, jinak 404).
 - Testy: `scripts/events-organizer-test.ts` (v `test:events`), E2E `40-events-organizer.spec.ts`.
+
+### Události: denní úlohy, přehled, ukázková data (U13)
+
+- **Denní úloha** `runEventsDailyJob` (`modules/events/daily.ts`, volá ji `/api/cron/daily` jen u zapnutého modulu, každý krok si hlídá
+  chyby sám): `events.reminder`, `events.purge`, `events.cleanup`.
+  - **Připomínka** `events.reminder` (výchozí vypnutá, nepovinná): registracím držícím místo (ne zrušeným, ne `WAITLIST`) s nezrušeným
+    termínem zítra (pásmo školy), u zveřejněných nebo uzavřených událostí s potvrzením jiným než `SCREEN_ONLY`. Jednou na registraci:
+    odeslání se pamatuje v `EventRegistration.reminderSentAt` (jediná migrace ticketu); při vyčerpaném limitu nebo chybě se neoznačí.
+    Odkaz na správu v e-mailu není (token je jen hash), účastník najde registraci přes kód a e-mail na stránce události.
+  - **Smazání osobních údajů**: konec události = konec posledního nezrušeného termínu, jinak `registrationClosesAt`, jinak se nemaže.
+    Po `events.purgeAfterDays` dnech (nastavení, výchozí 90) se u všech registrací události nastaví e-mail na `smazano-<id>@anonym.invalid`,
+    `name = null`, `answers = {}`, `userId = null` a `tokenHash` se nahradí náhodným (odkaz na správu přestane fungovat). Počty, stavy,
+    kódy, osoby navíc a termíny zůstávají. Událost dostane `purgedAt` (podruhé se přeskočí), audit `events.purge` je bez osobních údajů.
+    E-maily v `EmailLog` mají vlastní lhůtu (`email.logRetentionDays`).
+  - **Úklid**: `EventRateLimit` starší než 2 dny; `EventImage` starší než den, na které neodkazuje `Event.imageId` ani text
+    `/api/events/images/<id>` v `Event.descriptionHtml` (vyřizuje sirotky po výměně obrázku z U4).
+- **Nastavení modulu** (`/events/settings`, `events.manage.all`, deklarace v manifestu, obecný `SettingsForm`): `events.purgeAfterDays`,
+  `events.defaultConsentText`, `events.defaultConfirmationText`. Výchozí texty se použijí, když je text události prázdný
+  (`loadEventTextDefaults`): veřejná stránka, potvrzovací stránka i e-mail `events.registration.confirmed`.
+- **Karta přehledu** `events.mine` (`getDashboardCards`): moje (autor nebo spoluorganizátor) zveřejněné a uzavřené události s nadcházejícím
+  termínem, obsazenost míst včetně doprovodu (`meter`), nejbližší termín jako „nejbližší věc“. **Úkol** `events.unsent-confirmations`
+  (`getAdminTodos`, oprávnění `events.manage.own`): registrace s `confirmEmailFailed` u událostí, které začínají do 3 dnů (učitel jen svoje).
+  **Odhad e-mailů** (`getEmailEstimates`): počet registrací, které zítra dostanou připomínku.
+- **Ukázková data** (`demo-data.ts`): událost „Den otevřených dveří“ (zveřejněná, za 9 pracovních dní, malý vložený WebP 320×180, 8 termínů po 8 místech,
+  pevná pole a jedno vlastní, 25 registrací na `@ukazka.invalid`). Evidence `Event`, `EventImage`, `EventRegistration`; `clear` převezme
+  skutečné události a obrázky ukázkových učitelů adminem.
+- Testy: E2E `41-events-daily.spec.ts` (smazání, připomínka, úklid, nastavení, karta, úkol), `19-demo.spec.ts` (ukázková data).

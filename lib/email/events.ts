@@ -19,6 +19,7 @@ export type EmailEventId =
   | "events.registration.changed"
   | "events.registration.moved"
   | "events.registration.removed"
+  | "events.reminder"
   | "manual.bulk"
   | "test";
 
@@ -333,6 +334,28 @@ export const EMAIL_EVENTS: readonly EmailEventDef[] = [
     defaultSubject: "Změna registrace: {{akce}}",
     defaultBody:
       "Dobrý den, {{jmeno}},\n\norganizátor změnil vaši registraci na událost „{{akce}}“.\n\n{{zmena}}\n\nZbývající termíny:\n{{terminy}}\n\nMísto: {{misto}}\n\nKód registrace: {{kod}}\nStránka události: {{odkaz}}",
+  },
+  {
+    id: "events.reminder",
+    module: "events",
+    group: "Události",
+    label: "Připomínka den předem",
+    description:
+      "Účastníkovi den před termínem, na který je registrovaný (denní úloha), jednou na registraci. Neposílá se u událostí s potvrzením „jen na obrazovce“.",
+    defaultEnabled: false,
+    mandatory: false,
+    bulk: true,
+    variables: [
+      JMENO,
+      { name: "akce", description: "název události" },
+      { name: "terminy", description: "zítřejší termíny registrace (jeden na řádek)" },
+      { name: "misto", description: "místo konání" },
+      { name: "kod", description: "kód registrace" },
+      { name: "odkaz", description: "stránka události (registraci najdete přes kód a e-mail)" },
+    ],
+    defaultSubject: "Zítra: {{akce}}",
+    defaultBody:
+      "Dobrý den, {{jmeno}},\n\nzítra se koná událost „{{akce}}“, na kterou jste registrovaní.\n\nVáš termín:\n{{terminy}}\n\nMísto: {{misto}}\n\nKód registrace: {{kod}}\nRegistraci můžete zobrazit nebo zrušit na {{odkaz}} v části „Už jste registrovaní?“ (kód a váš e-mail).",
   },
   {
     id: "test",

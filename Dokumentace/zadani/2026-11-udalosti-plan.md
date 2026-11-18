@@ -30,11 +30,11 @@ Vlna C – veřejná registrace:
 
 Vlna D – po registraci:
 - [x] U10 Správa registrace účastníkem (odkaz, kód + e-mail, změna, zrušení, `.ics`) (PR #27)
-- [x] U11 Nástroje organizátora (seznam, ruční úpravy, odebrání, přesun, export, QR odkazu)
+- [x] U11 Nástroje organizátora (seznam, ruční úpravy, odebrání, přesun, export, QR odkazu) (PR #28)
 - [ ] U12 E-maily modulu v Upozorněních, statistika odeslaných e-mailů, hromadný e-mail
 
 Vlna E – provoz a doplňky:
-- [ ] U13 Denní úlohy (připomínka, smazání údajů po 90 dnech), přehled, úkoly, ukázková data
+- [x] U13 Denní úlohy (připomínka, smazání údajů po 90 dnech), přehled, úkoly, ukázková data
 - [ ] U14 Čekací listina, prezence (i s QR), duplikace události
 
 Velikost: U1, U2, U8 a U13 jsou malé až střední, ostatní střední. Jedna session zvládne

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { TabLinks } from "@/components/tab-links";
 import { isImpersonating, requirePagePermission } from "@/lib/session";
+import { loadEventTextDefaults } from "@/modules/events/text-defaults";
 import { loadEvent, loadEventFields, loadEventItems, listTeachers } from "@/modules/events/data";
 import { RegistrationsTab } from "@/modules/events/components/RegistrationsTab";
 import { loadRegistrations } from "@/modules/events/registrations-data";
@@ -68,7 +69,7 @@ export default async function EventDetailPage({ params, searchParams }: { params
           fields={await loadEventFields(event.id)}
           allowGuests={event.allowGuests}
           maxGuests={event.maxGuests}
-          consentText={event.consentText}
+          consentText={event.consentText || (await loadEventTextDefaults()).consentText}
           readOnly={event.status === "ARCHIVED"}
         />
       ) : (

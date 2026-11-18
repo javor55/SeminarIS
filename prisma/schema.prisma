@@ -787,6 +787,8 @@ model EventRegistration {
   // Potvrzovací e-mail měl odejít (podle nastavení události), ale neodešel (limit, vypnuto, chyba); registrace platí a účastník
   // dostal odkaz a kód na obrazovce. Organizátor to vidí jako varování v detailu události.
   confirmEmailFailed Boolean @default(false)
+  // Kdy odešla připomínka den předem (denní úloha); jednou na registraci
+  reminderSentAt DateTime?
   // Přihlášený uživatel, který se registroval (nepovinné)
   userId     String?
   user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)

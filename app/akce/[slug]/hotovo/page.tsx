@@ -1,3 +1,4 @@
+import { loadEventTextDefaults } from "@/modules/events/text-defaults";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -35,6 +36,7 @@ export default async function RegistrationDonePage({ params, searchParams }: Par
   });
   if (!reg || reg.event.slug !== slug) notFound();
   const event = reg.event;
+  const confirmationText = event.confirmationText?.trim() || (await loadEventTextDefaults()).confirmationText;
 
   const link = appUrl(`/akce/${event.slug}/r/${t}`);
   const items = reg.items.map((r) => r.item).sort((a, b) => (a.startsAt?.getTime() ?? 0) - (b.startsAt?.getTime() ?? 0) || a.order - b.order);
@@ -86,9 +88,9 @@ export default async function RegistrationDonePage({ params, searchParams }: Par
         </div>
       </header>
 
-      {!cancelled && event.confirmationText?.trim() && (
+      {!cancelled && confirmationText && (
         <p className="whitespace-pre-line break-words rounded-xl border bg-card p-4 text-sm" data-testid="confirmation-text">
-          {event.confirmationText.trim()}
+          {confirmationText}
         </p>
       )}
 

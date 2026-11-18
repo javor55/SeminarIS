@@ -7,6 +7,7 @@ import { prisma, type TxClient } from "@/lib/prisma";
 import { safeAction } from "@/lib/safe-action";
 import { serializable } from "@/lib/serializable";
 import { requirePermission } from "@/lib/session";
+import { loadEventTextDefaults } from "@/modules/events/text-defaults";
 import { effectiveFields, validateAnswers } from "@/modules/events/form";
 import { itemFullLabel } from "@/modules/events/format";
 import { takenWithoutOwn } from "@/modules/events/manage-core";
@@ -129,7 +130,7 @@ export async function addRegistration(eventId: string, input: AddRegistrationInp
             odkaz: appUrl(`/akce/${event.slug}/r/${token}`),
             kod: reg.code,
             misto: event.place ?? "—",
-            text: event.confirmationText ?? "",
+            text: event.confirmationText?.trim() || (await loadEventTextDefaults()).confirmationText,
           },
         },
       ]);
