@@ -79,7 +79,7 @@ export function EventFormTab({ eventId, fields, allowGuests, maxGuests, consentT
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   <div role="radiogroup" aria-label={`Režim pole ${f.label}`} className="inline-flex flex-wrap gap-2">
-                    {(f.builtin ? MODES : (["REQUIRED", "OPTIONAL"] as FieldMode[])).map((m) => (
+                    {MODES.map((m) => (
                       <button
                         key={m}
                         type="button"
@@ -87,7 +87,7 @@ export function EventFormTab({ eventId, fields, allowGuests, maxGuests, consentT
                         aria-checked={f.mode === m}
                         data-mode={m}
                         disabled={readOnly || busy}
-                        onClick={() => f.mode !== m && (f.builtin ? run(() => setFieldMode(eventId, f.id, m)) : run(() => updateField(eventId, f.id, { label: f.label, options: f.options, required: m === "REQUIRED" })))}
+                        onClick={() => f.mode !== m && run(() => setFieldMode(eventId, f.id, m))}
                         className={`min-h-9 rounded-md border px-3 text-sm ${f.mode === m ? "border-primary bg-primary text-primary-foreground" : "border-input hover:bg-accent"}`}
                       >
                         {MODE_LABEL[m]}
@@ -97,6 +97,11 @@ export function EventFormTab({ eventId, fields, allowGuests, maxGuests, consentT
                   {!f.builtin && !readOnly && (
                     <>
                       <Button type="button" variant="outline" size="sm" disabled={busy} data-action="edit" onClick={() => setEditing({ field: f })}><Pencil /> Upravit</Button>
+                      {f.answered ? (
+                        <span className="text-xs text-muted-foreground" data-testid="delete-blocked" data-field-key={f.key}>
+                          Pole má odpovědi účastníků, nejde smazat. Můžete ho skrýt.
+                        </span>
+                      ) : (
                       <ConfirmAction
                         title="Smazat pole?"
                         description={`Pole „${f.label}“ zmizí z formuláře.`}
@@ -105,6 +110,7 @@ export function EventFormTab({ eventId, fields, allowGuests, maxGuests, consentT
                         onConfirm={async () => void (await run(() => deleteField(eventId, f.id), "Pole je smazané."))}
                         trigger={<Button type="button" variant="outline" size="sm" disabled={busy} data-action="delete"><Trash2 /> Smazat</Button>}
                       />
+                      )}
                     </>
                   )}
                 </div>

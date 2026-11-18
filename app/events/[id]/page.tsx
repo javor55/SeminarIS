@@ -49,6 +49,11 @@ export default async function EventDetailPage({ params, searchParams }: { params
           </>
         }
       />
+      {event.emailFailedCount > 0 && (
+        <div className="rounded-lg border border-banner-border bg-banner px-3 py-2 text-sm text-banner-foreground" role="status" data-testid="email-failed-warning">
+          U {event.emailFailedCount} {event.emailFailedCount === 1 ? "registrace" : "registrací"} se nepodařilo odeslat potvrzovací e-mail (vyčerpaný limit, vypnuté e-maily nebo chyba odesílání). Účastníci dostali odkaz a kód na obrazovce. Limity a zapnutí e-mailů najdete v Administraci, Upozornění.
+        </div>
+      )}
       <TabLinks tabs={TABS} activeId={activeTab} baseHref={`/events/${event.id}`} testId="event-tabs" />
       {activeTab === "settings" ? (
         <EventSettingsForm

@@ -6,7 +6,7 @@ import type { AudienceState } from "@/modules/core/components/audience/AudienceP
 import { canManageEvent, eventsVisibleWhere } from "@/modules/events/access";
 import type { EventStatusValue } from "@/modules/events/status";
 import type { AudienceRole } from "@/modules/events/audience-roles";
-import { ensureFixedFields } from "@/modules/events/fields-db";
+import { ensureFixedFields, fieldKeysWithAnswers } from "@/modules/events/fields-db";
 
 // Čtení dat pro stránky modulu. Do klienta jdou jen prosté (serializovatelné) hodnoty.
 
@@ -60,6 +60,8 @@ export async function loadEvent(user: User, id: string) {
     },
   });
   if (!event || !canManageEvent(user, event)) return null;
+  // Registrace, kterým měl odejít potvrzovací e-mail, ale neodešel (limit, vypnuto, chyba); dostaly odkaz a kód na obrazovce
+  const emailFailedCount = event.confirmChannel === "SCREEN_ONLY" ? 0 : await prisma.eventRegistration.count({ where: { eventId: id, confirmEmailFailed: true, status: { not: "CANCELLED" } } });
 
   const person = (u: { id: string; firstName: string; lastName: string; email: string }) => ({ id: u.id, name: formatName(u, "list"), email: u.email });
   const audience: AudienceState = {
@@ -94,6 +96,7 @@ export async function loadEvent(user: User, id: string) {
     createdById: event.createdById,
     authorName: formatName(event.createdBy, "list"),
     registrationCount: event._count.registrations,
+    emailFailedCount,
     audience,
   };
 }
@@ -154,11 +157,14 @@ export type EventFieldRow = {
   mode: "REQUIRED" | "OPTIONAL" | "HIDDEN";
   options: string[];
   builtin: boolean;
+  /** K poli už existují odpovědi účastníků (smazat jde jen skrytím) */
+  answered: boolean;
 };
 
 /** Pole formuláře; chybějící pevná pole se doplní (u událostí vzniklých před U6). */
 export async function loadEventFields(eventId: string): Promise<EventFieldRow[]> {
   await ensureFixedFields(prisma, eventId);
   const rows = await prisma.eventField.findMany({ where: { eventId }, orderBy: [{ order: "asc" }, { key: "asc" }] });
-  return rows.map((f) => ({ id: f.id, key: f.key, type: f.type, label: f.label, mode: f.mode, options: f.options, builtin: f.builtin }));
+  const answered = await fieldKeysWithAnswers(prisma, eventId);
+  return rows.map((f) => ({ id: f.id, key: f.key, type: f.type, label: f.label, mode: f.mode, options: f.options, builtin: f.builtin, answered: answered.has(f.key) }));
 }

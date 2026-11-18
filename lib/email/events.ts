@@ -15,13 +15,14 @@ export type EmailEventId =
   | "account.pending.digest"
   | "seminars.window.opened"
   | "seminars.window.reminder"
+  | "events.registration.confirmed"
   | "manual.bulk"
   | "test";
 
 export type EmailEventDef = {
   id: EmailEventId;
   // Modul, kterému událost patří (vypnutý modul nic neposílá)
-  module: "core" | "makeup" | "seminars";
+  module: "core" | "makeup" | "seminars" | "events";
   group: string;
   label: string;
   // Komu a kdy se posílá
@@ -237,6 +238,29 @@ export const EMAIL_EVENTS: readonly EmailEventDef[] = [
     defaultSubject: "Nezapomeňte se zapsat: {{okno}}",
     defaultBody:
       "Dobrý den, {{jmeno}},\n\nzápis „{{okno}}“ končí {{konec}} a vy ještě nemáte zapsáno: {{chybejici}}.\n\nZapsat se můžete zde: {{odkaz}}",
+  },
+  {
+    id: "events.registration.confirmed",
+    module: "events",
+    group: "Události",
+    label: "Potvrzení registrace",
+    description:
+      "Účastníkovi po registraci na událost: odkaz na správu registrace a kód. Posílá se podle nastavení události „Potvrzení registrace“ (e-mailem i na obrazovce, jen e-mailem); při nastavení „jen na obrazovce“ se neposílá.",
+    defaultEnabled: true,
+    mandatory: true,
+    bulk: false,
+    variables: [
+      JMENO,
+      { name: "akce", description: "název události" },
+      { name: "terminy", description: "vybrané termíny (jeden na řádek)" },
+      { name: "odkaz", description: "odkaz na správu registrace" },
+      { name: "kod", description: "kód registrace (např. K7M-4QX2)" },
+      { name: "misto", description: "místo konání" },
+      { name: "text", description: "vlastní text potvrzení z nastavení události" },
+    ],
+    defaultSubject: "Potvrzení registrace: {{akce}}",
+    defaultBody:
+      "Dobrý den, {{jmeno}},\n\nděkujeme, vaše registrace na událost „{{akce}}“ je potvrzená.\n\nTermíny:\n{{terminy}}\n\nMísto: {{misto}}\n\nRegistraci můžete zobrazit, změnit nebo zrušit zde:\n{{odkaz}}\n\nKód registrace: {{kod}}\n(Pokud odkaz ztratíte, na stránce události v části „Už jste registrovaní?“ zadejte kód a svůj e-mail.)\n\n{{text}}",
   },
   {
     id: "test",

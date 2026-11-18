@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { AntibotField } from "@/components/antibot-field";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
+import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
+import { registerForEvent } from "@/modules/events/actions/public";
 import { DEFAULT_CONSENT_TEXT, EMAIL_LABEL, PRIVACY_LINK_TEXT, effectiveFields, validateAnswers, type FormField } from "@/modules/events/form";
 import { groupItemsByDay, itemLabel, itemTimeRange } from "@/modules/events/format";
 import { freePlaces } from "@/modules/events/public-state";
@@ -19,6 +22,7 @@ const INPUT = "h-11 text-base md:h-9 md:text-sm";
 const AREA = "text-base md:text-sm";
 
 type Props = {
+  slug: string;
   items: PublicItem[];
   /** Kolik termínů smí účastník vybrat */
   maxItems: number;
@@ -33,15 +37,19 @@ type Props = {
 
 /**
  * Výběr termínů (kompaktní řádky jako zápis studenta) a formulář účastníka na veřejné stránce.
- * Odeslání se doplní v U9; zatím se jen ověří vyplnění.
+ * Po ověření vyplnění se registrace odešle serverové akci a účastník přejde na stránku „hotovo“.
  */
-export function PublicRegistration({ items, maxItems, allowGuests, maxGuests, fields, consentText, prefill, renderToken }: Props) {
+export function PublicRegistration({ slug, items, maxItems, allowGuests, maxGuests, fields, consentText, prefill, renderToken }: Props) {
   const shown = useMemo(() => effectiveFields(fields, allowGuests).filter((f) => f.mode !== "HIDDEN"), [fields, allowGuests]);
   const [selected, setSelected] = useState<string[]>([]);
   const [values, setValues] = useState<Record<string, string | boolean>>(() => ({ email: prefill.email, ...(prefill.name ? { name: prefill.name } : {}) }));
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  // nová výzva proti robotům po zamítnutém odeslání (řešení se spotřebuje při každém pokusu)
+  const [antibotRound, setAntibotRound] = useState(0);
   // řešení výzvy proti robotům (null = ještě neověřeno) a honeypot (skryté pole, které člověk nevyplní)
   const [solution, setSolution] = useState<string | null>(null);
   const [website, setWebsite] = useState("");
@@ -63,8 +71,10 @@ export function PublicRegistration({ items, maxItems, allowGuests, maxGuests, fi
     });
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (pending) return;
+    setServerError(null);
     const result = validateAnswers(fields, { ...values }, { maxGuests: allowGuests ? maxGuests : 0 });
     const next: Record<string, string> = { ...result.errors };
     if (selected.length === 0) next.items = single ? "Vyberte termín." : "Vyberte alespoň jeden termín.";
@@ -76,8 +86,17 @@ export function PublicRegistration({ items, maxItems, allowGuests, maxGuests, fi
       el?.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
-    // Odeslání registrace doplní U9
     setPending(true);
+    try {
+      const { token } = unwrap(await registerForEvent(slug, { itemIds: selected, values: { ...values }, consent, solution, website, renderToken }));
+      // Token je jen v adrese stránky „hotovo“; nikam se neukládá
+      router.push(`/akce/${encodeURIComponent(slug)}/hotovo?t=${encodeURIComponent(token)}`);
+    } catch (err) {
+      setServerError((err as Error).message || "Registraci se nepodařilo odeslat.");
+      setSolution(null);
+      setAntibotRound((n) => n + 1);
+      setPending(false);
+    }
   }
 
   const groups = useMemo(() => groupItemsByDay(items), [items]);
@@ -200,14 +219,20 @@ export function PublicRegistration({ items, maxItems, allowGuests, maxGuests, fi
           </div>
           <input type="hidden" name="renderToken" value={renderToken} />
 
-          <AntibotField onChange={setSolution} />
+          <AntibotField key={antibotRound} onChange={setSolution} />
 
-          <Button type="submit" size="lg" className="h-12 w-full text-base md:w-auto md:min-w-48" disabled={!solution} data-testid="register-button">
-            Registrovat
+          <Button type="submit" size="lg" className="h-12 w-full text-base md:w-auto md:min-w-48" disabled={!solution || pending} data-testid="register-button">
+            {pending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Odesílám…
+              </>
+            ) : (
+              "Registrovat"
+            )}
           </Button>
-          {pending && (
-            <p className="rounded-lg border bg-muted/40 p-3 text-sm" role="status" data-testid="submit-pending">
-              Údaje jsou v pořádku. Odeslání registrace se zatím připravuje.
+          {serverError && (
+            <p className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger" role="alert" data-testid="submit-error">
+              {serverError}
             </p>
           )}
         </form>
