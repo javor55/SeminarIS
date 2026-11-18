@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { safeAction } from "@/lib/safe-action";
 import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
-import { ensureFixedFields } from "@/modules/events/fields-db";
+import { ensureFixedFields, fieldKeysWithAnswers } from "@/modules/events/fields-db";
 import { CUSTOM_FIELDS_LIMIT, MODE_LABEL, TYPE_LABEL, cleanFieldDefinition, nextCustomKey, type FieldMode, type FieldType } from "@/modules/events/form";
 import { assertEditable, loadManaged } from "@/modules/events/manage";
 
@@ -92,7 +92,7 @@ export async function updateField(eventId: string, fieldId: string, input: Omit<
       const field = await loadField(tx, eventId, fieldId);
       if (field.builtin) throw new Error("Pevné pole jde jen přepnout mezi Povinné, Volitelné a Skryté.");
       const def = cleanFieldDefinition({ type: field.type, label: input.label, options: input.options });
-      await tx.eventField.update({ where: { id: fieldId }, data: { label: def.label, options: def.options, mode: input.required ? "REQUIRED" : "OPTIONAL" } });
+      await tx.eventField.update({ where: { id: fieldId }, data: { label: def.label, options: def.options, mode: input.required ? "REQUIRED" : field.mode === "HIDDEN" ? "HIDDEN" : "OPTIONAL" } });
       await audit(tx, user, { action: "events.field.update", entityType: "event", entityId: eventId, summary: `Událost „${event.title}“: upraveno pole „${def.label}“` });
     });
     refresh(eventId);
@@ -107,6 +107,7 @@ export async function deleteField(eventId: string, fieldId: string) {
       assertEditable(event);
       const field = await loadField(tx, eventId, fieldId);
       if (field.builtin) throw new Error("Pevné pole nejde smazat, jen skrýt.");
+      if ((await fieldKeysWithAnswers(tx, eventId)).has(field.key)) throw new Error("K poli už existují odpovědi účastníků, proto ho nejde smazat. Skryjte ho, odpovědi zůstanou zachované.");
       await tx.eventField.delete({ where: { id: fieldId } });
       await audit(tx, user, { action: "events.field.delete", entityType: "event", entityId: eventId, summary: `Událost „${event.title}“: smazáno pole „${field.label}“` });
     });

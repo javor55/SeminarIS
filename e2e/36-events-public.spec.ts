@@ -78,10 +78,9 @@ test("otevřená registrace: obrázek, popis, termíny s volnými místy (včetn
   await page.fill("#rf-email", "jana@example.com");
   await page.fill("#rf-name", "Jana Nová");
   await page.locator("#rf-consent").check();
-  await page.getByTestId("register-button").click();
-  await expect(page.getByTestId("submit-pending")).toBeVisible();
   await noOverflow(page);
-  // nic se neuložilo
+  // odeslání je v 38-events-registration.spec.ts; tady jen ověření, že formulář je připravený k odeslání
+  await expect(page.getByTestId("register-button")).toBeEnabled({ timeout: 15_000 });
   expect(sql(`select count(*) from "EventRegistration" where email='jana@example.com'`)).toBe("0");
   await ctx.close();
 

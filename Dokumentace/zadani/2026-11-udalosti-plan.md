@@ -24,9 +24,9 @@ Vlna B – termíny a formulář:
 - [x] U6 Formulář účastníka (pevná a vlastní pole) (PR #24)
 
 Vlna C – veřejná registrace:
-- [x] U7 Veřejná stránka události (zobrazení, bez odeslání)
-- [x] U8 Ochrana proti robotům (proof-of-work, honeypot, limity)
-- [ ] U9 Odeslání registrace, potvrzení na obrazovce a e-mailem
+- [x] U7 Veřejná stránka události (zobrazení, bez odeslání) (PR #25)
+- [x] U8 Ochrana proti robotům (proof-of-work, honeypot, limity) (PR #25)
+- [x] U9 Odeslání registrace, potvrzení na obrazovce a e-mailem
 
 Vlna D – po registraci:
 - [ ] U10 Správa registrace účastníkem (odkaz, kód + e-mail, změna, zrušení, `.ics`)

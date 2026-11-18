@@ -13,13 +13,24 @@ import { formatName } from "@/lib/names";
 // `summary` je čitelný popis česky (zobrazuje se v Administraci → Historie), `data` jsou
 // strukturovaná data před/po pro případné dohledání detailu.
 
-/** Kdo změnu provedl: přihlášený uživatel (v náhledu i s `impersonatedBy`), nebo null = systém (cron). */
-export type AuditActor = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  impersonatedBy?: { id: string; name: string } | null;
-} | null;
+/** Kdo změnu provedl: přihlášený uživatel (v náhledu i s `impersonatedBy`), veřejný aktér bez účtu, nebo null = systém (cron). */
+export type AuditActor =
+  | {
+      id: string;
+      firstName: string;
+      lastName: string;
+      impersonatedBy?: { id: string; name: string } | null;
+    }
+  | PublicAuditActor
+  | null;
+
+/** Aktér bez účtu (např. účastník veřejné registrace na událost): v historii se ukáže jen pod zadaným jménem. */
+export type PublicAuditActor = { publicName: string };
+
+/** Veřejnost: návštěvník, který se registruje bez přihlášení. */
+export const PUBLIC_ACTOR: PublicAuditActor = { publicName: "Veřejnost" };
+
+const isPublicActor = (a: AuditActor): a is PublicAuditActor => !!a && "publicName" in a;
 
 export type AuditEntry = {
   // oblast.entita.akce, např. "makeup.registration.remove"; oblast = první část
@@ -35,9 +46,9 @@ export const fullName = (u: { firstName: string; lastName: string }) => formatNa
 export async function audit(db: TxClient, actor: AuditActor, entry: AuditEntry) {
   await db.auditLog.create({
     data: {
-      actorId: actor?.id ?? null,
-      actorName: actor ? fullName(actor) : "Systém",
-      impersonatorId: actor?.impersonatedBy?.id ?? null,
+      actorId: actor && !isPublicActor(actor) ? actor.id : null,
+      actorName: !actor ? "Systém" : isPublicActor(actor) ? actor.publicName : fullName(actor),
+      impersonatorId: actor && !isPublicActor(actor) ? (actor.impersonatedBy?.id ?? null) : null,
       action: entry.action,
       entityType: entry.entityType,
       entityId: entry.entityId ?? null,

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { resetDb, seedSubjects, sql, waitForAppHome } from "./helpers";
 
 // F14: na hlavních stránkách všech rolí (telefon 390×844 a počítač 1280×800) se tlačítka, odkazy a pole
@@ -61,7 +62,8 @@ test("rozložení: nic se nepřekrývá ani nepřetéká (student, učitel, admi
     `insert into "Event"(id,slug,title,subtitle,place,contact,status,visibility,"maxItemsPerRegistration","allowGuests","maxGuests","createdById","updatedAt") values ('evC','verejna','Konzultace pro uchazeče','Individuální schůzka','Budova A','info@skola.cz','PUBLISHED','PUBLIC',2,true,2,'usr_teacher',now())`
   );
   sql(`insert into "EventItem"(id,"eventId","startsAt","endsAt",capacity,"order") values ('itC1','evC',now()+interval '5 days',now()+interval '5 days 30 min',1,0),('itC2','evC',now()+interval '5 days 30 min',now()+interval '5 days 1 hour',20,1)`);
-  sql(`insert into "EventRegistration"(id,"eventId",email,status,"tokenHash",code,"consentAt","updatedAt") values ('rgC','evC','a@b.cz','CONFIRMED','hC','AAA-AAAA',now(),now())`);
+  const LAYOUT_TOKEN = "L".repeat(43);
+  sql(`insert into "EventRegistration"(id,"eventId",email,status,"tokenHash",code,"consentAt","updatedAt") values ('rgC','evC','a@b.cz','CONFIRMED','${createHash("sha256").update(LAYOUT_TOKEN).digest("hex")}','AAA-AAAA',now(),now())`);
   sql(`insert into "EventRegistrationItem"("registrationId","itemId") values ('rgC','itC1')`);
   sql(`insert into "EventField"(id,"eventId",key,type,label,mode,options,"order",builtin) values ('efC1','evC','custom_1','SELECT','Oblíbený předmět','REQUIRED',ARRAY['Matematika','Fyzika'],10,false)`);
   const pages: Record<string, string[]> = {
@@ -104,7 +106,7 @@ test("rozložení: přihlášení, registrace a dialogy (telefon i počítač)",
   for (const [vname, viewport] of Object.entries(VIEWPORTS)) {
     const anon = await browser.newContext({ viewport, hasTouch: vname === "phone" });
     const pa = await anon.newPage();
-    for (const url of ["/login", "/register", "/ochrana-udaju", "/akce/den-otevrenych-dveri", "/akce/verejna"]) {
+    for (const url of ["/login", "/register", "/ochrana-udaju", "/akce/den-otevrenych-dveri", "/akce/verejna", `/akce/verejna/hotovo?t=${"L".repeat(43)}`]) {
       await pa.goto(url);
       await pa.waitForLoadState("networkidle");
       const p = await problems(pa);

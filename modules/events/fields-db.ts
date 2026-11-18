@@ -11,3 +11,12 @@ export async function ensureFixedFields(tx: Pick<TxClient, "eventField">, eventI
     skipDuplicates: true,
   });
 }
+
+/**
+ * Klíče polí, ke kterým už existují odpovědi účastníků (i ve zrušených registracích). Takové pole se nesmí smazat:
+ * klíč vlastního pole `custom_<n>` se po smazání může znovu použít a staré odpovědi by se přiřadily novému poli.
+ */
+export async function fieldKeysWithAnswers(db: Pick<TxClient, "$queryRaw">, eventId: string): Promise<Set<string>> {
+  const rows = await db.$queryRaw<{ key: string }[]>`SELECT DISTINCT k AS key FROM "EventRegistration", jsonb_object_keys(answers) AS k WHERE "eventId" = ${eventId}`;
+  return new Set(rows.map((r) => r.key));
+}

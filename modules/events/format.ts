@@ -42,3 +42,10 @@ export function groupItemsByDay<T extends ItemLike & { order: number }>(items: T
   if (untimed.length) groups.push({ key: "none", title: "Bez času", items: untimed });
   return groups;
 }
+
+/** Plný popisek termínu pro potvrzení a e-mail: „12. 1. 2027 9:00–9:30 · název“, jinak jeho název. */
+export function itemFullLabel(item: ItemLike): string {
+  if (!item.startsAt) return item.label?.trim() || "Termín";
+  const label = item.label?.trim();
+  return `${formatDate(item.startsAt)} ${itemTimeRange(item)}${label ? ` · ${label}` : ""}`;
+}

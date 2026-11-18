@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma, type TxClient } from "@/lib/prisma";
 import type { EventStatusValue } from "@/modules/events/status";
 import type { FormField } from "@/modules/events/form";
 import { FIXED_FIELDS } from "@/modules/events/form";
@@ -12,14 +12,26 @@ import type { User } from "@/lib/types";
 export const HOLDING_STATUSES = ["PENDING", "CONFIRMED"] as const;
 
 /** Obsazená místa podle termínu, včetně doprovodu (součet `1 + guests`). */
-export async function loadTakenByItem(eventId: string): Promise<Map<string, number>> {
-  const rows = await prisma.eventRegistrationItem.findMany({
+export async function loadTakenByItem(eventId: string, db: Pick<TxClient, "eventRegistrationItem"> = prisma): Promise<Map<string, number>> {
+  const rows = await db.eventRegistrationItem.findMany({
     where: { item: { eventId }, registration: { status: { in: [...HOLDING_STATUSES] } } },
     select: { itemId: true, registration: { select: { guests: true } } },
   });
   const taken = new Map<string, number>();
   for (const r of rows) taken.set(r.itemId, (taken.get(r.itemId) ?? 0) + placesOf(r.registration.guests));
   return taken;
+}
+
+/** Pole formuláře; pevná pole, která u starší události ještě nevznikla, se doplní výchozím nastavením (bez zápisu do DB). */
+export function mergeFields(rows: { key: string; type: FormField["type"]; label: string; mode: FormField["mode"]; options: string[] }[]): FormField[] {
+  const have = new Set(rows.map((f) => f.key));
+  const fields: FormField[] = [
+    ...rows.map((f) => ({ key: f.key, type: f.type, label: f.label, mode: f.mode, options: f.options })),
+    ...FIXED_FIELDS.filter((f) => !have.has(f.key)).map((f) => ({ ...f, options: [] as string[] })),
+  ];
+  const order = new Map(rows.map((f, i) => [f.key, i]));
+  fields.sort((a, b) => (order.get(a.key) ?? 1e6) - (order.get(b.key) ?? 1e6));
+  return fields;
 }
 
 export type PublicItem = {
@@ -48,14 +60,7 @@ export async function loadPublicEvent(slug: string) {
   if (!event) return null;
   const takenBy = await loadTakenByItem(event.id);
 
-  // Pevná pole, která u starší události ještě nevznikla, se doplní výchozím nastavením (bez zápisu do DB)
-  const have = new Set(event.fields.map((f) => f.key));
-  const fields: FormField[] = [
-    ...event.fields.map((f) => ({ key: f.key, type: f.type, label: f.label, mode: f.mode, options: f.options })),
-    ...FIXED_FIELDS.filter((f) => !have.has(f.key)).map((f) => ({ ...f, options: [] as string[] })),
-  ];
-  const order = new Map(event.fields.map((f, i) => [f.key, i]));
-  fields.sort((a, b) => (order.get(a.key) ?? 1e6) - (order.get(b.key) ?? 1e6));
+  const fields = mergeFields(event.fields);
 
   const items: PublicItem[] = event.items.map((i) => ({
     id: i.id,

@@ -133,6 +133,7 @@ export default async function PublicEventPage({ params, searchParams }: Params) 
               <p className="text-sm text-muted-foreground" data-testid="closes-at">Registrace je otevřená do {formatDateTime(event.registrationClosesAt)}.</p>
             )}
             <PublicRegistration
+              slug={event.slug}
               items={event.items}
               maxItems={event.maxItemsPerRegistration}
               allowGuests={event.allowGuests}
