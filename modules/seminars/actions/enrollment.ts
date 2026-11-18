@@ -9,7 +9,7 @@ import type { User } from "@/lib/types";
 import { can } from "@/modules/registry";
 import { windowPhase, type WindowPhaseInput } from "@/modules/seminars/window-phase";
 import { getStudentAudienceInfo, isStudentInWindowAudience } from "@/modules/seminars/eligibility";
-import { isInOccurrenceAudience } from "@/modules/seminars/audience";
+import { isInOccurrenceAudience } from "@/modules/core/audience";
 import { checkStudentCanChange } from "@/modules/seminars/window-rules";
 import { formatName } from "@/lib/names";
 

@@ -1,17 +1,15 @@
 import type { Prisma } from "@prisma/client";
 import { prisma, type TxClient } from "@/lib/prisma";
-import { sanitizeGrades } from "@/lib/school";
 import type { User } from "@/lib/types";
 import { can } from "@/modules/registry";
-import { activeStudentsWhere } from "@/modules/core/school";
+import { audienceWhere, cleanAudienceDraft } from "@/modules/core/audience-db";
 import {
   audienceKey,
-  hasIncludes,
   isInAudience,
   type AudienceDraft,
   type AudienceEntry,
   type AudienceStudent,
-} from "@/modules/seminars/audience";
+} from "@/modules/core/audience";
 
 // JEDINÉ místo, které rozhoduje, komu je zápisové okno určeno a které výskyty komu patří.
 // Používá se pro viditelnost oken (dashboard, seznam, detail, štítky předmětů), kontrolu při zápisu,
@@ -21,7 +19,8 @@ import {
 // Publikum okna = (ročníky ∪ třídy ∪ konkrétní studenti) \ vynechaní studenti.
 // Bez kladných položek = všichni aktivní studenti.
 
-export { isInAudience } from "@/modules/seminars/audience";
+export { isInAudience } from "@/modules/core/audience";
+export { audienceWhere };
 
 
 type Db = TxClient;
@@ -34,26 +33,6 @@ export async function loadAudienceEntries(windowId: string, db: Db = prisma): Pr
     select: { type: true, grade: true, classGroupId: true, userId: true },
   });
   return rows;
-}
-
-/** Prisma podmínka na User: aktivní studenti, kteří jsou v publiku s danými položkami. Odpovídá `isInAudience`. */
-export function audienceWhere(entries: readonly AudienceEntry[]): Prisma.UserWhereInput {
-  const excluded = entries.filter((e) => e.type === "EXCLUDE_USER" && e.userId).map((e) => e.userId as string);
-  const grades = entries.filter((e) => e.type === "GRADE" && e.grade != null).map((e) => e.grade as number);
-  const classIds = entries.filter((e) => e.type === "CLASS" && e.classGroupId).map((e) => e.classGroupId as string);
-  const userIds = entries.filter((e) => e.type === "USER" && e.userId).map((e) => e.userId as string);
-
-  const includes: Prisma.UserWhereInput[] = [];
-  if (grades.length) includes.push({ classGroup: { grade: { in: grades } } });
-  if (classIds.length) includes.push({ classGroupId: { in: classIds } });
-  if (userIds.length) includes.push({ id: { in: userIds } });
-
-  return {
-    ...activeStudentsWhere,
-    ...(excluded.length ? { id: { notIn: excluded } } : {}),
-    // (kladné položky uživatelů a vynechaní se kombinují přes AND, aby `id` nepřepsalo jedno druhé)
-    ...(hasIncludes(entries) ? { AND: [{ OR: includes }] } : {}),
-  };
 }
 
 /** Aktivní studenti, pro které je okno určeno. */
@@ -128,19 +107,8 @@ export function occurrencesForViewerWhere(ctx: ViewerContext): Prisma.SubjectOcc
  * mezi vynechanými se z kladných položek vyřadí (výjimka vyhrává).
  */
 export async function replaceAudience(db: Db, windowId: string, draft: AudienceDraft): Promise<AudienceDraft> {
-  const grades = sanitizeGrades(draft.grades);
-  const unique = (xs: unknown): string[] => [...new Set(Array.isArray(xs) ? xs.filter((x): x is string => typeof x === "string" && x.length > 0) : [])];
-  const classIds = unique(draft.classIds);
-  const excludeUserIds = unique(draft.excludeUserIds);
-  const userIds = unique(draft.userIds).filter((id) => !excludeUserIds.includes(id));
-
-  if (classIds.length && (await db.classGroup.count({ where: { id: { in: classIds } } })) !== classIds.length) throw new Error("Některá z vybraných tříd neexistuje.");
-  const allUsers = [...userIds, ...excludeUserIds];
-  if (allUsers.length && (await db.user.count({ where: { id: { in: allUsers }, role: "STUDENT" } })) !== allUsers.length) {
-    throw new Error("Publikum může obsahovat jen studenty.");
-  }
-
-  const clean: AudienceDraft = { grades, classIds, userIds, excludeUserIds };
+  const clean = await cleanAudienceDraft(db, draft);
+  const { grades, classIds, userIds, excludeUserIds } = clean;
   const entries: AudienceEntry[] = [
     ...grades.map((grade) => ({ type: "GRADE" as const, grade })),
     ...classIds.map((classGroupId) => ({ type: "CLASS" as const, classGroupId })),

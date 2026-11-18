@@ -14,10 +14,10 @@ psané tak, aby je zvládl i levnější model: obsahují přesné soubory, krok
 
 ## Stav
 Vlna A – základ (bez veřejné části):
-- [x] U1 Bezpečné HTML a stránka „Zpracování osobních údajů“
-- [x] U2 Datový model a kostra modulu `events`
-- [ ] U3 Seznam událostí a základní nastavení události
-- [ ] U4 Obrázky (nahrání, ořez, uložení v DB) a popis v editoru
+- [x] U1 Bezpečné HTML a stránka „Zpracování osobních údajů“ (PR #22)
+- [x] U2 Datový model a kostra modulu `events` (PR #22)
+- [x] U3 Seznam událostí a základní nastavení události
+- [x] U4 Obrázky (nahrání, ořez, uložení v DB) a popis v editoru
 
 Vlna B – termíny a formulář:
 - [ ] U5 Termíny (položky), generátor, pravidla registrace
@@ -455,6 +455,8 @@ a registrace přesto projde (kód je na obrazovce).
      `purgedAt` na událost; počty zůstanou; zapiš audit;
    - úklid `EventRateLimit` starších než 2 dny;
    - smazání nepoužitých `EventImage` (starších než 1 den, na které neodkazuje událost ani popis).
+     TODO z U4: obrázek se nahrává hned při výběru, takže po výměně nebo odebrání zůstává sirotek.
+     Odkaz z popisu se hledá jako text `/api/events/images/<id>` v `Event.descriptionHtml`.
 2. Karta na přehledu (`getDashboardCards`): moje nadcházející události s obsazeností.
    Úkol (`getAdminTodos`): událost začíná do 3 dnů a má neodeslané potvrzovací e-maily.
 3. Ukázková data (`demoData.seed/clear`): událost „Den otevřených dveří“ s obrázkem

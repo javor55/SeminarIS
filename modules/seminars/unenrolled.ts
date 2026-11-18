@@ -3,7 +3,7 @@ import { classLabel } from "@/lib/school";
 import { formatDateTime } from "@/lib/datetime";
 import { appUrl, sendEventEmail, type SendSummary } from "@/lib/email";
 import { audienceWhere, loadAudienceEntries } from "@/modules/seminars/eligibility";
-import { isInOccurrenceAudience, type AudienceStudent } from "@/modules/seminars/audience";
+import { isInOccurrenceAudience, type AudienceStudent } from "@/modules/core/audience";
 import { sortByName } from "@/lib/names";
 
 // Nezapsaní studenti zápisového okna: aktivní studenti z publika okna, kteří nemají dost zápisů
