@@ -6,17 +6,17 @@ import { revalidatePath } from "next/cache";
 import { requireAuth, requireModule, requirePermission } from "@/lib/session";
 import { can } from "@/modules/registry";
 import { windowPhase } from "@/modules/seminars/window-phase";
-import { audienceWhere, audienceWhereForWindow, getViewerContext, isWindowVisibleTo, loadAudienceEntries, occurrencesForViewerWhere, replaceAudience, windowsForViewerWhere, type ViewerContext } from "@/modules/seminars/eligibility";
+import { audienceWhereForWindow, getViewerContext, isWindowVisibleTo, loadAudienceEntries, occurrencesForViewerWhere, replaceAudience, windowsForViewerWhere, type ViewerContext } from "@/modules/seminars/eligibility";
+import { listClassOptions, previewAudienceDraft, searchAudienceStudentsBy } from "@/modules/core/audience-db";
 import { audienceInclude, buildAudienceView } from "@/modules/seminars/audience-view";
-import { audienceSummary, draftFromEntries, EMPTY_AUDIENCE, entriesFromDraft, type AudienceDraft } from "@/modules/seminars/audience";
+import { audienceSummary, draftFromEntries, EMPTY_AUDIENCE, type AudienceDraft } from "@/modules/core/audience";
 import { blockRulesLabel, cleanBlockRules, type BlockRules } from "@/modules/seminars/window-rules";
 import { classLabel, compareClasses, sanitizeGrades } from "@/lib/school";
-import { activeStudentsWhere } from "@/modules/core/school";
 import type { Prisma } from "@prisma/client";
 import { audit, describeChanges } from "@/lib/audit";
 import { formatDateTime } from "@/lib/datetime";
 import { notifyWindowOpenedIfOpen } from "@/modules/seminars/notifications";
-import { compareNames, formatName, sortByName } from "@/lib/names";
+import { compareNames, formatName } from "@/lib/names";
 
 // === ČTENÍ DAT ===
 
@@ -765,45 +765,19 @@ export async function duplicateEnrollmentWindow(windowId: string) {
 /** Třídy pro výběr publika a omezení výskytů. */
 export async function getAudienceOptions() {
   await requirePermission("seminars.windows.manage");
-  const classes = await prisma.classGroup.findMany();
-  return classes.sort(compareClasses).map((c) => ({ id: c.id, grade: c.grade, label: classLabel(c) }));
+  return listClassOptions();
 }
 
 /** Hledání studentů (jméno nebo e-mail) pro přidání do publika / mezi vynechané. */
 export async function searchAudienceStudents(query: string) {
   await requirePermission("seminars.windows.manage");
-  const q = (query ?? "").trim().slice(0, 100);
-  if (q.length < 2) return [];
-  const users = await prisma.user.findMany({
-    where: {
-      ...activeStudentsWhere,
-      OR: [
-        { firstName: { contains: q, mode: "insensitive" } },
-        { lastName: { contains: q, mode: "insensitive" } },
-        { email: { contains: q, mode: "insensitive" } },
-      ],
-    },
-    include: { classGroup: true },
-    take: 12,
-  });
-  return sortByName(users).map((u) => ({ id: u.id, name: formatName(u, "list"), email: u.email, classLabel: u.classGroup ? classLabel(u.classGroup) : null }));
+  return searchAudienceStudentsBy(query);
 }
-
-const AUDIENCE_PREVIEW_LIMIT = 300;
 
 /** Kolik studentů odpovídá publiku (a kdo), ještě před uložením okna. */
 export async function previewAudience(draft: AudienceDraft) {
   await requirePermission("seminars.windows.manage");
-  const where = audienceWhere(entriesFromDraft({ grades: sanitizeGrades(draft?.grades), classIds: draft?.classIds ?? [], userIds: draft?.userIds ?? [], excludeUserIds: draft?.excludeUserIds ?? [] }));
-  // Řadí se v JS (česká kolace), proto se načte celé publikum a zkrátí až po seřazení
-  const all = sortByName(await prisma.user.findMany({ where, include: { classGroup: true } }));
-  const count = all.length;
-  const students = all.slice(0, AUDIENCE_PREVIEW_LIMIT);
-  return {
-    count,
-    truncated: count > students.length,
-    students: students.map((u) => ({ id: u.id, name: formatName(u, "list"), classLabel: u.classGroup ? classLabel(u.classGroup) : null })),
-  };
+  return previewAudienceDraft(draft);
 }
 
 

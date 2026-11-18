@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { classLabel, compareClasses } from "@/lib/school";
-import { audienceSummary, draftFromEntries, type AudienceView } from "@/modules/seminars/audience";
+import { audienceSummary, draftFromEntries, type AudienceView } from "@/modules/core/audience";
 import { formatName } from "@/lib/names";
 
 // Publikum okna pro zobrazení (jen pro učitele a adminy): s popisky tříd a jmény studentů.

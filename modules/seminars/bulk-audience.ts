@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
-import { audienceKey, hasIncludes, isInAudience, type AudienceEntry, type AudienceStudent } from "@/modules/seminars/audience";
+import { audienceKey, hasIncludes, isInAudience, type AudienceEntry, type AudienceStudent } from "@/modules/core/audience";
 import { loadAudienceEntries } from "@/modules/seminars/eligibility";
 import { windowPhase } from "@/modules/seminars/window-phase";
 import type { BulkPreview, BulkUserAction, BulkUserInfo } from "@/modules/server-types";

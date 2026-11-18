@@ -39,14 +39,19 @@ test("rozložení: nic se nepřekrývá ani nepřetéká (student, učitel, admi
     `insert into "MakeupSession"(id,"teacherId","startsAt","endsAt",room,capacity,"changeDeadlineMinutes","createdById","updatedAt") values ('mA','usr_teacher',now()+interval '3 days',now()+interval '3 days 45 min','101',5,60,'usr_teacher',now())`
   );
   sql(`insert into "MakeupSessionSubject" values ('mA','sm'),('mA','scj')`);
+  // U3: události (koncept i zveřejněná, s podtitulkem a obdobím registrace) pro seznam a nastavení
+  sql(
+    `insert into "Event"(id,slug,title,subtitle,status,visibility,"registrationOpensAt","registrationClosesAt","createdById","updatedAt") values ('evA','den-otevrenych-dveri','Den otevřených dveří','Prohlídka školy a laboratoří','PUBLISHED','USERS',now(),now()+interval '10 days','usr_teacher',now()),('evB','konzultace','Konzultace pro uchazeče',null,'DRAFT','PUBLIC',null,null,'usr_teacher',now())`
+  );
+  sql(`insert into "EventAudience"(id,"eventId",type,grade,key,"createdAt") values ('eaA','evA','GRADE',3,'GRADE:3',now())`);
   const pages: Record<string, string[]> = {
     "jan.student@skola.cz": ["/zapisy/enr_ls_2025", "/makeup", "/profile"],
-    "teacher@skola.cz": ["/dashboard", "/enrollments", "/enrollments/enr_ls_2025", "/makeup", "/makeup/sessions/mA", "/events", "/subjects/mine", "/users", "/profile"],
+    "teacher@skola.cz": ["/dashboard", "/enrollments", "/enrollments/enr_ls_2025", "/makeup", "/makeup/sessions/mA", "/events", "/events/new", "/events/evA", "/subjects/mine", "/users", "/profile"],
     "admin@skola.cz": [
       "/dashboard", "/admin", "/enrollments/enr_ls_2025", "/users", "/subjects", "/makeup",
       // F15: zbytek aplikace
       "/subjects/sm", "/users/usr_stud1", "/users?tab=approvals", "/enrollments", "/enrollments/settings", "/makeup/settings", "/profile",
-      "/admin/school-year", "/admin/registration", "/admin/modules", "/admin/notifications", "/admin/history", "/admin/diagnostics", "/admin/demo", "/ochrana-udaju", "/events", "/events/settings",
+      "/admin/school-year", "/admin/registration", "/admin/modules", "/admin/notifications", "/admin/history", "/admin/diagnostics", "/admin/demo", "/ochrana-udaju", "/events", "/events/new", "/events/evA", "/events/settings",
     ],
   };
   for (const [vname, viewport] of Object.entries(VIEWPORTS)) {

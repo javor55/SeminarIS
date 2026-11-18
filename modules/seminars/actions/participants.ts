@@ -5,7 +5,7 @@ import { classLabel } from "@/lib/school";
 import { requireAuth, requireModule } from "@/lib/session";
 import { can } from "@/modules/registry";
 import { getStudentAudienceInfo, getViewerContext, isWindowVisibleTo } from "@/modules/seminars/eligibility";
-import { isInOccurrenceAudience } from "@/modules/seminars/audience";
+import { isInOccurrenceAudience } from "@/modules/core/audience";
 
 export type OccurrenceParticipant = { name: string; classLabel: string | null };
 

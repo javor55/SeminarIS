@@ -39,7 +39,7 @@ modules/
     student-windows.ts  JEDINÉ místo, které vybírá okna pro studenta/hosta (stránka Zápisy i karty): viditelná, ne koncept, publikum, průběh
     window-phase.ts     JEDINÝ zdroj pravdy o stavu zápisového okna (koncept / plánováno / otevřeno / uzavřeno), čistá logika + Prisma podmínky
     occurrence-code.ts  kód výskytu „KAJ/A“, bez podkódu „KAJ“ (nikdy koncové lomítko)
-    audience.ts         publikum okna a omezení výskytu: typy a čistá logika (isInAudience), bez DB; audience-view.ts popisky pro UI
+    audience-view.ts    popisky publika okna pro UI (čistá logika publika je od U3 v jádru: modules/core/audience.ts)
     eligibility.ts      JEDINÝ zdroj pravdy o způsobilosti: audienceWhere, viditelnost oken a výskytů, zápis publika
     window-rules.ts     pravidla okna (odepsání, termín změn) a bloků (min/max, povinnost), sdílená serverem i UI
     bulk-audience.ts    hromadné akce Uživatelů „Přidat do / Odebrat z publika zápisu“ (bulkUserActions)
@@ -449,7 +449,7 @@ Publikum = **(ročníky ∪ třídy ∪ konkrétní studenti) \ vynechaní stude
 nad ročníkem, třídou i jmenovitým přidáním. Studenti mimo studium (absolventi, ukončení, neaktivní) v publiku nejsou.
 Migrace převedla dosavadní `targetGrades` na položky `GRADE` a sloupec zrušila.
 
-**Jediný zdroj pravdy** je `modules/seminars/eligibility.ts` (čistá logika bez DB v `audience.ts`):
+**Jediný zdroj pravdy** je `modules/seminars/eligibility.ts` (čistá logika bez DB v `modules/core/audience.ts`, sdílené dotazy a společný `AudiencePickerBase` v jádru: `audience-db.ts`, `components/audience/`; používá je i modul Události):
 `isInAudience(položky, student)`, `audienceWhere(položky)` (stejná logika jako Prisma podmínka na uživatele),
 `windowsForViewerWhere` / `occurrencesForViewerWhere` (co smí vidět konkrétní student), `isStudentInWindowAudience`.
 Používá je viditelnost oken (stránka Zápisy, karty dashboardu, seznam, detail), kontrola při zápisu, seznam nezapsaných, exporty, e-mailové odhady,
