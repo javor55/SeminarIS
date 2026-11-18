@@ -5,6 +5,7 @@ import { draftFromEntries } from "@/modules/core/audience";
 import type { AudienceState } from "@/modules/core/components/audience/AudiencePicker";
 import { canManageEvent, eventsVisibleWhere } from "@/modules/events/access";
 import type { EventStatusValue } from "@/modules/events/status";
+import type { AudienceRole } from "@/modules/events/audience-roles";
 import { ensureFixedFields } from "@/modules/events/fields-db";
 
 // Čtení dat pro stránky modulu. Do klienta jdou jen prosté (serializovatelné) hodnoty.
@@ -75,6 +76,7 @@ export async function loadEvent(user: User, id: string) {
     contact: event.contact ?? "",
     status: event.status as EventStatusValue,
     visibility: event.visibility,
+    audienceRoles: event.audienceRoles as AudienceRole[],
     imageId: event.imageId,
     imageAlt: event.imageAlt ?? "",
     descriptionHtml: event.descriptionHtml,

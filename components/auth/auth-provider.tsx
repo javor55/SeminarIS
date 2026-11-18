@@ -18,9 +18,14 @@ type AuthContextValue = {
   // Znovu načte session (např. po zapnutí/vypnutí modulu)
   refreshSession: () => Promise<void>;
    
-  login: (email: string, password?: string) => Promise<void>;
+  login: (email: string, password?: string, next?: string | null) => Promise<void>;
   logout: () => Promise<void>;
 };
+
+/** Vnitřní adresa aplikace („/akce/…“); odkazy na jiný web („//…“, „http…“) se nepřijmou. */
+export function isLocalPath(path: string): boolean {
+  return path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\");
+}
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -41,7 +46,7 @@ function AuthContextWrapper({ children }: { children: ReactNode }) {
   const enabledModules = session?.enabledModules ?? [];
 
   // 🔐 Přihlášení přes NextAuth credentials provider
-  const login = async (email: string, password?: string) => {
+  const login = async (email: string, password?: string, next?: string | null) => {
     const res = await signIn("credentials", {
       email,
       password,
@@ -54,7 +59,8 @@ function AuthContextWrapper({ children }: { children: ReactNode }) {
     
     // replace místo push – login stránka se nemá vracet v historii
     // Úvod ("/") podle role pošle studenta na zápis / dopisování, ostatní na dashboard
-    router.replace("/");
+    // `next` = návrat na stránku, ze které uživatel přišel (jen vnitřní adresa, např. veřejná událost)
+    router.replace(next && isLocalPath(next) ? next : "/");
     router.refresh();
   }
 

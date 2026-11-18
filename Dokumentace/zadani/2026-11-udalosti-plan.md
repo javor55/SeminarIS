@@ -305,6 +305,12 @@ upravit a zrušit. E2E pokryje generátor, úpravu i zrušení.
 5. **Viditelnost USERS:** nepřihlášený uvidí „Registrace je jen pro přihlášené“ a tlačítko
    Přihlásit (s návratem zpět). Přihlášenému mimo publikum se zobrazí „Tato událost pro vás
    není určena“. Přihlášenému se předvyplní jméno a e-mail.
+   - **Role (rozhodnutí majitele):** událost `USERS` může být pro libovolné role. `Event.audienceRoles Role[]`
+     (výchozí `[STUDENT]`, migrace `events_audience_roles`); v Nastavení zaškrtávátka Studenti / Učitelé /
+     Administrátoři. Výběr ročníků, tříd a jmenovitě (vynechaní) se ukáže jen při zaškrtnutých Studentech
+     a zužuje jen studenty; učitelé a admini, jsou-li zaškrtnutí, smějí vždy. Host (neschválený účet) nikdy.
+     Rozhoduje čistá funkce `canUserRegister` (`modules/events/audience-roles.ts`, test v `test:events`);
+     stejnou použije serverová akce v U9.
 
 **Hotovo když:** stránka funguje bez přihlášení na telefonu i počítači a nepřetéká. Na stavy
 DRAFT / před otevřením / otevřeno / uzavřeno a viditelnost USERS je E2E.

@@ -30,6 +30,8 @@ const load = async (rel: string) => import(pathToFileURL(path.resolve(import.met
 const form = (await load("modules/events/form.ts")) as typeof import("../modules/events/form");
 const items = (await load("modules/events/items.ts")) as typeof import("../modules/events/items");
 const format = (await load("modules/events/format.ts")) as typeof import("../modules/events/format");
+const roles = (await load("modules/events/audience-roles.ts")) as typeof import("../modules/events/audience-roles");
+const pub = (await load("modules/events/public-state.ts")) as typeof import("../modules/events/public-state");
 
 let failed = 0;
 function check(name: string, ok: boolean, detail?: unknown) {
@@ -121,6 +123,33 @@ const g = format.groupItemsByDay([
   { label: null, startsAt: "2026-12-01T08:00:00Z", endsAt: null, order: 2 },
 ]);
 check("seskupení po dnech a „Bez času“ na konci", g.length === 3 && g[2].title === "Bez času" && g[2].items[0].label === "A" && g[0].items[0].startsAt === "2026-12-01T08:00:00Z", g.map((x) => x.title));
+
+// Veřejná stránka: fáze registrace a volná místa
+const now = new Date("2026-12-01T10:00:00Z");
+const ph = (status: "DRAFT" | "PUBLISHED" | "CLOSED" | "ARCHIVED", opens: string | null, closes: string | null) => pub.registrationPhase({ status, registrationOpensAt: opens, registrationClosesAt: closes }, now);
+check("fáze: koncept", ph("DRAFT", null, null) === "DRAFT");
+check("fáze: zveřejněná bez období je otevřená", ph("PUBLISHED", null, null) === "OPEN");
+check("fáze: před otevřením", ph("PUBLISHED", "2026-12-02T00:00:00Z", null) === "NOT_OPEN");
+check("fáze: v období je otevřená", ph("PUBLISHED", "2026-11-30T00:00:00Z", "2026-12-05T00:00:00Z") === "OPEN");
+check("fáze: po konci období skončila", ph("PUBLISHED", null, "2026-12-01T09:00:00Z") === "ENDED");
+check("fáze: uzavřená a archivovaná skončila", ph("CLOSED", null, null) === "ENDED" && ph("ARCHIVED", null, null) === "ENDED");
+check("volná místa", pub.freePlaces(20, 5) === 15 && pub.freePlaces(5, 9) === 0 && pub.freePlaces(null, 100) === null);
+check("místa registrace s doprovodem", pub.placesOf(0) === 1 && pub.placesOf(3) === 4);
+
+// Kdo se smí registrovat (role + zúžení studentů)
+const ev = (over: object = {}) => ({ visibility: "USERS" as const, audienceRoles: ["STUDENT"], audience: [] as { type: "GRADE" | "CLASS" | "USER" | "EXCLUDE_USER"; grade?: number; classGroupId?: string; userId?: string }[], ...over });
+const stud = { id: "s1", classGroupId: "c3a", grade: 3 };
+const can = (e: ReturnType<typeof ev> | { visibility: "PUBLIC"; audienceRoles: string[]; audience: [] }, role: string | null, st: typeof stud | null = null) => roles.canUserRegister(e, role ? { id: "u1", role } : null, st);
+check("veřejná událost: kdokoli i nepřihlášený", can({ visibility: "PUBLIC", audienceRoles: [], audience: [] }, null));
+check("jen přihlášení: nepřihlášený ne", !can(ev(), null));
+check("výchozí (studenti): student ano, učitel a admin ne", can(ev(), "STUDENT", stud) && !can(ev(), "TEACHER") && !can(ev(), "ADMIN"));
+check("host se nesmí registrovat nikdy", !can(ev({ audienceRoles: ["STUDENT", "TEACHER", "ADMIN", "GUEST"] }), "GUEST"));
+check("jen učitelé: učitel ano, student ne", can(ev({ audienceRoles: ["TEACHER"] }), "TEACHER") && !can(ev({ audienceRoles: ["TEACHER"] }), "STUDENT", stud));
+check("učitelé a admini smějí vždy (publikum je netýká)", can(ev({ audienceRoles: ["TEACHER", "ADMIN"], audience: [{ type: "GRADE", grade: 1 }] }), "ADMIN") && can(ev({ audienceRoles: ["TEACHER"], audience: [{ type: "GRADE", grade: 1 }] }), "TEACHER"));
+check("student mimo ročník publika ne, v ročníku ano", !can(ev({ audience: [{ type: "GRADE", grade: 4 }] }), "STUDENT", stud) && can(ev({ audience: [{ type: "GRADE", grade: 3 }] }), "STUDENT", stud));
+check("vynechaný student ne", !can(ev({ audience: [{ type: "EXCLUDE_USER", userId: "u1" }] }), "STUDENT", { ...stud, id: "u1" }));
+check("student, který není aktivní (bez údajů), ne", !can(ev(), "STUDENT", null));
+check("studenti i učitelé: student se zúžením, učitel bez", can(ev({ audienceRoles: ["STUDENT", "TEACHER"], audience: [{ type: "GRADE", grade: 4 }] }), "TEACHER") && !can(ev({ audienceRoles: ["STUDENT", "TEACHER"], audience: [{ type: "GRADE", grade: 4 }] }), "STUDENT", stud));
 
 if (failed) {
   console.error(`${failed} testů selhalo`);

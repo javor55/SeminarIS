@@ -202,3 +202,5 @@ Datový model je obecný. „Termín“ je **položka**, která *může* mít č
    jak dlouho a jaká má účastník práva). Odkaz na ni bude u souhlasu ve formuláři a v patičce
    veřejných stránek. **Pokud se později přidá cokoli, co cookies nebo sledování používá, lišta
    potřeba bude.**
+9. **Neveřejná událost** může být pro libovolné role podle nastavení (studenti s volitelným zúžením na
+   ročníky/třídy/jmenovitě, učitelé, administrátoři). Neschválený účet (host) se registrovat nemůže.

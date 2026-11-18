@@ -1,4 +1,5 @@
 import { sanitizeRichHtml } from "@/lib/html";
+import { AUDIENCE_ROLES, type AudienceRole } from "@/modules/events/audience-roles";
 import { SLUG_MAX, SLUG_MIN, SLUG_PATTERN } from "@/modules/events/slug";
 
 // Základní nastavení události: tvar vstupu z formuláře a jeho ověření (čistá logika bez DB).
@@ -25,6 +26,7 @@ export type EventSettingsInput = {
   registrationOpensAt: string | null;
   registrationClosesAt: string | null;
   visibility: EventVisibilityValue;
+  audienceRoles: AudienceRole[];
   audience: { grades: number[]; classIds: string[]; userIds: string[]; excludeUserIds: string[] };
   maxItemsPerRegistration: number;
   allowGuests: boolean;
@@ -53,6 +55,7 @@ export type CleanEventSettings = {
   registrationOpensAt: Date | null;
   registrationClosesAt: Date | null;
   visibility: EventVisibilityValue;
+  audienceRoles: AudienceRole[];
   audience: EventSettingsInput["audience"];
   maxItemsPerRegistration: number;
   allowGuests: boolean;
@@ -119,6 +122,9 @@ export function cleanEventSettings(input: EventSettingsInput): CleanEventSetting
   if (input.visibility !== "PUBLIC" && input.visibility !== "USERS") throw new Error("Neplatná viditelnost.");
   if (!CONFIRM_CHANNELS.some((c) => c.value === input.confirmChannel)) throw new Error("Neplatný způsob potvrzení registrace.");
 
+  const roles = AUDIENCE_ROLES.map((r) => r.value).filter((r) => (input.audienceRoles ?? []).includes(r));
+  if (input.visibility === "USERS" && roles.length === 0) throw new Error("Vyberte, kdo se může registrovat (studenti, učitelé, administrátoři).");
+
   const allowGuests = !!input.allowGuests;
   const maxGuests = allowGuests ? int(input.maxGuests, 1, 50, "Nejvíce osob navíc") : 0;
 
@@ -132,6 +138,7 @@ export function cleanEventSettings(input: EventSettingsInput): CleanEventSetting
     registrationOpensAt: opens,
     registrationClosesAt: closes,
     visibility: input.visibility,
+    audienceRoles: roles.length ? roles : ["STUDENT"],
     audience: input.audience ?? { grades: [], classIds: [], userIds: [], excludeUserIds: [] },
     maxItemsPerRegistration: int(input.maxItemsPerRegistration, 1, 50, "Nejvíce termínů na registraci"),
     allowGuests,
