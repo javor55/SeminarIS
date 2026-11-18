@@ -1,4 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
 import { resetDb, seedSubjects, sql, waitForAppHome } from "./helpers";
 
 // F14: na hlavních stránkách všech rolí (telefon 390×844 a počítač 1280×800) se tlačítka, odkazy a pole
@@ -43,6 +45,10 @@ test("rozložení: nic se nepřekrývá ani nepřetéká (student, učitel, admi
   sql(
     `insert into "Event"(id,slug,title,subtitle,status,visibility,"registrationOpensAt","registrationClosesAt","createdById","updatedAt") values ('evA','den-otevrenych-dveri','Den otevřených dveří','Prohlídka školy a laboratoří','PUBLISHED','USERS',now(),now()+interval '10 days','usr_teacher',now()),('evB','konzultace','Konzultace pro uchazeče',null,'DRAFT','PUBLIC',null,null,'usr_teacher',now())`
   );
+  // U4: titulní obrázek a popis u první události
+  const png = fs.readFileSync(path.join(__dirname, "fixtures", "maly.png"));
+  sql(`insert into "EventImage"(id,data,mime,width,height,size,"createdById") values ('imA',decode('${png.toString("hex")}','hex'),'image/png',400,225,${png.length},'usr_teacher')`);
+  sql(`update "Event" set "imageId"='imA',"imageAlt"='Budova školy',"descriptionHtml"='<h2>Program</h2><p>Prohlídka <a href="https://example.com">školy</a> a laboratoří.</p>' where id='evA'`);
   sql(`insert into "EventAudience"(id,"eventId",type,grade,key,"createdAt") values ('eaA','evA','GRADE',3,'GRADE:3',now())`);
   const pages: Record<string, string[]> = {
     "jan.student@skola.cz": ["/zapisy/enr_ls_2025", "/makeup", "/profile"],

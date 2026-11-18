@@ -354,3 +354,17 @@
   border-radius: 0.25rem;
   overflow-x: auto;
 }
+
+/* Obrázky a odkazy v editoru */
+.tiptap .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+}
+.tiptap .ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid hsl(var(--ring));
+}
+.tiptap .ProseMirror a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+}

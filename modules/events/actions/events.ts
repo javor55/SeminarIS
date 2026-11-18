@@ -49,6 +49,11 @@ async function replaceEventAudience(tx: TxClient, eventId: string, visibility: "
   }
 }
 
+/** Titulní obrázek musí existovat. */
+async function checkImage(tx: TxClient, imageId: string | null) {
+  if (imageId && !(await tx.eventImage.findUnique({ where: { id: imageId }, select: { id: true } }))) throw new Error("Vybraný obrázek neexistuje, nahrajte ho znovu.");
+}
+
 const slugCollision = (e: unknown) => e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
 
 export async function createEvent(input: EventSettingsInput) {
@@ -64,6 +69,7 @@ export async function createEvent(input: EventSettingsInput) {
           slug = data.slug;
         } else slug = await uniqueSlug(slugify(data.title), slugExists(tx));
 
+        await checkImage(tx, data.imageId);
         const event = await tx.event.create({
           data: {
             slug,
@@ -82,6 +88,9 @@ export async function createEvent(input: EventSettingsInput) {
             confirmChannel: data.confirmChannel,
             confirmationText: data.confirmationText,
             consentText: data.consentText,
+            imageId: data.imageId,
+            imageAlt: data.imageAlt,
+            descriptionHtml: data.descriptionHtml,
             createdById: user.id,
           },
         });
@@ -116,6 +125,7 @@ const FIELD_LABELS = {
   confirmChannel: "potvrzení registrace",
   confirmationText: "text potvrzení",
   consentText: "text souhlasu",
+  imageAlt: "alternativní text obrázku",
 } as const;
 
 export async function updateEvent(id: string, input: EventSettingsInput) {
@@ -125,6 +135,7 @@ export async function updateEvent(id: string, input: EventSettingsInput) {
     try {
       const result = await prisma.$transaction(async (tx) => {
         const before = await loadManaged(tx, user, id);
+        await checkImage(tx, data.imageId);
         let slug = before.slug;
         if (data.randomSlug) slug = await uniqueSlug(randomSlug(), slugExists(tx, id));
         else if (data.slug && data.slug !== before.slug) {
@@ -150,6 +161,9 @@ export async function updateEvent(id: string, input: EventSettingsInput) {
             confirmChannel: data.confirmChannel,
             confirmationText: data.confirmationText,
             consentText: data.consentText,
+            imageId: data.imageId,
+            imageAlt: data.imageAlt,
+            descriptionHtml: data.descriptionHtml,
           },
         });
         await replaceOrganizers(tx, id, before.createdById, data.organizerIds);
@@ -158,6 +172,8 @@ export async function updateEvent(id: string, input: EventSettingsInput) {
         const changes = (Object.keys(FIELD_LABELS) as (keyof typeof FIELD_LABELS)[])
           .filter((k) => norm(before[k]) !== norm(after[k]))
           .map((k) => `${FIELD_LABELS[k]}: ${norm(before[k])} → ${norm(after[k])}`)
+          .concat(before.imageId !== after.imageId ? ["titulní obrázek změněn"] : [])
+          .concat(before.descriptionHtml !== after.descriptionHtml ? ["popis změněn"] : [])
           .join("; ");
         await audit(tx, user, {
           action: "events.event.update",

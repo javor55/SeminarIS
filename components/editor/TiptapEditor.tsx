@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useEditor, EditorContent, Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import Image from "@tiptap/extension-image";
 
 import {
   Bold,
@@ -19,9 +20,13 @@ import {
   Minus,
   Undo2,
   Redo2,
+  Link2,
+  ImagePlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 function ToolButton({ active, className, ...props }: React.ComponentProps<typeof Button> & { active?: boolean }) {
   return (
@@ -35,11 +40,42 @@ function ToolButton({ active, className, ...props }: React.ComponentProps<typeof
   );
 }
 
-function MenuBar({ editor }: { editor: Editor | null }) {
+function MenuBar({ editor, onImageUpload }: { editor: Editor | null; onImageUpload?: ImageUploader }) {
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileInput = React.useRef<HTMLInputElement>(null);
   if (!editor) return null;
 
+  function openLink() {
+    setLinkUrl(editor!.getAttributes("link").href ?? "https://");
+    setLinkOpen(true);
+  }
+
+  function applyLink() {
+    const url = linkUrl.trim();
+    if (!url || url === "https://") editor!.chain().focus().extendMarkRange("link").unsetLink().run();
+    else editor!.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+    setLinkOpen(false);
+  }
+
+  async function insertImage(file: File | undefined) {
+    if (!file || !onImageUpload) return;
+    setUploading(true);
+    try {
+      const url = await onImageUpload(file);
+      editor!.chain().focus().setImage({ src: url, alt: "" }).run();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Obrázek se nepodařilo vložit.");
+    } finally {
+      setUploading(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+
   return (
-    <div className="flex flex-wrap items-center gap-1 p-2 border-b bg-muted/50 rounded-t-md">
+    <div className="border-b bg-muted/50 rounded-t-md">
+    <div className="flex flex-wrap items-center gap-1 p-2">
       <ToolButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         disabled={!editor.can().chain().focus().toggleBold().run()}
@@ -149,17 +185,59 @@ function MenuBar({ editor }: { editor: Editor | null }) {
       >
         <Eraser size={18} />
       </ToolButton>
+
+      <div className="w-px h-6 bg-border mx-1" />
+
+      <ToolButton onClick={openLink} active={editor.isActive("link")} title="Odkaz" aria-label="Odkaz" data-testid="editor-link">
+        <Link2 size={18} />
+      </ToolButton>
+      {onImageUpload && (
+        <>
+          <ToolButton onClick={() => fileInput.current?.click()} disabled={uploading} title="Vložit obrázek" aria-label="Vložit obrázek" data-testid="editor-image">
+            <ImagePlus size={18} />
+          </ToolButton>
+          <input ref={fileInput} type="file" accept="image/*" className="sr-only" data-testid="editor-image-file" tabIndex={-1} onChange={(e) => insertImage(e.target.files?.[0])} />
+        </>
+      )}
+    </div>
+    {linkOpen && (
+      <div className="flex flex-wrap items-center gap-2 border-t p-2">
+        <Input
+          value={linkUrl}
+          onChange={(e) => setLinkUrl(e.target.value)}
+          // (editor bývá uvnitř formuláře stránky, proto Enter nesmí odeslat formulář)
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              applyLink();
+            }
+          }}
+          placeholder="https://…"
+          aria-label="Adresa odkazu"
+          data-testid="editor-link-url"
+          className="h-8 min-w-0 flex-1 basis-48"
+          autoFocus
+        />
+        <Button type="button" size="sm" onClick={applyLink} data-testid="editor-link-apply">Použít</Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setLinkOpen(false)}>Zrušit</Button>
+      </div>
+    )}
     </div>
   );
 }
 
+/** Nahraje obrázek vložený do textu a vrátí jeho adresu; bez něj editor tlačítko obrázku nenabízí. */
+export type ImageUploader = (file: File) => Promise<string>;
+
 export function TiptapEditor({
   value,
   onChange,
+  onImageUpload,
 }: {
   value: string;
    
   onChange: (_val: string) => void;
+  onImageUpload?: ImageUploader;
 }) {
   const [isClient, setIsClient] = useState(false);
   useEffect(() => {
@@ -173,7 +251,10 @@ export function TiptapEditor({
           heading: {
             levels: [1, 2, 3, 4, 5, 6],
           },
+          // Odkazy se v editoru neotevírají klepnutím, upravují se tlačítkem Odkaz
+          link: { openOnClick: false },
         }),
+        Image.configure({ inline: false }),
       ],
       content: value || "",
       onUpdate({ editor }) {
@@ -194,7 +275,7 @@ export function TiptapEditor({
 
   return (
     <div className="tiptap-wrapper border rounded-md bg-background">
-      <MenuBar editor={editor} />
+      <MenuBar editor={editor} onImageUpload={onImageUpload} />
       <EditorContent
         editor={editor}
         className="tiptap edit-area"

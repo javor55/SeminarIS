@@ -1,3 +1,4 @@
+import { sanitizeRichHtml } from "@/lib/html";
 import { SLUG_MAX, SLUG_MIN, SLUG_PATTERN } from "@/modules/events/slug";
 
 // Základní nastavení události: tvar vstupu z formuláře a jeho ověření (čistá logika bez DB).
@@ -35,6 +36,11 @@ export type EventSettingsInput = {
   confirmationText: string;
   consentText: string;
   organizerIds: string[];
+  /** Titulní obrázek (id z `EventImage`) a jeho alternativní text. */
+  imageId: string | null;
+  imageAlt: string;
+  /** Popis z editoru (HTML); server ho při uložení vyčistí. */
+  descriptionHtml: string;
 };
 
 export type CleanEventSettings = {
@@ -57,7 +63,21 @@ export type CleanEventSettings = {
   confirmationText: string | null;
   consentText: string | null;
   organizerIds: string[];
+  imageId: string | null;
+  imageAlt: string | null;
+  descriptionHtml: string;
 };
+
+export const MAX_DESCRIPTION_CHARS = 100_000;
+
+/** Popis z editoru: vyčištěný whitelistem; prázdný odstavec = prázdný popis. */
+export function cleanDescriptionHtml(html: unknown): string {
+  const raw = typeof html === "string" ? html : "";
+  if (raw.length > MAX_DESCRIPTION_CHARS) throw new Error("Popis je příliš dlouhý.");
+  const clean = sanitizeRichHtml(raw).trim();
+  const hasContent = /<(img|hr)\b/i.test(clean) || clean.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() !== "";
+  return hasContent ? clean : "";
+}
 
 const text = (v: unknown, max: number, label: string): string | null => {
   const s = typeof v === "string" ? v.trim() : "";
@@ -122,5 +142,8 @@ export function cleanEventSettings(input: EventSettingsInput): CleanEventSetting
     confirmationText: text(input.confirmationText, 5000, "Text potvrzení"),
     consentText: text(input.consentText, 5000, "Text souhlasu"),
     organizerIds: [...new Set((input.organizerIds ?? []).filter((x) => typeof x === "string" && x))],
+    imageId: typeof input.imageId === "string" && input.imageId ? input.imageId : null,
+    imageAlt: text(input.imageAlt, 300, "Alternativní text"),
+    descriptionHtml: cleanDescriptionHtml(input.descriptionHtml),
   };
 }

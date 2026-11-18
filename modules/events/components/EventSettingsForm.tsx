@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import { ImageUpload } from "@/components/ui/image-upload";
+import { TiptapEditor } from "@/components/editor/TiptapEditor";
+import { resizeToBlob, uploadImage } from "@/lib/image-client";
 import { unwrap } from "@/lib/action-result";
 import { emptyAudienceState, AudiencePickerBase, type AudiencePickerApi, type AudienceState } from "@/modules/core/components/audience/AudiencePicker";
 import { ConfirmAction } from "@/modules/core/components/users/ConfirmAction";
@@ -43,6 +46,9 @@ export type EventSettingsValues = {
   consentText: string;
   organizerIds: string[];
   audience: AudienceState;
+  imageId: string | null;
+  imageAlt: string;
+  descriptionHtml: string;
   status?: string;
   registrationCount?: number;
 };
@@ -66,7 +72,18 @@ export const NEW_EVENT_VALUES: EventSettingsValues = {
   consentText: "",
   organizerIds: [],
   audience: emptyAudienceState(),
+  imageId: null,
+  imageAlt: "",
+  descriptionHtml: "",
 };
+
+const IMAGE_UPLOAD_URL = "/api/events/images";
+const imageUrl = (id: string) => `${IMAGE_UPLOAD_URL}/${id}`;
+
+/** Obrázek vložený do popisu: bez ořezu, jen zmenšený. */
+async function uploadInlineImage(file: File): Promise<string> {
+  return (await uploadImage(IMAGE_UPLOAD_URL, await resizeToBlob(file))).url;
+}
 
 function Section({ title, description, testId, children }: { title: string; description?: string; testId: string; children: ReactNode }) {
   return (
@@ -146,6 +163,9 @@ export function EventSettingsForm({ values, teachers, canDelete }: { values: Eve
         confirmationText: v.confirmationText,
         consentText: v.consentText,
         organizerIds: v.organizerIds,
+        imageId: v.imageId,
+        imageAlt: v.imageAlt,
+        descriptionHtml: v.descriptionHtml,
       };
       if (isNew) {
         const created = unwrap(await createEvent(input));
@@ -200,6 +220,22 @@ export function EventSettingsForm({ values, teachers, canDelete }: { values: Eve
             <Input id="contact" value={v.contact} onChange={(e) => set({ contact: e.target.value })} maxLength={300} />
           </Field>
         </div>
+      </Section>
+
+      <Section title="Titulní obrázek" description="Zobrazí se nad popisem události. Před nahráním ho oříznete na poměr 16:9 a zmenšíte." testId="section-image">
+        <ImageUpload
+          id="event-image"
+          uploadUrl={IMAGE_UPLOAD_URL}
+          currentUrl={v.imageId ? imageUrl(v.imageId) : null}
+          onUploaded={(img) => set({ imageId: img.id })}
+          onRemove={() => set({ imageId: null, imageAlt: "" })}
+          alt={v.imageAlt}
+          onAltChange={(imageAlt) => set({ imageAlt })}
+        />
+      </Section>
+
+      <Section title="Popis" description="Text, který účastník uvidí na stránce události. Jde vložit nadpisy, seznamy, odkazy a obrázky." testId="section-description">
+        <TiptapEditor value={v.descriptionHtml} onChange={(descriptionHtml) => set({ descriptionHtml })} onImageUpload={uploadInlineImage} />
       </Section>
 
       <Section title="Odkaz" description="Adresa, na které se účastníci registrují. Stránka má vždy noindex." testId="section-link">

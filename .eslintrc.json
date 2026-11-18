@@ -65,7 +65,7 @@
       }
     },
     {
-      "files": ["modules/events/**/*.{ts,tsx}", "app/events/**/*.{ts,tsx}", "app/akce/**/*.{ts,tsx}"],
+      "files": ["modules/events/**/*.{ts,tsx}", "app/events/**/*.{ts,tsx}", "app/akce/**/*.{ts,tsx}", "app/api/events/**/*.{ts,tsx}"],
       "rules": {
         "no-restricted-imports": ["error", {
           "patterns": [
