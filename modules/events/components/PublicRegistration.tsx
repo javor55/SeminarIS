@@ -6,6 +6,7 @@ import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { AntibotField } from "@/components/antibot-field";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
@@ -26,19 +27,24 @@ type Props = {
   fields: FormField[];
   consentText: string | null;
   prefill: { email: string; name: string };
+  /** Podepsaný čas zobrazení formuláře (minimální doba vyplnění) */
+  renderToken: string;
 };
 
 /**
  * Výběr termínů (kompaktní řádky jako zápis studenta) a formulář účastníka na veřejné stránce.
  * Odeslání se doplní v U9; zatím se jen ověří vyplnění.
  */
-export function PublicRegistration({ items, maxItems, allowGuests, maxGuests, fields, consentText, prefill }: Props) {
+export function PublicRegistration({ items, maxItems, allowGuests, maxGuests, fields, consentText, prefill, renderToken }: Props) {
   const shown = useMemo(() => effectiveFields(fields, allowGuests).filter((f) => f.mode !== "HIDDEN"), [fields, allowGuests]);
   const [selected, setSelected] = useState<string[]>([]);
   const [values, setValues] = useState<Record<string, string | boolean>>(() => ({ email: prefill.email, ...(prefill.name ? { name: prefill.name } : {}) }));
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
+  // řešení výzvy proti robotům (null = ještě neověřeno) a honeypot (skryté pole, které člověk nevyplní)
+  const [solution, setSolution] = useState<string | null>(null);
+  const [website, setWebsite] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
   const single = maxItems <= 1;
@@ -185,7 +191,18 @@ export function PublicRegistration({ items, maxItems, allowGuests, maxGuests, fi
             {errors.consent && <p className="text-sm text-danger" data-testid="error-consent">{errors.consent}</p>}
           </div>
 
-          <Button type="submit" size="lg" className="h-12 w-full text-base md:w-auto md:min-w-48" data-testid="register-button">
+          {/* Honeypot: mimo obrazovku, bez zaostření a bez automatického vyplnění; roboti ho vyplní */}
+          <div aria-hidden="true" style={{ position: "absolute", left: "-10000px", top: "auto", width: 1, height: 1, overflow: "hidden" }}>
+            <label>
+              Web
+              <input type="text" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} data-testid="honeypot" />
+            </label>
+          </div>
+          <input type="hidden" name="renderToken" value={renderToken} />
+
+          <AntibotField onChange={setSolution} />
+
+          <Button type="submit" size="lg" className="h-12 w-full text-base md:w-auto md:min-w-48" disabled={!solution} data-testid="register-button">
             Registrovat
           </Button>
           {pending && (

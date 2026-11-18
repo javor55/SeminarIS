@@ -9,6 +9,7 @@ import { isModuleEnabled } from "@/lib/modules";
 import { formatName } from "@/lib/names";
 import { getCurrentUser } from "@/lib/session";
 import { canManageEvent } from "@/modules/events/access";
+import { createRenderToken } from "@/lib/antibot";
 import { canUserRegister } from "@/modules/events/audience-roles";
 import { loadPublicEvent, loadStudentAudienceInfo } from "@/modules/events/public-data";
 import { registrationPhase } from "@/modules/events/public-state";
@@ -49,6 +50,8 @@ export default async function PublicEventPage({ params, searchParams }: Params) 
   // V náhledu konceptu se registrace ukazuje otevřená, i když by podle stavu a termínů ještě nebyla
   const phase = preview ? "OPEN" : registrationPhase(event);
   const inAudience = event.visibility === "USERS" && user ? preview || canUserRegister(event, user, await loadStudentAudienceInfo(user)) : false;
+  const canRegister = phase === "OPEN" && (event.visibility === "PUBLIC" || (!!user && inAudience));
+  const renderToken = canRegister ? await createRenderToken() : "";
   const description = event.descriptionHtml.trim() ? sanitizeRichHtml(event.descriptionHtml) : "";
 
   return (
@@ -124,7 +127,7 @@ export default async function PublicEventPage({ params, searchParams }: Params) 
         {phase === "OPEN" && event.visibility === "USERS" && user && !inAudience && (
           <Notice icon={<ShieldAlert className="h-5 w-5" aria-hidden="true" />} testId="notice-denied" title="Tato událost pro vás není určena" text="Registrace je vyhrazena jiné skupině uživatelů." />
         )}
-        {phase === "OPEN" && (event.visibility === "PUBLIC" || (user && inAudience)) && (
+        {canRegister && (
           <div className="space-y-4">
             {event.registrationClosesAt && !preview && (
               <p className="text-sm text-muted-foreground" data-testid="closes-at">Registrace je otevřená do {formatDateTime(event.registrationClosesAt)}.</p>
@@ -136,6 +139,7 @@ export default async function PublicEventPage({ params, searchParams }: Params) 
               maxGuests={event.maxGuests}
               fields={event.fields}
               consentText={event.consentText}
+              renderToken={renderToken}
               prefill={{ email: user?.email ?? "", name: user ? formatName(user) : "" }}
             />
           </div>

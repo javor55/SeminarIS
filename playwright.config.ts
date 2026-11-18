@@ -23,6 +23,8 @@ export default defineConfig({
   webServer: {
     command: "npm run start",
     url: `${baseURL}/login`,
+    // Server E2E přijímá testovací řešení ochrany proti robotům (ostré řešení v prohlížeči se přesto počítá doopravdy)
+    env: { ANTIBOT_TEST_MODE: "1" },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
