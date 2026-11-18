@@ -5,18 +5,22 @@ import { prisma } from "@/lib/prisma";
 import { saveSettings } from "@/lib/settings-registry";
 import { requirePermission } from "@/lib/session";
 import { getEnabledModuleIds } from "@/lib/modules";
-import { CONFIGURABLE_EMAIL_EVENTS, getEmailEvent, type EmailEventId } from "@/lib/email/events";
+import { CONFIGURABLE_EMAIL_EVENTS, MANUAL_EMAIL_EVENTS, getEmailEvent, type EmailEventId } from "@/lib/email/events";
 import { unknownVariables } from "@/lib/email/template";
 import {
   loadEmailConfig,
   getEmailUsage,
+  getEmailStatsByEvent,
+  STATS_DAYS,
   emailEventKeys,
+  type EmailEventStats,
   EMAIL_SETTING_KEYS,
   MIN_LOG_RETENTION_DAYS,
   type EmailSettings,
   type EmailUsage,
 } from "@/lib/email/settings";
 import { sendEventEmail } from "@/lib/email/send";
+import { formatDayRelative, startOfSchoolDay } from "@/lib/datetime";
 import type { EmailStatus } from "@/lib/email/transport";
 import { MODULE_SERVERS } from "@/modules/server-registry";
 import { revalidatePath } from "next/cache";
@@ -40,7 +44,25 @@ export type NotificationEventView = {
   variables: { name: string; description: string }[];
   // Odhad počtu příjemců při příštím spuštění (jen hromadné události)
   estimate: number | null;
+  // Odeslané e-maily tohoto typu podle EmailLog (dnes a za posledních 30 dní)
+  stats: EmailEventStats;
 };
+
+/** Odhad zátěže limitu na jeden z nejbližších dnů (běh denní úlohy). */
+export type EmailForecastDay = {
+  // Den běhu úlohy ve tvaru „Dnes“, „Zítra“, „pá 20. 11.“
+  label: string;
+  // Už odesláno ten den (jen pro dnešek), aby šlo porovnat s denním limitem
+  alreadySent: number;
+  // Kolik e-mailů odejde ze zapnutých typů
+  planned: number;
+  items: { id: EmailEventId; label: string; count: number; enabled: boolean }[];
+};
+
+/** Typy bez vlastního přepínače (zkušební, hromadný e-mail správce): jen statistika. */
+export type ManualEmailStat = { id: EmailEventId; label: string; stats: EmailEventStats };
+
+const FORECAST_DAYS = 3;
 
 export type NotificationsOverview = {
   status: EmailStatus;
@@ -50,25 +72,50 @@ export type NotificationsOverview = {
   envFrom: string | null;
   envReplyTo: string | null;
   minLogRetentionDays: number;
+  statsDays: number;
   events: NotificationEventView[];
+  manualStats: ManualEmailStat[];
+  forecast: EmailForecastDay[];
 };
 
 export async function getNotificationsOverview(): Promise<NotificationsOverview> {
   await requirePermission("core.admin");
   const [cfg, enabledModules] = await Promise.all([loadEmailConfig(), getEnabledModuleIds()]);
-  const usage = await getEmailUsage(cfg.settings);
+  const [usage, stats] = await Promise.all([getEmailUsage(cfg.settings), getEmailStatsByEvent()]);
+  const noStats: EmailEventStats = { today: 0, last30: 0, skippedLimit30: 0 };
 
   const estimates: Record<string, number> = {};
+  const forecasts: Record<string, number[]> = {};
   await Promise.all(
     MODULE_SERVERS.filter(({ id }) => enabledModules.includes(id)).map(async ({ server }) => {
       try {
         Object.assign(estimates, (await server.getEmailEstimates?.()) ?? {});
+        Object.assign(forecasts, (await server.getEmailForecast?.(FORECAST_DAYS)) ?? {});
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error("Odhad příjemců selhal:", e);
       }
     })
   );
+
+  // Odhad na nejbližší dny: prvek 0 je příští spuštění úlohy; typy bez předpovědi mají jen odhad pro příští spuštění
+  const now = new Date();
+  const forecast: EmailForecastDay[] = Array.from({ length: FORECAST_DAYS }, (_, i) => {
+    const items = CONFIGURABLE_EMAIL_EVENTS.filter((d) => d.bulk && enabledModules.includes(d.module))
+      .map((d) => ({
+        id: d.id,
+        label: d.label,
+        count: forecasts[d.id]?.[i] ?? (i === 0 ? (estimates[d.id] ?? 0) : 0),
+        enabled: cfg.settings.enabled && (cfg.events.get(d.id)?.enabled ?? false),
+      }))
+      .filter((x) => x.count > 0);
+    return {
+      label: formatDayRelative(startOfSchoolDay(now, i), now),
+      alreadySent: i === 0 ? usage.today : 0,
+      planned: items.filter((x) => x.enabled).reduce((sum, x) => sum + x.count, 0),
+      items,
+    };
+  });
 
   return {
     status: cfg.status,
@@ -77,6 +124,9 @@ export async function getNotificationsOverview(): Promise<NotificationsOverview>
     envFrom: process.env.EMAIL_FROM?.trim() || null,
     envReplyTo: process.env.EMAIL_REPLY_TO?.trim() || null,
     minLogRetentionDays: MIN_LOG_RETENTION_DAYS,
+    statsDays: STATS_DAYS,
+    forecast,
+    manualStats: MANUAL_EMAIL_EVENTS.map((id) => ({ id, label: getEmailEvent(id)!.label, stats: stats.get(id) ?? noStats })),
     events: CONFIGURABLE_EMAIL_EVENTS.map((def) => {
       const c = cfg.events.get(def.id)!;
       return {
@@ -94,6 +144,7 @@ export async function getNotificationsOverview(): Promise<NotificationsOverview>
         defaultBody: def.defaultBody,
         variables: def.variables,
         estimate: def.bulk ? (estimates[def.id] ?? null) : null,
+        stats: stats.get(def.id) ?? noStats,
       };
     }),
   };

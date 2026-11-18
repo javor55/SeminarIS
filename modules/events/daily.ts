@@ -31,6 +31,14 @@ export async function getEventsEmailEstimates(now = new Date()): Promise<Partial
   return { "events.reminder": count };
 }
 
+/** Kolik připomínek se pošle při příštích `days` spuštěních denní úlohy (odhad na nejbližší dny, bez ohledu na zapnutí). */
+export async function getEventsEmailForecast(days: number, now = new Date()): Promise<Partial<Record<EmailEventId, number[]>>> {
+  const counts = await Promise.all(
+    Array.from({ length: days }, (_, i) => prisma.eventRegistration.count({ where: reminderWhere(startOfSchoolDay(now, i + 1), startOfSchoolDay(now, i + 2)) }))
+  );
+  return { "events.reminder": counts };
+}
+
 /** Připomínka den předem: jednou na registraci (`reminderSentAt`), ne u potvrzení „jen na obrazovce“. */
 async function sendReminders(now: Date): Promise<DailyJobStep> {
   if (!(await isEmailEventActive("events.reminder"))) return { task: "events.reminder", ok: true, detail: "Připomínky událostí jsou vypnuté." };

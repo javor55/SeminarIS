@@ -22,6 +22,7 @@ import { placesOf } from "@/modules/events/public-state";
 
 export type DialogState =
   | { kind: "add" }
+  | { kind: "bulk" }
   | { kind: "edit"; reg: RegRow }
   | { kind: "move"; reg: RegRow }
   | { kind: "remove"; reg: RegRow }

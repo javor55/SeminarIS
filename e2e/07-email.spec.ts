@@ -27,7 +27,7 @@ test("upozornění: zkušební e-mail sobě se zapíše do přehledu", async ({ 
 
   await expect(p.getByTestId("email-status")).toContainText(process.env.EMAIL_FROM);
   await expect(p.getByTestId("email-usage")).toContainText("Dnes 0 / 90");
-  await expect(p.getByTestId("email-usage")).toContainText("tento měsíc 0 / 2 900");
+  await expect(p.getByTestId("email-usage")).toContainText("Tento měsíc 0 / 2 900");
 
   await send.click();
   expect(await toastText(p)).toContain("Zkušební e-mail odeslán na admin@skola.cz");

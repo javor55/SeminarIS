@@ -681,6 +681,7 @@ klient i server:
   trvalým smazáním uživatele. Běží i u vypnutého modulu.
 - `runDailyJob(now)` je krok denní úlohy (cron, viz Plánované úlohy); vrací seznam kroků s výsledkem,
 - `getEmailEstimates()` vrací odhad počtu příjemců hromadných upozornění pro Administraci → Upozornění,
+- `getEmailForecast(days)` vrací pro každou událost pole odhadů na nejbližší dny (prvek 0 = příští spuštění denní úlohy); Upozornění z něj skládají odhad čerpání denního limitu,
 - `demoData` ukázková data modulu pro prezentaci (viz Ukázková data): `{ labels, seed(tx, ctx), clear(tx, ctx) }`.
 
 ### Body rozšíření jádra
@@ -1269,7 +1270,8 @@ Test bez DB: `npm run test:html` (CI). Veřejná stránka `/ochrana-udaju` bere 
 - **Karta přehledu** `events.mine` (`getDashboardCards`): moje (autor nebo spoluorganizátor) zveřejněné a uzavřené události s nadcházejícím
   termínem, obsazenost míst včetně doprovodu (`meter`), nejbližší termín jako „nejbližší věc“. **Úkol** `events.unsent-confirmations`
   (`getAdminTodos`, oprávnění `events.manage.own`): registrace s `confirmEmailFailed` u událostí, které začínají do 3 dnů (učitel jen svoje).
-  **Odhad e-mailů** (`getEmailEstimates`): počet registrací, které zítra dostanou připomínku.
+  **Odhad e-mailů** (`getEmailEstimates`): počet registrací, které zítra dostanou připomínku; `getEmailForecast` totéž na další dny.
+  **U12 – e-maily a Upozornění:** u každého typu e-mailu ukazuje Upozornění odeslané dnes a za 30 dní (z `EmailLog`), součet za skupinu „Události“, pruhy čerpání denního a měsíčního limitu a odhad na 3 dny. Hromadný e-mail účastníkům (záložka Registrace, `actions/bulk.ts`, `bulk-core.ts`) jde přes `manual.bulk`: rozsah všichni aktivní / jeden termín, bez zrušených a bez smazaných údajů, náhled počtu příjemců a zbývajícího limitu, při nedostatku limitu jen prvním N nebo zrušit, jen `canManageEvent`, audit `events.bulk_email` bez adres, v režimu „zobrazit jako“ bez tlačítka. Text je prostý, HTML se escapuje (`textToHtml`). Testy: `42-events-email.spec.ts`, `scripts/events-bulk-test.ts`.
 - **Ukázková data** (`demo-data.ts`): událost „Den otevřených dveří“ (zveřejněná, za 9 pracovních dní, malý vložený WebP 320×180, 8 termínů po 8 místech,
   pevná pole a jedno vlastní, 25 registrací na `@ukazka.invalid`). Evidence `Event`, `EventImage`, `EventRegistration`; `clear` převezme
   skutečné události a obrázky ukázkových učitelů adminem.

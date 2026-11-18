@@ -133,6 +133,8 @@ test("rozložení: přihlášení, registrace a dialogy (telefon i počítač)",
       ["/events/evA?tab=items", "Přidat termín"],
       ["/events/evA?tab=items", "Vygenerovat řadu"],
       ["/events/evA?tab=form", "Přidat vlastní pole"],
+      // U12: hromadný e-mail účastníkům
+      ["/events/evA?tab=registrations", "E-mail účastníkům"],
     ] as const) {
       await page.goto(url);
       await page.waitForLoadState("networkidle");

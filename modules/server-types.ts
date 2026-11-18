@@ -254,6 +254,9 @@ export type ModuleServer = {
   runDailyJob?: (now: Date) => Promise<DailyJobStep[]>;
   // Odhad počtu příjemců hromadných upozornění pro administraci (Upozornění)
   getEmailEstimates?: () => Promise<Partial<Record<EmailEventId, number>>>;
+  // Odhad e-mailů na nejbližší dny: pro každou událost pole délky `days`, kde prvek 0 je příští spuštění denní úlohy
+  // (shoduje se s `getEmailEstimates`), prvek 1 následující den atd. Počítá se bez ohledu na zapnutí události.
+  getEmailForecast?: (days: number) => Promise<Partial<Record<EmailEventId, number[]>>>;
 
   // === Body rozšíření jádra ===
   // Jádro je volá jen u zapnutých modulů přes pomocné funkce v `modules/core/extensions.ts`

@@ -109,3 +109,38 @@ export async function getEmailUsage(settings?: EmailSettings): Promise<EmailUsag
   ]);
   return { today, month, dailyLimit: s.dailyLimit, monthlyLimit: s.monthlyLimit, skippedToday, skippedMonth };
 }
+
+// === Statistika podle typu e-mailu ===
+
+export type EmailEventStats = {
+  // Odesláno dnes (podle pásma školy, stejně jako denní limit)
+  today: number;
+  // Odesláno za posledních 30 dní
+  last30: number;
+  // Za posledních 30 dní nedošlo kvůli limitu (SKIPPED_LIMIT)
+  skippedLimit30: number;
+};
+
+export const STATS_DAYS = 30;
+
+/** Počty odeslaných e-mailů podle typu (dnes a za 30 dní) přímo z EmailLog; typy bez záznamu v mapě nemají nic. */
+export async function getEmailStatsByEvent(now: Date = new Date()): Promise<Map<string, EmailEventStats>> {
+  const since = new Date(now.getTime() - STATS_DAYS * 24 * 3600_000);
+  const dayStart = startOfSchoolDay(now);
+  const [month, today] = await Promise.all([
+    prisma.emailLog.groupBy({ by: ["event", "status"], where: { createdAt: { gte: since }, status: { in: ["SENT", "SKIPPED_LIMIT"] } }, _count: { _all: true } }),
+    prisma.emailLog.groupBy({ by: ["event"], where: { createdAt: { gte: dayStart }, status: "SENT" }, _count: { _all: true } }),
+  ]);
+  const map = new Map<string, EmailEventStats>();
+  const row = (id: string) => {
+    let r = map.get(id);
+    if (!r) map.set(id, (r = { today: 0, last30: 0, skippedLimit30: 0 }));
+    return r;
+  };
+  for (const m of month) {
+    if (m.status === "SENT") row(m.event).last30 += m._count._all;
+    else row(m.event).skippedLimit30 += m._count._all;
+  }
+  for (const t of today) row(t.event).today += t._count._all;
+  return map;
+}
