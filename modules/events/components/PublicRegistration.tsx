@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { registerForEvent } from "@/modules/events/actions/public";
 import { DEFAULT_CONSENT_TEXT, EMAIL_LABEL, PRIVACY_LINK_TEXT, effectiveFields, validateAnswers, type FormField } from "@/modules/events/form";
 import { groupItemsByDay, itemLabel, itemTimeRange } from "@/modules/events/format";
-import { freePlaces } from "@/modules/events/public-state";
+import { freePlaces, placesOf } from "@/modules/events/public-state";
 import type { PublicItem } from "@/modules/events/public-data";
 
 const INPUT = "h-11 text-base md:h-9 md:text-sm";
@@ -28,6 +28,8 @@ type Props = {
   maxItems: number;
   allowGuests: boolean;
   maxGuests: number;
+  /** Plný termín jde vybrat a zapsat se na čekací listinu */
+  waitlist: boolean;
   fields: FormField[];
   consentText: string | null;
   prefill: { email: string; name: string };
@@ -39,7 +41,7 @@ type Props = {
  * Výběr termínů (kompaktní řádky jako zápis studenta) a formulář účastníka na veřejné stránce.
  * Po ověření vyplnění se registrace odešle serverové akci a účastník přejde na stránku „hotovo“.
  */
-export function PublicRegistration({ slug, items, maxItems, allowGuests, maxGuests, fields, consentText, prefill, renderToken }: Props) {
+export function PublicRegistration({ slug, items, maxItems, allowGuests, maxGuests, waitlist, fields, consentText, prefill, renderToken }: Props) {
   const shown = useMemo(() => effectiveFields(fields, allowGuests).filter((f) => f.mode !== "HIDDEN"), [fields, allowGuests]);
   const [selected, setSelected] = useState<string[]>([]);
   const [values, setValues] = useState<Record<string, string | boolean>>(() => ({ email: prefill.email, ...(prefill.name ? { name: prefill.name } : {}) }));
@@ -56,6 +58,8 @@ export function PublicRegistration({ slug, items, maxItems, allowGuests, maxGues
   const formRef = useRef<HTMLFormElement>(null);
 
   const single = maxItems <= 1;
+  // Čekací listina: některý vybraný termín nemá pro účastníka a jeho doprovod dost volných míst
+  const need = placesOf(allowGuests ? Math.max(0, Math.floor(Number(values.guests) || 0)) : 0);
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const set = (key: string, v: string | boolean) => {
     setValues((s) => ({ ...s, [key]: v }));
@@ -70,6 +74,12 @@ export function PublicRegistration({ slug, items, maxItems, allowGuests, maxGues
       return cur.length >= maxItems ? cur : [...cur, id];
     });
   }
+
+  const onWaitlist = waitlist && selected.some((id) => {
+    const it = byId.get(id);
+    const free = it ? freePlaces(it.capacity, it.taken) : null;
+    return free !== null && free < need;
+  });
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -88,7 +98,7 @@ export function PublicRegistration({ slug, items, maxItems, allowGuests, maxGues
     }
     setPending(true);
     try {
-      const { token } = unwrap(await registerForEvent(slug, { itemIds: selected, values: { ...values }, consent, solution, website, renderToken }));
+      const { token } = unwrap(await registerForEvent(slug, { itemIds: selected, values: { ...values }, consent, solution, website, renderToken, waitlist: onWaitlist }));
       // Token je jen v adrese stránky „hotovo“; nikam se neukládá
       router.push(`/akce/${encodeURIComponent(slug)}/hotovo?t=${encodeURIComponent(token)}`);
     } catch (err) {
@@ -126,7 +136,7 @@ export function PublicRegistration({ slug, items, maxItems, allowGuests, maxGues
                   {(groups.length > 1 || g.key !== "none") && <h3 className="mb-1 text-sm font-semibold text-muted-foreground">{g.title}</h3>}
                   <ul className="divide-y overflow-hidden rounded-xl border bg-card">
                     {rows.map((item) => (
-                      <ItemRow key={item.id} item={item} selected={selected.includes(item.id)} single={single} limitReached={!single && selected.length >= maxItems} onToggle={() => toggle(item.id)} />
+                      <ItemRow key={item.id} item={item} waitlist={waitlist} selected={selected.includes(item.id)} single={single} limitReached={!single && selected.length >= maxItems} onToggle={() => toggle(item.id)} />
                     ))}
                   </ul>
                 </div>
@@ -135,6 +145,11 @@ export function PublicRegistration({ slug, items, maxItems, allowGuests, maxGues
           </div>
         )}
         {errors.items && <p className="text-sm text-danger" role="alert" data-testid="error-items">{errors.items}</p>}
+        {onWaitlist && (
+          <p className="rounded-lg border border-info/40 bg-info/10 p-3 text-sm" role="status" data-testid="waitlist-note">
+            Vybraný termín je plný. Zapíšeme vás na čekací listinu: místo vám nedržíme, ale jakmile se nějaké uvolní, registrace se potvrdí automaticky a dostanete e-mail.
+          </p>
+        )}
         {selected.length > 0 && (
           <p className="text-sm" data-testid="selected-summary">
             <span className="text-muted-foreground">Vybráno: </span>
@@ -227,7 +242,7 @@ export function PublicRegistration({ slug, items, maxItems, allowGuests, maxGues
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Odesílám…
               </>
             ) : (
-              "Registrovat"
+              onWaitlist ? "Zapsat na čekací listinu" : "Registrovat"
             )}
           </Button>
           {serverError && (
@@ -246,20 +261,21 @@ function isFull(i: PublicItem): boolean {
   return free !== null && free <= 0;
 }
 
-function ItemRow({ item, selected, single, limitReached, onToggle }: { item: PublicItem; selected: boolean; single: boolean; limitReached: boolean; onToggle: () => void }) {
+function ItemRow({ item, waitlist, selected, single, limitReached, onToggle }: { item: PublicItem; waitlist: boolean; selected: boolean; single: boolean; limitReached: boolean; onToggle: () => void }) {
   const free = freePlaces(item.capacity, item.taken);
   const full = free !== null && free <= 0;
   const timed = !!item.startsAt;
   const title = timed ? itemTimeRange(item) : item.label?.trim() || "Termín";
   const sub = [timed ? item.label?.trim() : null, item.note?.trim()].filter(Boolean).join(" · ");
-  const disabled = full || (!single && !selected && limitReached);
+  const blocked = full && !waitlist;
+  const disabled = blocked || (!single && !selected && limitReached);
   const info = (
     <div className="min-w-0 flex-1">
       <div className={cn("font-medium", timed && "tabular-nums")}>{title}</div>
       <div className="text-xs text-muted-foreground">
         {sub && <span>{sub}</span>}
         {sub && free !== null && " · "}
-        {full ? <span data-testid="item-full">Plno</span> : free !== null && <span data-testid="item-free">Volno: {free} z {item.capacity}</span>}
+        {full ? <span data-testid="item-full">{waitlist ? "Plno, jde se zapsat na čekací listinu" : "Plno"}</span> : free !== null && <span data-testid="item-free">Volno: {free} z {item.capacity}</span>}
       </div>
     </div>
   );
@@ -283,12 +299,12 @@ function ItemRow({ item, selected, single, limitReached, onToggle }: { item: Pub
         size="sm"
         variant={selected ? "outline" : full ? "secondary" : "default"}
         className={cn("h-11 min-w-24 shrink-0 md:h-8", selected && "border-success bg-success/15 text-success hover:bg-success/20 hover:text-success")}
-        disabled={full}
+        disabled={blocked}
         aria-pressed={selected}
         data-testid="item-pick"
         onClick={onToggle}
       >
-        {selected ? <><Check className="h-4 w-4" aria-hidden="true" /> Vybráno</> : full ? "Plno" : "Vybrat"}
+        {selected ? <><Check className="h-4 w-4" aria-hidden="true" /> Vybráno</> : full ? (waitlist ? "Čekací listina" : "Plno") : "Vybrat"}
       </Button>
     </li>
   );

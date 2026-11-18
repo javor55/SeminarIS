@@ -9,6 +9,7 @@ import { audit } from "@/lib/audit";
 import { audienceKey, entriesFromDraft } from "@/modules/core/audience";
 import { cleanAudienceDraft } from "@/modules/core/audience-db";
 import { loadManaged } from "@/modules/events/manage";
+import { cleanDuplicateInput, shiftByDays, type DuplicateInput } from "@/modules/events/duplicate-core";
 import { ensureFixedFields } from "@/modules/events/fields-db";
 import { cleanEventSettings, type EventSettingsInput } from "@/modules/events/settings";
 import { EVENT_STATUS_LABEL, canChangeStatus, type EventStatusValue } from "@/modules/events/status";
@@ -79,6 +80,7 @@ export async function createEvent(input: EventSettingsInput) {
             maxGuests: data.maxGuests,
             changeDeadlineMinutes: data.changeDeadlineMinutes,
             maxRegistrationsPerEmail: data.maxRegistrationsPerEmail,
+            waitlistEnabled: data.waitlistEnabled,
             confirmChannel: data.confirmChannel,
             confirmationText: data.confirmationText,
             consentText: data.consentText,
@@ -118,6 +120,7 @@ const FIELD_LABELS = {
   maxGuests: "max. osob navíc",
   changeDeadlineMinutes: "uzávěrka změn (min)",
   maxRegistrationsPerEmail: "registrací na e-mail",
+  waitlistEnabled: "čekací listina",
   confirmChannel: "potvrzení registrace",
   confirmationText: "text potvrzení",
   consentText: "text souhlasu",
@@ -155,6 +158,7 @@ export async function updateEvent(id: string, input: EventSettingsInput) {
             maxGuests: data.maxGuests,
             changeDeadlineMinutes: data.changeDeadlineMinutes,
             maxRegistrationsPerEmail: data.maxRegistrationsPerEmail,
+            waitlistEnabled: data.waitlistEnabled,
             confirmChannel: data.confirmChannel,
             confirmationText: data.confirmationText,
             consentText: data.consentText,
@@ -236,5 +240,90 @@ export async function setOrganizers(id: string, userIds: string[]) {
       await audit(tx, user, { action: "events.event.organizers", entityType: "event", entityId: id, summary: `Událost „${event.title}“: spoluorganizátorů ${count}` });
     });
     revalidatePath("/events", "layout");
+  });
+}
+
+/**
+ * Duplikace události: zkopíruje nastavení, formulář, titulní obrázek (odkaz na stejný `EventImage`), popis, nezrušené termíny
+ * (i s obdobím registrace posunuté o `shiftDays` dní), publikum, role a spoluorganizátory. Registrace se nekopírují; nová
+ * událost je koncept s novým odkazem a jejím autorem je ten, kdo duplikuje (původní autor se stane spoluorganizátorem, je-li
+ * aktivní učitel). Povolená je i u archivované události.
+ */
+export async function duplicateEvent(id: string, input: DuplicateInput) {
+  return safeAction(async () => {
+    const user = await requirePermission("events.manage.own");
+    const { title, shiftDays } = cleanDuplicateInput(input);
+    try {
+      const created = await prisma.$transaction(async (tx) => {
+        const src = await loadManaged(tx, user, id);
+        const [items, fields, audience] = await Promise.all([
+          tx.eventItem.findMany({ where: { eventId: id, cancelledAt: null }, orderBy: [{ order: "asc" }, { startsAt: "asc" }] }),
+          tx.eventField.findMany({ where: { eventId: id }, orderBy: [{ order: "asc" }, { key: "asc" }] }),
+          tx.eventAudience.findMany({ where: { eventId: id } }),
+        ]);
+        const slug = await uniqueSlug(slugify(title), slugExists(tx));
+        const shift = (d: Date | null) => (d ? shiftByDays(d, shiftDays) : null);
+        const event = await tx.event.create({
+          data: {
+            slug,
+            title,
+            subtitle: src.subtitle,
+            place: src.place,
+            contact: src.contact,
+            descriptionHtml: src.descriptionHtml,
+            imageId: src.imageId,
+            imageAlt: src.imageAlt,
+            status: "DRAFT",
+            visibility: src.visibility,
+            audienceRoles: src.audienceRoles,
+            registrationOpensAt: shift(src.registrationOpensAt),
+            registrationClosesAt: shift(src.registrationClosesAt),
+            maxItemsPerRegistration: src.maxItemsPerRegistration,
+            allowGuests: src.allowGuests,
+            maxGuests: src.maxGuests,
+            changeDeadlineMinutes: src.changeDeadlineMinutes,
+            maxRegistrationsPerEmail: src.maxRegistrationsPerEmail,
+            waitlistEnabled: src.waitlistEnabled,
+            confirmChannel: src.confirmChannel,
+            confirmationText: src.confirmationText,
+            consentText: src.consentText,
+            createdById: user.id,
+          },
+        });
+        if (items.length) {
+          await tx.eventItem.createMany({
+            data: items.map((i) => ({ eventId: event.id, label: i.label, startsAt: shift(i.startsAt), endsAt: shift(i.endsAt), capacity: i.capacity, note: i.note, order: i.order })),
+          });
+        }
+        if (fields.length) {
+          await tx.eventField.createMany({
+            data: fields.map((f) => ({ eventId: event.id, key: f.key, type: f.type, label: f.label, mode: f.mode, options: f.options, order: f.order, builtin: f.builtin })),
+          });
+        }
+        if (audience.length) {
+          await tx.eventAudience.createMany({
+            data: audience.map((a) => ({ eventId: event.id, type: a.type, grade: a.grade, classGroupId: a.classGroupId, userId: a.userId, key: a.key })),
+          });
+        }
+        // Původní spoluorganizátoři a autor (pokud nejde o toho, kdo duplikuje); jiní než aktivní učitelé se vynechají
+        const wanted = [...src.organizers.map((o) => o.userId), src.createdById].filter((x) => x !== user.id);
+        const teachers = wanted.length ? await tx.user.findMany({ where: { id: { in: wanted }, role: "TEACHER", isActive: true }, select: { id: true } }) : [];
+        if (teachers.length) await tx.eventOrganizer.createMany({ data: teachers.map((t) => ({ eventId: event.id, userId: t.id })) });
+        await ensureFixedFields(tx, event.id);
+        await audit(tx, user, {
+          action: "events.event.duplicate",
+          entityType: "event",
+          entityId: event.id,
+          summary: `Událost „${src.title}“ duplikována jako „${event.title}“ (/akce/${event.slug}): termínů ${items.length}, posun ${shiftDays} dní, bez registrací, koncept`,
+          data: { sourceId: id, shiftDays, items: items.length },
+        });
+        return { id: event.id, slug: event.slug };
+      });
+      revalidatePath("/events", "layout");
+      return created;
+    } catch (e) {
+      if (slugCollision(e)) throw new Error("Odkaz nové události se právě obsadil jinou událostí, zkuste to znovu.");
+      throw e;
+    }
   });
 }

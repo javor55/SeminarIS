@@ -15,7 +15,8 @@ import { assertEditable, loadManaged } from "@/modules/events/manage";
 import { relaxRequired } from "@/modules/events/organizer-core";
 import { loadTakenByItem, mergeFields } from "@/modules/events/public-data";
 import { placesOf } from "@/modules/events/public-state";
-import { answersToStore, capacityError, checkSelectedItems, generateCode, generateToken, hashToken } from "@/modules/events/registration-core";
+import { notifyPromoted, promoteFromWaitlist } from "@/modules/events/waitlist";
+import { TOKEN_RE, answersToStore, capacityError, checkSelectedItems, generateCode, generateToken, hashToken } from "@/modules/events/registration-core";
 
 // Akce organizátora nad registracemi. Každá projde `requirePermission` + `loadManaged` (= `canManageEvent`; cizí událost se tváří,
 // že neexistuje) a `safeAction` (režim „zobrazit jako“ je jen pro čtení). Uzávěrky pro organizátora neplatí; kapacitu hlídá,
@@ -147,7 +148,7 @@ export async function updateRegistration(eventId: string, regId: string, input: 
   return safeAction(async () => {
     const user = await requirePermission("events.manage.own");
     if (!input || typeof input !== "object" || !input.values || typeof input.values !== "object") throw new Error("Neplatný formulář.");
-    await serializable(async (tx) => {
+    const promoted = await serializable(async (tx) => {
       const event = await loadManaged(tx, user, eventId);
       assertEditable(event);
       const reg = await loadRegistration(tx, eventId, regId);
@@ -171,7 +172,10 @@ export async function updateRegistration(eventId: string, regId: string, input: 
         summary: `Událost „${event.title}“: organizátor upravil údaje registrace ${reg.code} (osob: ${placesOf(guests)})`,
         data: { registrationId: reg.id },
       });
+      // Méně osob uvolní místa (u čekajícího se může najednou vejít)
+      return guests !== reg.guests ? promoteFromWaitlist(tx, reg.items.map((i) => i.itemId), user) : [];
     });
+    await notifyPromoted(promoted);
     refresh(eventId);
   });
 }
@@ -209,8 +213,11 @@ export async function moveRegistration(eventId: string, regId: string, input: Mo
         summary: `Událost „${event.title}“: organizátor přesunul registraci ${reg.code} z termínu ${labelOf(items, input.fromItemId)} na ${itemFullLabel(to)}${input.force ? " (nad kapacitu)" : ""}`,
         data: { registrationId: reg.id, from: input.fromItemId, to: to.id, force: !!input.force },
       });
-      return { reg, event, items, after };
+      // Uvolnil se původní termín; čekající registrace se může na novém termínu hned vejít
+      const promoted = await promoteFromWaitlist(tx, [input.fromItemId, to.id], user);
+      return { reg, event, items, after, promoted };
     });
+    await notifyPromoted(done.promoted);
     const emailed = input.sendEmail
       ? await mail("events.registration.moved", done.reg, done.event, {
           puvodni: labelOf(done.items, input.fromItemId),
@@ -244,8 +251,10 @@ export async function removeFromItem(eventId: string, regId: string, input: { it
         summary: `Událost „${event.title}“: organizátor odebral registraci ${reg.code} z termínu ${labelOf(items, input.itemId)}`,
         data: { registrationId: reg.id, itemId: input.itemId },
       });
-      return { reg, event, items, after: own.filter((id) => id !== input.itemId) };
+      const promoted = reg.status === "WAITLIST" ? [] : await promoteFromWaitlist(tx, [input.itemId], user);
+      return { reg, event, items, after: own.filter((id) => id !== input.itemId), promoted };
     });
+    await notifyPromoted(done.promoted);
     const emailed = input.sendEmail
       ? await mail("events.registration.removed", done.reg, done.event, {
           zmena: `Organizátor vás odebral z termínu: ${labelOf(done.items, input.itemId)}.`,
@@ -274,8 +283,11 @@ export async function cancelRegistrationByOrganizer(eventId: string, regId: stri
         summary: `Událost „${event.title}“: organizátor zrušil registraci ${reg.code}`,
         data: { registrationId: reg.id },
       });
-      return { reg, event, items, own: reg.items.map((i) => i.itemId) };
+      const own = reg.items.map((i) => i.itemId);
+      const promoted = reg.status === "WAITLIST" ? [] : await promoteFromWaitlist(tx, own, user);
+      return { reg, event, items, own, promoted };
     });
+    await notifyPromoted(done.promoted);
     const emailed = input?.sendEmail
       ? await mail("events.registration.removed", done.reg, done.event, { zmena: "Organizátor vaši registraci zrušil.", terminy: "—" })
       : null;
@@ -284,3 +296,56 @@ export async function cancelRegistrationByOrganizer(eventId: string, regId: stri
   });
 }
 
+
+export type AttendanceResult = { attendedAt: string | null; changed: boolean };
+
+/** Prezence: jen registrace, která drží místo (ne zrušená, ne čekající). Beze změny se nic nezapisuje (ani do historie). */
+async function applyAttendance(tx: TxClient, user: Parameters<typeof audit>[1], event: { id: string; title: string }, reg: { id: string; code: string; status: string; attendedAt: Date | null }, attended: boolean): Promise<AttendanceResult> {
+  if (reg.status === "CANCELLED") throw new Error("Registrace je zrušená.");
+  if (reg.status === "WAITLIST") throw new Error("Registrace je na čekací listině, místo nedrží.");
+  if (attended === !!reg.attendedAt) return { attendedAt: reg.attendedAt?.toISOString() ?? null, changed: false };
+  const attendedAt = attended ? new Date() : null;
+  await tx.eventRegistration.update({ where: { id: reg.id }, data: { attendedAt } });
+  await audit(tx, user, {
+    action: attended ? "events.registration.attend" : "events.registration.unattend",
+    entityType: "event",
+    entityId: event.id,
+    summary: `Událost „${event.title}“: ${attended ? "označen příchod" : "zrušeno označení příchodu"} u registrace ${reg.code}`,
+    data: { registrationId: reg.id },
+  });
+  return { attendedAt: attendedAt?.toISOString() ?? null, changed: true };
+}
+
+/** Prezence v detailu termínu: označí nebo odznačí příchod (odznačit jde kdykoli). */
+export async function setAttendance(eventId: string, regId: string, attended: boolean) {
+  return safeAction(async () => {
+    const user = await requirePermission("events.manage.own");
+    const out = await serializable(async (tx) => {
+      const event = await loadManaged(tx, user, eventId);
+      assertEditable(event);
+      const reg = await loadRegistration(tx, eventId, regId);
+      return applyAttendance(tx, user, event, reg, !!attended);
+    });
+    refresh(eventId);
+    return out;
+  });
+}
+
+/**
+ * Označení příchodu po načtení QR kódu z potvrzení: organizátor (přihlášený, `canManageEvent`) na stránce správy registrace
+ * klikne na „Označit příchod“. Token jen identifikuje registraci; oprávnění dává přihlášení, ne znalost tokenu.
+ */
+export async function setAttendanceByLink(slug: string, token: string, attended: boolean) {
+  return safeAction(async () => {
+    const user = await requirePermission("events.manage.own");
+    if (typeof slug !== "string" || typeof token !== "string" || !TOKEN_RE.test(token)) throw new Error(NOT_FOUND);
+    const out = await serializable(async (tx) => {
+      const reg = await tx.eventRegistration.findUnique({ where: { tokenHash: hashToken(token) }, select: { id: true, eventId: true, code: true, status: true, attendedAt: true, event: { select: { slug: true } } } });
+      if (!reg || reg.event.slug !== slug) throw new Error(NOT_FOUND);
+      const event = await loadManaged(tx, user, reg.eventId);
+      assertEditable(event);
+      return applyAttendance(tx, user, event, reg, !!attended);
+    });
+    return out;
+  });
+}

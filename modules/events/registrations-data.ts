@@ -52,6 +52,7 @@ export async function loadRegistrations(user: User, eventId: string): Promise<Re
     createdAt: r.createdAt.toISOString(),
     cancelledAt: r.cancelledAt?.toISOString() ?? null,
     confirmEmailFailed: r.confirmEmailFailed,
+    attendedAt: r.attendedAt?.toISOString() ?? null,
     items: r.items
       .map((x) => byId.get(x.itemId))
       .filter((i): i is NonNullable<typeof i> => !!i)

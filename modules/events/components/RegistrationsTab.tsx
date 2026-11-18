@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRightLeft, Download, Mail, MoreHorizontal, Pencil, UserMinus, UserPlus, XCircle } from "lucide-react";
+import { ArrowRightLeft, ClipboardCheck, Download, Mail, MoreHorizontal, Pencil, UserMinus, UserPlus, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { StatTile } from "@/components/ui/stat-tile";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateTime } from "@/lib/datetime";
 import { plural } from "@/lib/plural";
+import { AttendancePanel } from "@/modules/events/components/AttendancePanel";
 import { BulkEmailDialog } from "@/modules/events/components/BulkEmailDialog";
 import { CopyLinkButton } from "@/modules/events/components/CopyLinkButton";
 import { CancelDialog, MoveDialog, RegistrationFormDialog, RemoveDialog, type DialogState } from "@/modules/events/components/RegistrationDialogs";
@@ -35,6 +36,7 @@ export function RegistrationsTab({ data, readOnly }: { data: RegistrationsData; 
   const [itemFilter, setItemFilter] = useState("");
   const [showCancelled, setShowCancelled] = useState(false);
   const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [attendance, setAttendance] = useState(false);
 
   const active = data.rows.filter((r) => r.status !== "CANCELLED");
   const holding = data.rows.filter((r) => r.status === "CONFIRMED" || r.status === "PENDING");
@@ -46,6 +48,19 @@ export function RegistrationsTab({ data, readOnly }: { data: RegistrationsData; 
     () => data.rows.filter((r) => (showCancelled || r.status !== "CANCELLED") && (!itemFilter || r.items.some((i) => i.id === itemFilter)) && matchesQuery(r, query)).slice().reverse(),
     [data.rows, showCancelled, itemFilter, query]
   );
+
+  const waiting = data.rows.filter((r) => r.status === "WAITLIST");
+
+  // Prezence se vede po termínech: bez vybraného termínu se vybere nejbližší nadcházející (jinak první)
+  function startAttendance() {
+    if (!itemFilter) {
+      const live = data.items.filter((i) => !i.cancelled);
+      const upcoming = live.filter((i) => i.startsAt && new Date(i.startsAt).getTime() >= Date.now() - 3_600_000).sort((a, b) => new Date(a.startsAt!).getTime() - new Date(b.startsAt!).getTime());
+      const first = upcoming[0] ?? live[0];
+      if (first) setItemFilter(first.id);
+    }
+    setAttendance(true);
+  }
 
   const close = () => setDialog(null);
   const refresh = () => router.refresh();
@@ -94,17 +109,20 @@ export function RegistrationsTab({ data, readOnly }: { data: RegistrationsData; 
 
   return (
     <div className="space-y-6" data-testid="registrations-tab">
-      <div className="grid grid-cols-3 gap-3" data-testid="reg-summary">
+      {!attendance && <div className="grid grid-cols-3 gap-3" data-testid="reg-summary">
         <StatTile label={plural(active.length, "registrace", "registrace", "registrací")} value={<span data-testid="sum-registrations">{active.length}</span>} />
         <StatTile label="osob celkem" value={<span data-testid="sum-people">{people}</span>} />
         <StatTile label={limited.length === 0 ? "volných míst (bez omezení)" : "volných míst"} value={<span data-testid="sum-free">{limited.length === 0 ? "∞" : free}</span>} />
-      </div>
+      </div>}
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+      {!attendance && <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Obsazenost termínů</CardTitle></CardHeader>
           <CardContent className="space-y-3" data-testid="occupancy">
             {data.items.length === 0 && <p className="text-sm text-muted-foreground">Událost zatím nemá žádné termíny.</p>}
+            {waiting.length > 0 && (
+              <p className="text-sm text-muted-foreground" data-testid="waitlist-summary">Na čekací listině: <span className="font-medium text-foreground" data-testid="sum-waitlist">{waiting.length}</span> {plural(waiting.length, "registrace", "registrace", "registrací")} ({waiting.reduce((s, r) => s + placesOf(r.guests), 0)} {plural(waiting.reduce((s, r) => s + placesOf(r.guests), 0), "osoba", "osoby", "osob")})</p>
+            )}
             {data.items.map((i) => (
               <div key={i.id} className="space-y-1" data-item={i.id}>
                 <div className="flex items-baseline justify-between gap-3 text-sm">
@@ -130,7 +148,7 @@ export function RegistrationsTab({ data, readOnly }: { data: RegistrationsData; 
             </div>
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
       <div className="space-y-3">
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
@@ -144,16 +162,23 @@ export function RegistrationsTab({ data, readOnly }: { data: RegistrationsData; 
           <Checkbox data-testid="show-cancelled" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} label="Zobrazit zrušené" labelClassName="min-h-9" />
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          {!readOnly && (
+          {!readOnly && !attendance && (
             <Button type="button" onClick={() => setDialog({ kind: "add" })} data-testid="add-registration" className="min-h-11 md:min-h-9"><UserPlus /> Přidat registraci</Button>
           )}
-          {!readOnly && (
+          {!readOnly && !attendance && (
             <Button type="button" variant="outline" onClick={() => setDialog({ kind: "bulk" })} data-testid="bulk-email" className="min-h-11 md:min-h-9"><Mail /> E-mail účastníkům</Button>
           )}
-          <Button asChild variant="outline" className="min-h-11 md:min-h-9"><a href={`/api/events/${data.event.id}/export`} data-testid="export-csv"><Download /> Export CSV</a></Button>
+          {!readOnly && (
+            <Button type="button" variant={attendance ? "default" : "outline"} onClick={() => (attendance ? setAttendance(false) : startAttendance())} aria-pressed={attendance} data-testid="attendance-toggle" className="min-h-11 md:min-h-9"><ClipboardCheck /> {attendance ? "Zpět na seznam" : "Prezence"}</Button>
+          )}
+          {!attendance && <Button asChild variant="outline" className="min-h-11 md:min-h-9"><a href={`/api/events/${data.event.id}/export`} data-testid="export-csv"><Download /> Export CSV</a></Button>}
         </div>
 
-        {rows.length === 0 ? (
+        {attendance && !itemFilter ? (
+          <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground" data-testid="attend-pick">Prezenci vedete po termínech. Vyberte termín ve filtru.</div>
+        ) : attendance ? (
+          <AttendancePanel eventId={data.event.id} rows={data.rows} itemId={itemFilter} query={query} readOnly={readOnly} />
+        ) : rows.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground" data-testid="reg-empty">
             {data.rows.length === 0 ? "Zatím se nikdo neregistroval." : "Hledání nic nenašlo."}
           </div>

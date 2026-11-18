@@ -32,6 +32,8 @@ export type RegRow = {
   createdAt: string;
   cancelledAt: string | null;
   confirmEmailFailed: boolean;
+  /** Kdy organizátor označil příchod (prezence); `null` = nepřišel/neoznačeno */
+  attendedAt: string | null;
   items: RegItemRef[];
 };
 

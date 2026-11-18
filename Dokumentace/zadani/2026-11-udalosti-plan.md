@@ -35,7 +35,7 @@ Vlna D – po registraci:
 
 Vlna E – provoz a doplňky:
 - [x] U13 Denní úlohy (připomínka, smazání údajů po 90 dnech), přehled, úkoly, ukázková data (PR #29)
-- [ ] U14 Čekací listina, prezence (i s QR), duplikace události
+- [x] U14 Čekací listina, prezence (i s QR), duplikace události
 
 Velikost: U1, U2, U8 a U13 jsou malé až střední, ostatní střední. Jedna session zvládne
 zhruba 1–2 tickety včetně E2E.

@@ -70,6 +70,13 @@ test("rozložení: nic se nepřekrývá ani nepřetéká (student, učitel, admi
   const LAYOUT_TOKEN = "L".repeat(43);
   sql(`insert into "EventRegistration"(id,"eventId",email,status,"tokenHash",code,"consentAt","updatedAt") values ('rgC','evC','a@b.cz','CONFIRMED','${createHash("sha256").update(LAYOUT_TOKEN).digest("hex")}','AAA-AAAA',now(),now())`);
   sql(`insert into "EventRegistrationItem"("registrationId","itemId") values ('rgC','itC1')`);
+  // U14: čekací listina (plný termín itC1 nabízí zápis na listinu, jedna registrace už čeká) a QR v potvrzení
+  sql(`update "Event" set "waitlistEnabled"=true where id='evC'`);
+  const WAIT_TOKEN = "W".repeat(43);
+  sql(`insert into "EventRegistration"(id,"eventId",email,status,"tokenHash",code,"consentAt","updatedAt") values ('rgW','evC','cekam@b.cz','WAITLIST','${createHash("sha256").update(WAIT_TOKEN).digest("hex")}','WWW-WWWW',now(),now())`);
+  sql(`insert into "EventRegistrationItem"("registrationId","itemId") values ('rgW','itC1')`);
+  sql(`insert into "EventRegistration"(id,"eventId",email,name,guests,status,"tokenHash",code,"consentAt","updatedAt") values ('rgA4','evA','cekajici@example.com','Čekající na místo',1,'WAITLIST','${createHash("sha256").update("layout-rgA4").digest("hex")}','BBB-9999',now(),now())`);
+  sql(`insert into "EventRegistrationItem"("registrationId","itemId") values ('rgA4','itA1')`);
   sql(`insert into "EventField"(id,"eventId",key,type,label,mode,options,"order",builtin) values ('efC1','evC','custom_1','SELECT','Oblíbený předmět','REQUIRED',ARRAY['Matematika','Fyzika'],10,false)`);
   const pages: Record<string, string[]> = {
     "jan.student@skola.cz": ["/zapisy/enr_ls_2025", "/makeup", "/profile"],
@@ -111,7 +118,7 @@ test("rozložení: přihlášení, registrace a dialogy (telefon i počítač)",
   for (const [vname, viewport] of Object.entries(VIEWPORTS)) {
     const anon = await browser.newContext({ viewport, hasTouch: vname === "phone" });
     const pa = await anon.newPage();
-    for (const url of ["/login", "/register", "/ochrana-udaju", "/akce/den-otevrenych-dveri", "/akce/verejna", `/akce/verejna/hotovo?t=${"L".repeat(43)}`, `/akce/verejna/r/${"L".repeat(43)}`]) {
+    for (const url of ["/login", "/register", "/ochrana-udaju", "/akce/den-otevrenych-dveri", "/akce/verejna", `/akce/verejna/hotovo?t=${"L".repeat(43)}`, `/akce/verejna/r/${"L".repeat(43)}`, `/akce/verejna/hotovo?t=${"W".repeat(43)}`, `/akce/verejna/r/${"W".repeat(43)}`]) {
       await pa.goto(url);
       await pa.waitForLoadState("networkidle");
       const p = await problems(pa);
@@ -135,6 +142,8 @@ test("rozložení: přihlášení, registrace a dialogy (telefon i počítač)",
       ["/events/evA?tab=form", "Přidat vlastní pole"],
       // U12: hromadný e-mail účastníkům
       ["/events/evA?tab=registrations", "E-mail účastníkům"],
+      // U14: duplikace události
+      ["/events/evA", "Duplikovat"],
     ] as const) {
       await page.goto(url);
       await page.waitForLoadState("networkidle");
@@ -161,6 +170,12 @@ test("rozložení: přihlášení, registrace a dialogy (telefon i počítač)",
       check(`${vname} dialog ${button}`, p.length === 0, p.join("; "));
       await page.keyboard.press("Escape");
     }
+    // U14: režim Prezence v detailu termínu
+    await page.goto("/events/evA?tab=registrations");
+    await page.waitForLoadState("networkidle");
+    await page.getByTestId("attendance-toggle").click();
+    await page.getByTestId("attendance-panel").waitFor();
+    check(`${vname} prezence`, (await problems(page)).length === 0, (await problems(page)).join("; "));
     await ctx.close();
   }
 });

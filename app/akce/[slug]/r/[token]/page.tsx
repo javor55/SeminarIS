@@ -1,11 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Info, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Hourglass, Info, TriangleAlert } from "lucide-react";
 import { formatDateTime } from "@/lib/datetime";
 import { appUrl } from "@/lib/email";
 import { isModuleEnabled } from "@/lib/modules";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/session";
+import { canManageEvent } from "@/modules/events/access";
+import { MarkArrival } from "@/modules/events/components/MarkArrival";
 import { ConfirmationActions } from "@/modules/events/components/ConfirmationActions";
 import { ManageRegistration, type ManageItem } from "@/modules/events/components/ManageRegistration";
 import { effectiveFields } from "@/modules/events/form";
@@ -34,11 +37,15 @@ export default async function ManageRegistrationPage({ params }: Params) {
 
   const reg = await prisma.eventRegistration.findUnique({
     where: { tokenHash: hashToken(token) },
-    include: { event: { include: { items: { orderBy: [{ order: "asc" }, { startsAt: "asc" }] }, fields: true } }, items: true },
+    include: { event: { include: { items: { orderBy: [{ order: "asc" }, { startsAt: "asc" }] }, fields: true, organizers: { select: { userId: true } } } }, items: true },
   });
   if (!reg || reg.event.slug !== slug || reg.event.status === "DRAFT") notFound();
   const event = reg.event;
   const cancelled = reg.status === "CANCELLED";
+  const waiting = reg.status === "WAITLIST";
+  // Organizátor (přihlášený, smí událost spravovat), který načetl QR kód z potvrzení, může označit příchod
+  const viewer = await getCurrentUser();
+  const canMark = !!viewer && !cancelled && event.status !== "ARCHIVED" && canManageEvent(viewer, event);
 
   const ownIds = new Set(reg.items.map((i) => i.itemId));
   const mine = event.items.filter((i) => ownIds.has(i.id)).sort((a, b) => (a.startsAt?.getTime() ?? 0) - (b.startsAt?.getTime() ?? 0) || a.order - b.order);
@@ -85,17 +92,27 @@ export default async function ManageRegistrationPage({ params }: Params) {
     `Odkaz na správu registrace: ${link}`,
     `Kód registrace: ${reg.code}`,
   ].join("\r\n");
-  const hasTime = mine.some((i) => i.startsAt);
+  const hasTime = !waiting && mine.some((i) => i.startsAt);
 
   return (
     <main className="mx-auto w-full max-w-2xl space-y-5 px-4 pb-10 pt-4 md:pt-8" data-testid="manage-page" data-state={cancelled ? "cancelled" : window.open ? "open" : "locked"}>
       <header className="flex items-start gap-3">
-        {cancelled ? <TriangleAlert className="mt-1 h-6 w-6 shrink-0 text-warning" aria-hidden="true" /> : <CheckCircle2 className="mt-1 h-6 w-6 shrink-0 text-success" aria-hidden="true" />}
+        {cancelled ? <TriangleAlert className="mt-1 h-6 w-6 shrink-0 text-warning" aria-hidden="true" /> : waiting ? <Hourglass className="mt-1 h-6 w-6 shrink-0 text-info" aria-hidden="true" /> : <CheckCircle2 className="mt-1 h-6 w-6 shrink-0 text-success" aria-hidden="true" />}
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold leading-tight tracking-tight" data-testid="manage-title">{cancelled ? "Registrace byla zrušena" : "Vaše registrace"}</h1>
+          <h1 className="text-2xl font-bold leading-tight tracking-tight" data-testid="manage-title">{cancelled ? "Registrace byla zrušena" : waiting ? "Jste na čekací listině" : "Vaše registrace"}</h1>
           <p className="break-words text-muted-foreground">{event.title}</p>
         </div>
       </header>
+
+      {canMark && (
+        <MarkArrival slug={event.slug} token={token} code={reg.code} name={reg.name ?? reg.email} guests={placesOf(reg.guests)} status={reg.status} attendedAt={reg.attendedAt?.toISOString() ?? null} />
+      )}
+
+      {waiting && (
+        <p className="rounded-xl border bg-card p-4 text-sm" data-testid="waitlist-info">
+          Termín je zatím plný, proto jste na čekací listině. Místo vám nedržíme; jakmile se nějaké uvolní, registrace se potvrdí automaticky a pošleme vám e-mail. Do té doby můžete registraci upravit nebo zrušit.
+        </p>
+      )}
 
       {cancelled && (
         <p className="rounded-xl border bg-card p-4 text-sm" data-testid="cancelled-info">

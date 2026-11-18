@@ -91,6 +91,7 @@ export async function loadPublicEvent(slug: string) {
     maxItemsPerRegistration: event.maxItemsPerRegistration,
     allowGuests: event.allowGuests,
     maxGuests: event.maxGuests,
+    waitlistEnabled: event.waitlistEnabled,
     // Prázdný vlastní text = výchozí z nastavení modulu (prázdné = vestavěný text)
     consentText: event.consentText?.trim() || defaults.consentText || null,
     createdById: event.createdById,

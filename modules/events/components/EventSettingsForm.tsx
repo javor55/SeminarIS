@@ -43,6 +43,7 @@ export type EventSettingsValues = {
   maxGuests: number;
   changeDeadlineMinutes: number;
   maxRegistrationsPerEmail: number;
+  waitlistEnabled: boolean;
   confirmChannel: EventConfirmChannelValue;
   confirmationText: string;
   consentText: string;
@@ -70,6 +71,7 @@ export const NEW_EVENT_VALUES: EventSettingsValues = {
   maxGuests: 1,
   changeDeadlineMinutes: 1440,
   maxRegistrationsPerEmail: 1,
+  waitlistEnabled: false,
   confirmChannel: "EMAIL_AND_SCREEN",
   confirmationText: "",
   consentText: "",
@@ -163,6 +165,7 @@ export function EventSettingsForm({ values, teachers, canDelete }: { values: Eve
         maxGuests: Number(v.maxGuests),
         changeDeadlineMinutes: Number(v.changeDeadlineMinutes),
         maxRegistrationsPerEmail: Number(v.maxRegistrationsPerEmail),
+        waitlistEnabled: v.waitlistEnabled,
         confirmChannel: v.confirmChannel,
         confirmationText: v.confirmationText,
         consentText: v.consentText,
@@ -327,6 +330,10 @@ export function EventSettingsForm({ values, teachers, canDelete }: { values: Eve
             <Input id="maxGuests" type="number" min={1} max={50} value={v.maxGuests} onChange={(e) => set({ maxGuests: e.target.value as unknown as number })} className="w-32" />
           </Field>
         )}
+        <div className="space-y-1">
+          <Checkbox id="waitlistEnabled" data-testid="waitlist-enabled" label="Povolit čekací listinu" checked={v.waitlistEnabled} onChange={(e) => set({ waitlistEnabled: e.target.checked })} />
+          <p className="text-xs text-muted-foreground">Plný termín nabídne „Zapsat na čekací listinu“. Čekající nedrží místo; po uvolnění se posune nejstarší, kdo se vejde (i s doprovodem), a dostane e-mail. Čekající se počítají do limitu registrací na e-mail.</p>
+        </div>
       </Section>
 
       <Section title="Potvrzení registrace a texty" testId="section-texts">

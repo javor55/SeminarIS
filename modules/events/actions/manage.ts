@@ -13,6 +13,7 @@ import { itemFullLabel } from "@/modules/events/format";
 import { changeWindow, takenWithoutOwn } from "@/modules/events/manage-core";
 import { loadTakenByItem, mergeFields } from "@/modules/events/public-data";
 import { placesOf } from "@/modules/events/public-state";
+import { notifyPromoted, promoteFromWaitlist } from "@/modules/events/waitlist";
 import {
   RECOVER_LIMIT,
   RECOVER_WINDOW_SECONDS,
@@ -97,9 +98,13 @@ export async function changeRegistrationItems(slug: string, token: string, itemI
       if (!changeWindow(ev, picked.map((i) => i.startsAt)).open) throw new Error("Na vybraný termín už nejde přejít, uzávěrka změn pro něj uplynula.");
 
       // Obsazenost se čte znovu uvnitř transakce; kontrolují se jen nově přidané termíny (vlastní místo se neodečítá dvakrát)
+      // Čekající místo nedrží, proto se kapacita při změně termínu nekontroluje (na termínu čeká dál, nebo se hned posune)
       const added = ids.filter((id) => !own.includes(id));
-      const full = capacityError(added, ev.items, await loadTakenByItem(ev.id, tx), reg.guests);
-      if (full) throw new Error(full);
+      const waiting = reg.status === "WAITLIST";
+      if (!waiting) {
+        const full = capacityError(added, ev.items, await loadTakenByItem(ev.id, tx), reg.guests);
+        if (full) throw new Error(full);
+      }
 
       await tx.eventRegistrationItem.deleteMany({ where: { registrationId: reg.id, itemId: { notIn: ids } } });
       if (added.length) await tx.eventRegistrationItem.createMany({ data: added.map((itemId) => ({ registrationId: reg.id, itemId })) });
@@ -111,10 +116,13 @@ export async function changeRegistrationItems(slug: string, token: string, itemI
         summary: `Událost „${ev.title}“: účastník změnil termín registrace ${reg.code} (termínů: ${ids.length})`,
         data: { registrationId: reg.id, from: own, to: ids },
       });
-      return { reg, event: ev, before, after: picked };
+      // Uvolněné termíny (a u čekajícího jeho nové termíny) mohou posunout někoho z čekací listiny
+      const promoted = await promoteFromWaitlist(tx, waiting ? ids : own.filter((id) => !ids.includes(id)), PUBLIC_ACTOR);
+      return { reg, event: ev, before, after: picked, promoted };
     });
     const label = (xs: typeof done.after) => xs.map((i) => itemFullLabel(i)).join(", ");
     await notifyChanged(done.reg, done.event, token, "items", `Změna termínu: původně ${label(done.before)}, nově ${label(done.after)}.`, done.after);
+    await notifyPromoted(done.promoted);
     return { ok: true as const };
   });
 }
@@ -135,7 +143,7 @@ export async function updateRegistrationAnswers(slug: string, token: string, val
       const guests = ev.allowGuests && "guests" in v ? Number(v.guests || 0) : reg.guests;
 
       // Víc osob = víc míst na všech termínech registrace (vlastní původní místa se odečtou)
-      if (guests > reg.guests) {
+      if (guests > reg.guests && reg.status !== "WAITLIST") {
         const own = ownItems(reg);
         const full = capacityError(own.map((i) => i.id), ev.items, takenWithoutOwn(await loadTakenByItem(ev.id, tx), own.map((i) => i.id), reg.guests), guests);
         if (full) throw new Error(full);
@@ -150,9 +158,12 @@ export async function updateRegistrationAnswers(slug: string, token: string, val
         summary: `Událost „${ev.title}“: účastník upravil údaje registrace ${reg.code} (osob: ${placesOf(guests)})`,
         data: { registrationId: reg.id },
       });
-      return { reg: { email: reg.email, name }, event: ev, items: ownItems(reg) };
+      // Méně osob = víc volných míst (u čekajícího se může najednou vejít)
+      const promoted = guests !== reg.guests ? await promoteFromWaitlist(tx, reg.items.map((i) => i.itemId), PUBLIC_ACTOR) : [];
+      return { reg: { email: reg.email, name }, event: ev, items: ownItems(reg), promoted };
     });
     await notifyChanged(done.reg, done.event, token, "answers", "Upravili jste své údaje v registraci.", done.items);
+    await notifyPromoted(done.promoted);
     return { ok: true as const };
   });
 }
@@ -172,9 +183,12 @@ export async function cancelRegistration(slug: string, token: string) {
         summary: `Událost „${reg.event.title}“: účastník zrušil registraci ${reg.code}`,
         data: { registrationId: reg.id },
       });
-      return { reg, event: reg.event };
+      // Uvolněná místa posunou nejstaršího čekajícího (zrušení čekajícího nic neuvolní)
+      const promoted = reg.status === "WAITLIST" ? [] : await promoteFromWaitlist(tx, reg.items.map((i) => i.itemId), PUBLIC_ACTOR);
+      return { reg, event: reg.event, promoted };
     });
     await notifyChanged(done.reg, done.event, token, "cancel", "Registraci jste zrušili.", []);
+    await notifyPromoted(done.promoted);
     return { ok: true as const };
   });
 }

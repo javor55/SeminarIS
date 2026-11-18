@@ -651,6 +651,8 @@ model Event {
   // Účastník smí měnit a rušit nejpozději tolik minut před začátkem prvního termínu
   changeDeadlineMinutes    Int     @default(1440)
   maxRegistrationsPerEmail Int     @default(1)
+  // Plný termín nabídne zápis na čekací listinu (stav WAITLIST nedrží místo; po uvolnění místa se nejstarší čekající posune)
+  waitlistEnabled          Boolean @default(false)
 
   confirmChannel   EventConfirmChannel @default(EMAIL_AND_SCREEN)
   confirmationText String?
