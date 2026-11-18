@@ -57,6 +57,11 @@ test("rozložení: nic se nepřekrývá ani nepřetéká (student, učitel, admi
   sql(`insert into "EventItem"(id,"eventId",label,note,"order") values ('itA3','evA','Individuální termín','Po domluvě s organizátorem',2)`);
   sql(`insert into "EventField"(id,"eventId",key,type,label,mode,options,"order",builtin) values ('efA1','evA','custom_1','SELECT','Oblíbený předmět','REQUIRED',ARRAY['Matematika','Fyzika'],10,false)`);
   sql(`insert into "EventAudience"(id,"eventId",type,grade,key,"createdAt") values ('eaA','evA','GRADE',3,'GRADE:3',now())`);
+  // U11: registrace u první události (doprovod, poznámka, termín bez času, plný termín, neodeslané potvrzení) pro záložku Registrace
+  for (const [i, [id, email, name, guests, item]] of ([["rgA1", "jana@example.com", "Jana Nováková", 2, "itA1"], ["rgA2", "petr.dlouhe.jmeno@example.com", "Petr s velmi dlouhým příjmením Novotný-Svobodovský", 0, "itA2"], ["rgA3", "eva@example.com", "Eva Malá", 1, "itA3"]] as const).entries()) {
+    sql(`insert into "EventRegistration"(id,"eventId",email,name,guests,answers,status,"tokenHash",code,"consentAt","confirmEmailFailed","updatedAt") values ('${id}','evA','${email}','${name}',${guests},'{"phone":"+420 123 456 789","note":"Poznámka k registraci, která je trochu delší, aby se ověřilo zalamování textu v tabulce i na kartě.","custom_1":"Fyzika"}'::jsonb,'CONFIRMED','${createHash("sha256").update(`layout-${id}`).digest("hex")}','BBB-${i + 2}222',now(),${i === 1},now())`);
+    sql(`insert into "EventRegistrationItem"("registrationId","itemId") values ('${id}','${item}')`);
+  }
   // U7: veřejná událost s termíny (jeden plný, doprovod, vlastní pole)
   sql(
     `insert into "Event"(id,slug,title,subtitle,place,contact,status,visibility,"maxItemsPerRegistration","allowGuests","maxGuests","createdById","updatedAt") values ('evC','verejna','Konzultace pro uchazeče','Individuální schůzka','Budova A','info@skola.cz','PUBLISHED','PUBLIC',2,true,2,'usr_teacher',now())`
@@ -68,12 +73,12 @@ test("rozložení: nic se nepřekrývá ani nepřetéká (student, učitel, admi
   sql(`insert into "EventField"(id,"eventId",key,type,label,mode,options,"order",builtin) values ('efC1','evC','custom_1','SELECT','Oblíbený předmět','REQUIRED',ARRAY['Matematika','Fyzika'],10,false)`);
   const pages: Record<string, string[]> = {
     "jan.student@skola.cz": ["/zapisy/enr_ls_2025", "/makeup", "/profile"],
-    "teacher@skola.cz": ["/dashboard", "/enrollments", "/enrollments/enr_ls_2025", "/makeup", "/makeup/sessions/mA", "/events", "/events/new", "/events/evA", "/events/evA?tab=items", "/events/evA?tab=form", "/subjects/mine", "/users", "/profile"],
+    "teacher@skola.cz": ["/dashboard", "/enrollments", "/enrollments/enr_ls_2025", "/makeup", "/makeup/sessions/mA", "/events", "/events/new", "/events/evA", "/events/evA?tab=items", "/events/evA?tab=form", "/events/evA?tab=registrations", "/subjects/mine", "/users", "/profile"],
     "admin@skola.cz": [
       "/dashboard", "/admin", "/enrollments/enr_ls_2025", "/users", "/subjects", "/makeup",
       // F15: zbytek aplikace
       "/subjects/sm", "/users/usr_stud1", "/users?tab=approvals", "/enrollments", "/enrollments/settings", "/makeup/settings", "/profile",
-      "/admin/school-year", "/admin/registration", "/admin/modules", "/admin/notifications", "/admin/history", "/admin/diagnostics", "/admin/demo", "/ochrana-udaju", "/events", "/events/new", "/events/evA", "/events/evA?tab=items", "/events/evA?tab=form", "/events/settings",
+      "/admin/school-year", "/admin/registration", "/admin/modules", "/admin/notifications", "/admin/history", "/admin/diagnostics", "/admin/demo", "/ochrana-udaju", "/events", "/events/new", "/events/evA", "/events/evA?tab=items", "/events/evA?tab=form", "/events/evA?tab=registrations", "/events/settings",
     ],
   };
   for (const [vname, viewport] of Object.entries(VIEWPORTS)) {

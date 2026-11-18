@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { TabLinks } from "@/components/tab-links";
-import { requirePagePermission } from "@/lib/session";
+import { isImpersonating, requirePagePermission } from "@/lib/session";
 import { loadEvent, loadEventFields, loadEventItems, listTeachers } from "@/modules/events/data";
+import { RegistrationsTab } from "@/modules/events/components/RegistrationsTab";
+import { loadRegistrations } from "@/modules/events/registrations-data";
 import { CopyLinkButton } from "@/modules/events/components/CopyLinkButton";
 import { EventSettingsForm } from "@/modules/events/components/EventSettingsForm";
 import { EventFormTab } from "@/modules/events/components/EventFormTab";
@@ -16,10 +18,6 @@ const TABS = [
   { id: "form", label: "Formulář" },
   { id: "registrations", label: "Registrace" },
 ];
-
-const PLACEHOLDERS: Record<string, string> = {
-  registrations: "Seznam registrací přibude v další verzi.",
-};
 
 export default async function EventDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const [{ id }, { tab }] = await Promise.all([params, searchParams]);
@@ -74,9 +72,7 @@ export default async function EventDetailPage({ params, searchParams }: { params
           readOnly={event.status === "ARCHIVED"}
         />
       ) : (
-        <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground" data-testid="tab-placeholder">
-          {PLACEHOLDERS[activeTab]}
-        </div>
+        <RegistrationsTab data={(await loadRegistrations(user, event.id))!} readOnly={event.status === "ARCHIVED" || (await isImpersonating())} />
       )}
     </div>
   );
