@@ -8,7 +8,7 @@ const check = (name: string, ok: boolean, extra = "") => expect.soft(ok, `${name
 const auditCount = (where: string) => Number(sql(`select count(*) from "AuditLog" where ${where}`));
 
 // Menu je ve skupinách (F13): Přehled, Škola, Moduly (sekce modulů, pak zapnutí modulů), Provoz
-const NAV = ["Přehled", "Školní rok a třídy", "Registrace a přihlášení", "Semináře", "Dopisování", "Moduly", "Upozornění", "Historie", "Diagnostika", "Ukázková data"];
+const NAV = ["Přehled", "Školní rok a třídy", "Registrace a přihlášení", "Semináře", "Dopisování", "Události", "Moduly", "Upozornění", "Historie", "Diagnostika", "Ukázková data"];
 
 test("administrace: boční menu s oddíly, staré adresy fungují, na mobilu je výběr", async ({ browser }) => {
   resetDb();
@@ -30,6 +30,7 @@ test("administrace: boční menu s oddíly, staré adresy fungují, na mobilu je
     ["Ukázková data", "/admin/demo", /Ukázková data/],
     ["Semináře", "/enrollments/settings", /Semináře/],
     ["Dopisování", "/makeup/settings", /Dopisování/],
+    ["Události", "/events/settings", /Události/],
   ];
   for (const [label, url, heading] of targets) {
     await pa.getByTestId("admin-nav").getByRole("link", { name: label, exact: true }).click();

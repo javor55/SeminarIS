@@ -49,6 +49,9 @@ modules/
     notifications.ts    e-maily modulu (zápis otevřen, připomínka nezapsaným) a jeho denní úloha
     demo-data.ts        ukázková data modulu (zápisová okna, bloky, výskyty, zápisy)
     subject-windows.ts  „v zápisu“: ve kterých oknech je předmět nabízen (podklad pro štítky předmětů)
+  events/               události: registrace veřejnosti na akce (zatím kostra – U2; plán v Dokumentace/zadani/2026-11-udalosti-plan.md)
+    manifest.ts, server.tsx (onUserDelete), access.ts (canManageEvent: admin, autor, spoluorganizátor)
+    stránky: app/events (seznam, nastavení modulu /events/settings); veřejná část app/akce přibude v U7
   makeup/               dopisování písemek (termíny, zápisy, docházka)
     manifest.ts, server.tsx, data.ts (interní dotazy), types.ts, notifications.ts (e-maily a denní úloha), demo-data.ts (ukázková data)
     dashboard-cards.tsx karty dashboardu: student (moje zápisy, volné termíny), učitel (dozory, kdo u mě dopisuje), admin (dnes a zítra)
@@ -712,8 +715,8 @@ i Dopisování), `getAdminTodos` (jádro, Semináře, Dopisování), `getAdminSt
 ESLint (`no-restricted-imports` v `.eslintrc.json`, chyba při `npm run lint`):
 
 - `modules/core/**`, `lib/**`, `components/**` a stránky jádra (`app/**` kromě složek modulů)
-  nesmějí importovat `@/modules/seminars/**` ani `@/modules/makeup/**`,
-- `modules/seminars/**` (a `app/enrollments/**`, `app/zapisy/**`) nesmí importovat `modules/makeup` a naopak,
+  nesmějí importovat `@/modules/seminars/**`, `@/modules/makeup/**` ani `@/modules/events/**`,
+- moduly (`modules/seminars/**` + `app/enrollments/**`, `app/zapisy/**`; `modules/makeup/**`; `modules/events/**` + `app/events/**`, `app/akce/**`) se navzájem neimportují,
 - jediná výjimka: `modules/registry.ts` a `modules/server-registry.ts`.
 
 Co moduly sdílejí, patří do jádra; co jádro potřebuje od modulů, jde přes body rozšíření.
@@ -1166,3 +1169,11 @@ dialog `components/import/ImportDialog.tsx`):
 - **Předměty** (`core.subjects.edit`; Předměty): `nazev;kod;rocniky` (`1,2,3`, `2-4`, prázdné = všechny), klíč
   zkratka, jinak název; volba „Aktualizovat existující“ (název, ročníky).
 - Vzorové soubory (`lib/import-samples.ts`) se stahují z dialogu. E2E: `e2e/16-imports.spec.ts`.
+
+## Bezpečné HTML (`lib/html.ts`)
+
+`sanitizeRichHtml(html)` (knihovna `sanitize-html`) ponechá jen tagy `p, br, strong, b, em, i, u, s, h2–h4, ul, ol, li,
+blockquote, a, img, hr, span`; odkazy jen `http(s)`, `mailto`, `tel` s vynuceným `rel="noopener noreferrer"`, obrázky jen
+z `/api/…` nebo `https:`. Používá se u sylabu předmětu (při uložení i zobrazení), později u popisu událostí.
+Test bez DB: `npm run test:html` (CI). Veřejná stránka `/ochrana-udaju` bere text z nastavení `privacy.text` a `privacy.controller`
+(Administrace → Registrace a přihlášení) a nevyžaduje přihlášení.

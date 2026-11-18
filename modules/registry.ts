@@ -3,13 +3,14 @@ import type { NavItem } from "@/modules/types";
 import { coreModule } from "@/modules/core/manifest";
 import { seminarsModule } from "@/modules/seminars/manifest";
 import { makeupModule } from "@/modules/makeup/manifest";
+import { eventsModule } from "@/modules/events/manifest";
 
 /**
  * Registr modulů. Nový modul = nová složka v `modules/` s `manifest.ts`
  * (a případně `server.ts`) + přidání sem a do `modules/server-registry.ts`.
  * Soubor je bez závislostí na DB, používá ho i middleware a klient.
  */
-export const MODULES = [coreModule, seminarsModule, makeupModule] as const;
+export const MODULES = [coreModule, seminarsModule, makeupModule, eventsModule] as const;
 
 type AnyModule = (typeof MODULES)[number];
 export type ModuleId = AnyModule["id"];

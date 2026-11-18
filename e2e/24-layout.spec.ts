@@ -41,12 +41,12 @@ test("rozložení: nic se nepřekrývá ani nepřetéká (student, učitel, admi
   sql(`insert into "MakeupSessionSubject" values ('mA','sm'),('mA','scj')`);
   const pages: Record<string, string[]> = {
     "jan.student@skola.cz": ["/zapisy/enr_ls_2025", "/makeup", "/profile"],
-    "teacher@skola.cz": ["/dashboard", "/enrollments", "/enrollments/enr_ls_2025", "/makeup", "/makeup/sessions/mA", "/subjects/mine", "/users", "/profile"],
+    "teacher@skola.cz": ["/dashboard", "/enrollments", "/enrollments/enr_ls_2025", "/makeup", "/makeup/sessions/mA", "/events", "/subjects/mine", "/users", "/profile"],
     "admin@skola.cz": [
       "/dashboard", "/admin", "/enrollments/enr_ls_2025", "/users", "/subjects", "/makeup",
       // F15: zbytek aplikace
       "/subjects/sm", "/users/usr_stud1", "/users?tab=approvals", "/enrollments", "/enrollments/settings", "/makeup/settings", "/profile",
-      "/admin/school-year", "/admin/registration", "/admin/modules", "/admin/notifications", "/admin/history", "/admin/diagnostics", "/admin/demo", "/ochrana-udaju",
+      "/admin/school-year", "/admin/registration", "/admin/modules", "/admin/notifications", "/admin/history", "/admin/diagnostics", "/admin/demo", "/ochrana-udaju", "/events", "/events/settings",
     ],
   };
   for (const [vname, viewport] of Object.entries(VIEWPORTS)) {
