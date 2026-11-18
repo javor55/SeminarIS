@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@/components/auth/auth-provider";
+import { isLocalPath, useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,9 +25,12 @@ type LoginFormProps = {
   // Heslo jen pro některé role (když je M365 zapnuté) – jen informační text
   passwordNote?: string | null;
   errorCode?: string | null;
+  // Kam se vrátit po přihlášení (vnitřní adresa)
+  next?: string | null;
 };
 
-export function LoginForm({ microsoftEnabled, passwordNote, errorCode }: LoginFormProps) {
+export function LoginForm({ microsoftEnabled, passwordNote, errorCode, next }: LoginFormProps) {
+  const returnTo = next && isLocalPath(next) ? next : null;
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,7 +44,7 @@ export function LoginForm({ microsoftEnabled, passwordNote, errorCode }: LoginFo
     setError(null);
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, returnTo);
     } catch (err: unknown) {
       const error = err as Error;
       setError(error.message ?? "Nepodařilo se přihlásit.");
@@ -69,7 +72,7 @@ export function LoginForm({ microsoftEnabled, passwordNote, errorCode }: LoginFo
               variant="outline"
               className="w-full gap-2"
               data-testid="microsoft-login"
-              onClick={() => signIn("azure-ad", { callbackUrl: "/" })}
+              onClick={() => signIn("azure-ad", { callbackUrl: returnTo ?? "/" })}
             >
               {/* Logo Microsoftu (4 čtverce) */}
               <svg width="16" height="16" viewBox="0 0 21 21" aria-hidden="true">

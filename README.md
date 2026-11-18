@@ -48,7 +48,7 @@ Systém primárně navrhuje čtyři přístupové úrovně chráněné autentiza
 - **Pravidla bloků:** Výskyty předmětů jsou členěny do bloků. V rámci jednoho bloku může mít student **nejvýše jeden aktivní zápis** a stejný předmět (podle kódu) se nesmí vyskytovat na seznamu zapsaných předmětů jednoho studenta dvakrát na daném okně.
 - **Časová synchronizace:** Zápisová okna určuje přesný časový start i konec; stav (`SCHEDULED` → `OPEN` → `CLOSED`) přeskakuje podle reálného běhu času na serveru aplikaci automaticky, kde klient na to nemá vliv.
 - **Hromadné zpracování:** Import uživatelů (CSV/JSON), pro přidání celých tříd najednou a zpřístupnění exportů nad datovými sadami.
-- **Sledování výkonu & analytika:** O monitorování výkonu systému se stará Vercel Analytics spolu se Speed Insights, je integrován Google Analytics 4 a provádí i vlastní diagnostiku uvnitř platformy.
+- **Sledování výkonu & analytika:** O monitorování výkonu systému se stará Vercel Analytics spolu se Speed Insights, provádí i vlastní diagnostiku uvnitř platformy.
 
 ---
 
@@ -269,7 +269,6 @@ Výběr technologií vychází z požadavků na moderní server-side architektur
 | **@prisma/client** | ^6.19.0 | Runtime klient pro PostgreSQL, používán jako singleton v `lib/prisma.ts` |
 | **next-auth** | ^4.24.13 | Autentizace – Credentials Provider, JWT session, `withAuth` middleware |
 | **bcryptjs** | ^3.0.3 | Hashování hesel (10 rund salt), ověřování přes `bcrypt.compare` |
-| **@next/third-parties** | ^16.2.3 | Oficiální Google Analytics 4 integrace (`GoogleAnalytics` komponenta) |
 | **@vercel/analytics** | ^2.0.1 | Vercel Analytics – návštěvnost platformy |
 | **@vercel/speed-insights** | ^2.0.0 | Vercel Speed Insights – Core Web Vitals |
 | **@tanstack/react-table** | ^8.21.3 | Datové tabulky pro přehledy zápisů a uživatelů |
@@ -335,7 +334,6 @@ Tím je zajištěno, že i přímé volání Server Action (např. z jiného kli
 |-------|-------------|----------|
 | **Databáze** | PostgreSQL (Prisma Postgres / Data Platform) | Vzdálená managed instance, konfigurovaná přes `DATABASE_URL` |
 | **Hosting** | Vercel | Serverless produkční nasazení Next.js |
-| **Analytika návštěvnosti** | Google Analytics 4 | ID přes proměnnou `NEXT_PUBLIC_GA_ID` |
 | **Platformní analytika** | Vercel Analytics | Integrováno přes `<Analytics />` v root layoutu |
 | **Performance** | Vercel Speed Insights | Core Web Vitals v produkci |
 | **CI/CD** | Vercel Git Integration | Automatický deploy při push do hlavní větve |
@@ -661,16 +659,12 @@ Tabulky s testovacími scénáři jsou primárně určeny pro finálního tester
 
 ## 8. Monitoring
 
-Aplikace využívá čtyři vrstvy monitoringu, které jsou smysluplně rozděleny na dvě hlavní oblasti: sledování návštěvnosti a sledování výkonu (performance). Všechny externí nástroje jsou napojené přímo do root layoutu platformy ([app/layout.tsx](../app/layout.tsx)).
+Aplikace využívá vrstvy monitoringu, které jsou smysluplně rozděleny na dvě hlavní oblasti: sledování návštěvnosti a sledování výkonu (performance). Všechny externí nástroje jsou napojené přímo do root layoutu platformy ([app/layout.tsx](../app/layout.tsx)).
 
 ### 8.1 Sledování návštěvnosti
 
 Tato sekce se zaměřuje na analytiku toho, jak uživatelé celkově pracují se systémem a z jakých zdrojů přicházejí. Vzhledem k tomu, že projekt běží pouze v raném testovacím nasazení a pro limitovaný počet testujících uživatelů, je ze statistiky návštěvnosti v této chvíli zatím nemožné vyčíst jakékoliv hlubší nebo smysluplné trendy.
 
-*   **Google Analytics 4**
-    *   **Integrace:** Využita moderní Next.js komponenta `GoogleAnalytics` z balíčku `@next/third-parties/google`.
-    *   **Konfigurace:** Identifikátor je udržován skrytě přes proměnnou prostředí `NEXT_PUBLIC_GA_ID`.
-    *   **Účel:** Detailní logování stránek, analýza chování klientů a celková uživatelská aktivita.
 *   **Vercel Analytics**
     *   **Integrace:** Komponenta `<Analytics />` od stejnojmenného hostingu (`@vercel/analytics/next`).
     *   **Účel:** Sledování unikátních návštěv u verze nasazené přímo přes infrastrukturu Vercelu.
@@ -741,7 +735,7 @@ Výsledkem je funkční systém, který umožňuje pohodlný online zápis, spr�
 - Hromadný import uživatelů z CSV/JSON s rozlišováním create/update podle e-mailu
 - Matice zápisů a detailní přehledy pro administrátory (`getEnrollmentMatrixData`, `getEnrollmentDetails`)
 - Self-modification protection v admin operacích (nelze změnit roli ani deaktivovat sám sebe)
-- Vícevrstvý monitoring (GA4, Vercel Analytics, Speed Insights, vlastní benchmark na admin stránce)
+- Vícevrstvý monitoring (Vercel Analytics, Speed Insights, vlastní benchmark na admin stránce)
 - Rich text editor pro syllabus předmětů (Tiptap)
 - Responzivní UI s podporou tmavého režimu (shadcn/ui, Tailwind CSS)
 
@@ -772,7 +766,6 @@ Na základě provedeného testování lze konstatovat, že hlavní cíle projekt
 | TanStack Table | https://tanstack.com/table/latest/docs/introduction |
 | Vercel Analytics | https://vercel.com/docs/analytics |
 | Vercel Speed Insights | https://vercel.com/docs/speed-insights |
-| Google Analytics 4 | https://developers.google.com/analytics |
 | bcryptjs | https://www.npmjs.com/package/bcryptjs |
 | date-fns | https://date-fns.org/docs/Getting-Started |
 | Radix UI | https://www.radix-ui.com/primitives/docs/overview/introduction |

@@ -51,7 +51,7 @@ modules/
     subject-windows.ts  „v zápisu“: ve kterých oknech je předmět nabízen (podklad pro štítky předmětů)
   events/               události: registrace veřejnosti na akce (zatím kostra – U2; plán v Dokumentace/zadani/2026-11-udalosti-plan.md)
     manifest.ts, server.tsx (onUserDelete), access.ts (canManageEvent: admin, autor, spoluorganizátor)
-    stránky: app/events (seznam, nastavení modulu /events/settings); veřejná část app/akce přibude v U7
+    stránky: app/events (seznam, nastavení modulu /events/settings); veřejná stránka události app/akce/[slug] (U7)
   makeup/               dopisování písemek (termíny, zápisy, docházka)
     manifest.ts, server.tsx, data.ts (interní dotazy), types.ts, notifications.ts (e-maily a denní úloha), demo-data.ts (ukázková data)
     dashboard-cards.tsx karty dashboardu: student (moje zápisy, volné termíny), učitel (dozory, kdo u mě dopisuje), admin (dnes a zítra)
@@ -1177,3 +1177,24 @@ blockquote, a, img, hr, span`; odkazy jen `http(s)`, `mailto`, `tel` s vynucený
 z `/api/…` nebo `https:`. Používá se u sylabu předmětu (při uložení i zobrazení), později u popisu událostí.
 Test bez DB: `npm run test:html` (CI). Veřejná stránka `/ochrana-udaju` bere text z nastavení `privacy.text` a `privacy.controller`
 (Administrace → Registrace a přihlášení) a nevyžaduje přihlášení.
+
+## Veřejná stránka události a ochrana proti robotům (U7, U8)
+
+- **`/akce/[slug]`** (`app/akce`): veřejná, bez přihlášení (výjimka `akce` v `middleware.ts`), `noindex`, Open Graph (název,
+  podtitulek, obrázek). `AppShell` na `/akce/*` nevykreslí navigaci aplikace (`BARE_PREFIXES`), stránka má vlastní hlavičku
+  (název aplikace) a patičku s odkazem na `/ochrana-udaju`. Stav bloku registrace: `registrationPhase` v
+  `modules/events/public-state.ts` (koncept = jen organizátor s `?nahled=1`, před otevřením, otevřeno, skončila).
+  Volná místa se počítají včetně doprovodu (`1 + guests` registrací PENDING a CONFIRMED, `loadTakenByItem`).
+  Termíny jsou kompaktní řádky (čas + volno vlevo, Vybrat vpravo; při více termínech zaškrtávátka; plné dole, zašedlé).
+  Formulář `PublicRegistration` ověřuje na klientu `validateAnswers`; odeslání je až U9.
+- **Kdo se smí registrovat:** `Event.audienceRoles` (výchozí studenti) a čistá funkce `canUserRegister`
+  (`modules/events/audience-roles.ts`); publikum (ročníky, třídy, jmenovitě) zužuje jen studenty, učitelé a admini smějí vždy,
+  host nikdy. Přihlášení s návratem: `/login?next=/akce/<slug>` (jen vnitřní adresy, `isLocalPath`).
+- **Ochrana proti robotům** (`lib/antibot-core.ts` čistá část, `lib/antibot.ts` s DB): proof-of-work kompatibilní s ALTCHA
+  (`createChallenge`, `verifySolution` s jednorázovou spotřebou přes `EventRateLimit` `pow:<hash>`), tajný klíč
+  `SystemSetting` `antibot.key` (vznikne při prvním použití), `checkRateLimit` (pevná okna), podepsaný čas zobrazení
+  formuláře (`createRenderToken`, min. 3 s), honeypot `website` a společná `checkSubmission` pro U9 (`honeypot` = falešný
+  úspěch). `GET /api/antibot/challenge`, klientská komponenta `components/antibot-field.tsx` (Web Worker, SHA-256 přes
+  `crypto.subtle`; výpočet řádově stovky ms, nejhorší případ 100 000 pokusů do ~0,5 s). `ANTIBOT_TEST_MODE=1` (E2E a CI, ne
+  v ostrém provozu) přijme řešení `test`. Testy: `scripts/antibot-test.ts` (v `test:events`), `scripts/antibot-db-test.ts`
+  (pouští E2E `37`).

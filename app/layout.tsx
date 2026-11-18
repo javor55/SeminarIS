@@ -5,7 +5,6 @@ import { AuthProvider } from "@/components/auth/auth-provider";
 import { AppShell } from "@/components/app-shell";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
-import { GoogleAnalytics } from "@next/third-parties/google";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/app-config";
 import { getCurrentUser } from "@/lib/session";
 import { getStudentNav, type StudentNav } from "@/modules/core/student-nav";
@@ -39,7 +38,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <SpeedInsights />
         <Analytics />
       </body>
-      <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID as string} />
     </html>
   );
 }

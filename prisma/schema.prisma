@@ -638,6 +638,8 @@ model Event {
 
   status     EventStatus     @default(DRAFT)
   visibility EventVisibility @default(PUBLIC)
+  // Role, které se smějí registrovat u viditelnosti USERS. Publikum (ročníky, třídy, jmenovitě) zužuje jen studenty.
+  audienceRoles Role[]       @default([STUDENT])
 
   registrationOpensAt  DateTime?
   registrationClosesAt DateTime?

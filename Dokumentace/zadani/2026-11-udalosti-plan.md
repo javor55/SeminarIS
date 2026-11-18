@@ -20,12 +20,12 @@ Vlna A – základ (bez veřejné části):
 - [x] U4 Obrázky (nahrání, ořez, uložení v DB) a popis v editoru (PR #23)
 
 Vlna B – termíny a formulář:
-- [x] U5 Termíny (položky), generátor, pravidla registrace
-- [x] U6 Formulář účastníka (pevná a vlastní pole)
+- [x] U5 Termíny (položky), generátor, pravidla registrace (PR #24)
+- [x] U6 Formulář účastníka (pevná a vlastní pole) (PR #24)
 
 Vlna C – veřejná registrace:
-- [ ] U7 Veřejná stránka události (zobrazení, bez odeslání)
-- [ ] U8 Ochrana proti robotům (proof-of-work, honeypot, limity)
+- [x] U7 Veřejná stránka události (zobrazení, bez odeslání)
+- [x] U8 Ochrana proti robotům (proof-of-work, honeypot, limity)
 - [ ] U9 Odeslání registrace, potvrzení na obrazovce a e-mailem
 
 Vlna D – po registraci:
@@ -305,6 +305,12 @@ upravit a zrušit. E2E pokryje generátor, úpravu i zrušení.
 5. **Viditelnost USERS:** nepřihlášený uvidí „Registrace je jen pro přihlášené“ a tlačítko
    Přihlásit (s návratem zpět). Přihlášenému mimo publikum se zobrazí „Tato událost pro vás
    není určena“. Přihlášenému se předvyplní jméno a e-mail.
+   - **Role (rozhodnutí majitele):** událost `USERS` může být pro libovolné role. `Event.audienceRoles Role[]`
+     (výchozí `[STUDENT]`, migrace `events_audience_roles`); v Nastavení zaškrtávátka Studenti / Učitelé /
+     Administrátoři. Výběr ročníků, tříd a jmenovitě (vynechaní) se ukáže jen při zaškrtnutých Studentech
+     a zužuje jen studenty; učitelé a admini, jsou-li zaškrtnutí, smějí vždy. Host (neschválený účet) nikdy.
+     Rozhoduje čistá funkce `canUserRegister` (`modules/events/audience-roles.ts`, test v `test:events`);
+     stejnou použije serverová akce v U9.
 
 **Hotovo když:** stránka funguje bez přihlášení na telefonu i počítači a nepřetéká. Na stavy
 DRAFT / před otevřením / otevřeno / uzavřeno a viditelnost USERS je E2E.
@@ -346,6 +352,11 @@ DRAFT / před otevřením / otevřeno / uzavřeno a viditelnost USERS je E2E.
 (ověř Playwrightem bez test módu).
 
 ## U9 Odeslání registrace, potvrzení na obrazovce a e-mailem
+**Poznámky z U7/U8 (pro U9):** (a) odeslání volá `checkSubmission` z `lib/antibot.ts` (`solution` = pole `altcha`,
+`honeypot` = pole `website`, `renderToken` = pole `renderToken`; výsledek `honeypot` = falešný úspěch bez zápisu); (b) kontrola
+„smí se registrovat“ = `canUserRegister` (`modules/events/audience-roles.ts`) + `loadStudentAudienceInfo` (`public-data.ts`);
+(c) obsazenost včetně doprovodu: `loadTakenByItem` (uvnitř transakce počítej znovu); (d) `PublicRegistration` po validaci jen
+zobrazí `submit-pending`, tam napoj odeslání; (e) limity: `checkRateLimit(key, limit, windowSeconds, tx)`.
 **Poznámky z U6 (zapracovat):** (a) ověř povinný souhlas na serveru (`validateAnswers` ho zatím
 nekontroluje); (b) pevné pole „Jméno“ může být skryté – registrace i přehledy musí fungovat bez jména
 (zobrazit e-mail); (c) klíč vlastního pole `custom_<n>` se po smazání může znovu použít – jakmile má pole

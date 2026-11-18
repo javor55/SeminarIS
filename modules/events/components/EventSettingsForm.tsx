@@ -21,6 +21,7 @@ import { ConfirmAction } from "@/modules/core/components/users/ConfirmAction";
 import { createEvent, deleteEvent, updateEvent } from "@/modules/events/actions/events";
 import { getEventAudienceOptions, previewEventAudience, searchEventAudienceStudents } from "@/modules/events/actions/audience";
 import { CONFIRM_CHANNELS, type EventConfirmChannelValue, type EventVisibilityValue } from "@/modules/events/settings";
+import { AUDIENCE_ROLES, DEFAULT_AUDIENCE_ROLES, type AudienceRole } from "@/modules/events/audience-roles";
 import { looksRandomSlug } from "@/modules/events/slug";
 
 const AUDIENCE_API: AudiencePickerApi = { getOptions: getEventAudienceOptions, searchStudents: searchEventAudienceStudents, preview: previewEventAudience };
@@ -34,6 +35,7 @@ export type EventSettingsValues = {
   place: string;
   contact: string;
   visibility: EventVisibilityValue;
+  audienceRoles: AudienceRole[];
   registrationOpensAt: string | null;
   registrationClosesAt: string | null;
   maxItemsPerRegistration: number;
@@ -60,6 +62,7 @@ export const NEW_EVENT_VALUES: EventSettingsValues = {
   place: "",
   contact: "",
   visibility: "PUBLIC",
+  audienceRoles: DEFAULT_AUDIENCE_ROLES,
   registrationOpensAt: null,
   registrationClosesAt: null,
   maxItemsPerRegistration: 1,
@@ -153,6 +156,7 @@ export function EventSettingsForm({ values, teachers, canDelete }: { values: Eve
         registrationOpensAt: v.registrationOpensAt,
         registrationClosesAt: v.registrationClosesAt,
         visibility: v.visibility,
+        audienceRoles: v.audienceRoles,
         audience: v.audience.draft,
         maxItemsPerRegistration: Number(v.maxItemsPerRegistration),
         allowGuests: v.allowGuests,
@@ -273,16 +277,35 @@ export function EventSettingsForm({ values, teachers, canDelete }: { values: Eve
           </NativeSelect>
         </Field>
         {v.visibility === "USERS" && (
-          <AudiencePickerBase
-            value={v.audience}
-            onChange={(audience) => set({ audience })}
-            api={AUDIENCE_API}
-            texts={{
-              title: "Publikum události (komu je určena)",
-              description: "Událost uvidí přihlášení studenti z vybraných ročníků, tříd a konkrétní studenti, kromě vynechaných. Nevybráno nic = všichni aktivní studenti. Jméno a e-mail se jim předvyplní z účtu.",
-              countText: (n) => (n === 0 ? "Událost se nikoho netýká." : `Událost je určena ${n} ${n === 1 ? "studentovi" : "studentům"}.`),
-            }}
-          />
+          <div className="space-y-4">
+            <fieldset className="space-y-2" data-testid="audience-roles">
+              <legend className="text-sm font-medium">Kdo se může registrovat</legend>
+              <div className="flex flex-wrap gap-x-6 gap-y-2">
+                {AUDIENCE_ROLES.map((r) => (
+                  <Checkbox
+                    key={r.value}
+                    checked={v.audienceRoles.includes(r.value)}
+                    onChange={(e) => set({ audienceRoles: e.target.checked ? [...v.audienceRoles, r.value] : v.audienceRoles.filter((x) => x !== r.value) })}
+                    label={r.label}
+                    data-testid={`role-${r.value}`}
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Přihlášení uživatelé zaškrtnutých rolí. Neschválené účty (hosté) se registrovat nemohou. Jméno a e-mail se jim předvyplní z účtu.</p>
+            </fieldset>
+            {v.audienceRoles.includes("STUDENT") && (
+              <AudiencePickerBase
+                value={v.audience}
+                onChange={(audience) => set({ audience })}
+                api={AUDIENCE_API}
+                texts={{
+                  title: "Zúžení studentů (ročníky, třídy, jmenovitě)",
+                  description: "Zúží jen studenty: smějí se registrovat studenti z vybraných ročníků, tříd a konkrétní studenti, kromě vynechaných. Nevybráno nic = všichni aktivní studenti. Učitelé a administrátoři, jsou-li zaškrtnutí, se mohou registrovat vždy.",
+                  countText: (n) => (n === 0 ? "Událost se žádného studenta netýká." : `Událost je určena ${n} ${n === 1 ? "studentovi" : "studentům"}.`),
+                }}
+              />
+            )}
+          </div>
         )}
       </Section>
 

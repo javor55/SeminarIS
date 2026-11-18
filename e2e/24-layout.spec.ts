@@ -56,6 +56,14 @@ test("rozložení: nic se nepřekrývá ani nepřetéká (student, učitel, admi
   sql(`insert into "EventItem"(id,"eventId",label,note,"order") values ('itA3','evA','Individuální termín','Po domluvě s organizátorem',2)`);
   sql(`insert into "EventField"(id,"eventId",key,type,label,mode,options,"order",builtin) values ('efA1','evA','custom_1','SELECT','Oblíbený předmět','REQUIRED',ARRAY['Matematika','Fyzika'],10,false)`);
   sql(`insert into "EventAudience"(id,"eventId",type,grade,key,"createdAt") values ('eaA','evA','GRADE',3,'GRADE:3',now())`);
+  // U7: veřejná událost s termíny (jeden plný, doprovod, vlastní pole)
+  sql(
+    `insert into "Event"(id,slug,title,subtitle,place,contact,status,visibility,"maxItemsPerRegistration","allowGuests","maxGuests","createdById","updatedAt") values ('evC','verejna','Konzultace pro uchazeče','Individuální schůzka','Budova A','info@skola.cz','PUBLISHED','PUBLIC',2,true,2,'usr_teacher',now())`
+  );
+  sql(`insert into "EventItem"(id,"eventId","startsAt","endsAt",capacity,"order") values ('itC1','evC',now()+interval '5 days',now()+interval '5 days 30 min',1,0),('itC2','evC',now()+interval '5 days 30 min',now()+interval '5 days 1 hour',20,1)`);
+  sql(`insert into "EventRegistration"(id,"eventId",email,status,"tokenHash",code,"consentAt","updatedAt") values ('rgC','evC','a@b.cz','CONFIRMED','hC','AAA-AAAA',now(),now())`);
+  sql(`insert into "EventRegistrationItem"("registrationId","itemId") values ('rgC','itC1')`);
+  sql(`insert into "EventField"(id,"eventId",key,type,label,mode,options,"order",builtin) values ('efC1','evC','custom_1','SELECT','Oblíbený předmět','REQUIRED',ARRAY['Matematika','Fyzika'],10,false)`);
   const pages: Record<string, string[]> = {
     "jan.student@skola.cz": ["/zapisy/enr_ls_2025", "/makeup", "/profile"],
     "teacher@skola.cz": ["/dashboard", "/enrollments", "/enrollments/enr_ls_2025", "/makeup", "/makeup/sessions/mA", "/events", "/events/new", "/events/evA", "/events/evA?tab=items", "/events/evA?tab=form", "/subjects/mine", "/users", "/profile"],
@@ -96,7 +104,7 @@ test("rozložení: přihlášení, registrace a dialogy (telefon i počítač)",
   for (const [vname, viewport] of Object.entries(VIEWPORTS)) {
     const anon = await browser.newContext({ viewport, hasTouch: vname === "phone" });
     const pa = await anon.newPage();
-    for (const url of ["/login", "/register", "/ochrana-udaju"]) {
+    for (const url of ["/login", "/register", "/ochrana-udaju", "/akce/den-otevrenych-dveri", "/akce/verejna"]) {
       await pa.goto(url);
       await pa.waitForLoadState("networkidle");
       const p = await problems(pa);

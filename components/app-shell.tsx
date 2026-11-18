@@ -2,6 +2,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";
 import { useAuth } from "@/components/auth/auth-provider";
 import { AppTopbar } from "@/components/app-topbar";
@@ -10,8 +11,20 @@ import { StudentBottomNav, StudentTopbar } from "@/components/student-nav";
 import { cn } from "@/lib/utils";
 import type { StudentNav } from "@/modules/core/student-nav";
 
+// Veřejné stránky mají vlastní jednoduchý layout bez navigace aplikace (např. registrace na události, /akce/…)
+const BARE_PREFIXES = ["/akce"];
+
 export function AppShell({ children, studentNav }: { children: ReactNode; studentNav: StudentNav | null }) {
   const { user, isLoading } = useAuth();
+  const pathname = usePathname();
+  if (BARE_PREFIXES.some((p) => pathname === p || pathname?.startsWith(`${p}/`))) {
+    return (
+      <>
+        {children}
+        <Toaster position="top-center" richColors closeButton />
+      </>
+    );
+  }
 
   // Student má zjednodušenou navigaci (F12). Server ji vypočítal pro přihlášeného studenta; po odhlášení nebo přihlášení
   // jiného uživatele bez znovunačtení layoutu ji klient nepoužije (session už je jiná).

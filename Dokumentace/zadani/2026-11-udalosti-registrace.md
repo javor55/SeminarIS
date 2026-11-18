@@ -195,10 +195,12 @@ Datový model je obecný. „Termín“ je **položka**, která *může* mít č
 8. **Cookies:** cookie lišta s potvrzováním **není potřeba**. Souhlas v EU (ePrivacy/GDPR) se vyžaduje
    jen pro nepovinné cookies (analytika, reklama). Aplikace používá:
    - jen nezbytné cookies (přihlášení, režim „zobrazit jako“);
-   - Vercel Analytics, které cookies nepoužívá;
+   - Vercel Analytics, které cookies nepoužívá (Google Analytics odstraněno, rozhodnutí 18. 11. 2026, cookie lišta tedy není potřeba);
    - písma, která jsou součástí aplikace.
 
    Potřeba je ale stránka **„Zpracování osobních údajů“** (kdo údaje zpracovává, k jakému účelu,
    jak dlouho a jaká má účastník práva). Odkaz na ni bude u souhlasu ve formuláři a v patičce
    veřejných stránek. **Pokud se později přidá cokoli, co cookies nebo sledování používá, lišta
    potřeba bude.**
+9. **Neveřejná událost** může být pro libovolné role podle nastavení (studenti s volitelným zúžením na
+   ročníky/třídy/jmenovitě, učitelé, administrátoři). Neschválený účet (host) se registrovat nemůže.

@@ -10,7 +10,7 @@ const PASSWORD_NOTES = {
   ADMIN: "Přihlášení heslem je určeno jen pro administrátory.",
 } as const;
 
-export default async function LoginPage({ searchParams }: { searchParams: { error?: string } }) {
+export default async function LoginPage({ searchParams }: { searchParams: { error?: string; next?: string } }) {
   const settings = await getAuthSettings();
   const microsoftEnabled = isMicrosoftActive(settings);
   return (
@@ -18,6 +18,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
       microsoftEnabled={microsoftEnabled}
       passwordNote={microsoftEnabled ? PASSWORD_NOTES[settings.passwordScope] : null}
       errorCode={searchParams.error ?? null}
+      next={searchParams.next ?? null}
     />
   );
 }
