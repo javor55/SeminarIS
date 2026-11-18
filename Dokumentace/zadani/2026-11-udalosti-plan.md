@@ -14,8 +14,8 @@ psané tak, aby je zvládl i levnější model: obsahují přesné soubory, krok
 
 ## Stav
 Vlna A – základ (bez veřejné části):
-- [ ] U1 Bezpečné HTML a stránka „Zpracování osobních údajů“
-- [ ] U2 Datový model a kostra modulu `events`
+- [x] U1 Bezpečné HTML a stránka „Zpracování osobních údajů“
+- [x] U2 Datový model a kostra modulu `events`
 - [ ] U3 Seznam událostí a základní nastavení události
 - [ ] U4 Obrázky (nahrání, ořez, uložení v DB) a popis v editoru
 
