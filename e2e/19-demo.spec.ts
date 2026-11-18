@@ -6,7 +6,7 @@ import { sql, resetDb, seedSubjects, login, toastText } from "./helpers";
 // učitel sekci nevidí; e-mailová vrstva přeskakuje adresy na .invalid.
 const check = (name: string, ok: boolean, extra = "") => expect.soft(ok, `${name} ${extra}`).toBe(true);
 
-const TABLES = ["User", "ClassGroup", "ClassMembership", "Subject", "TeachingAssignment", "EnrollmentWindow", "Block", "SubjectOccurrence", "StudentEnrollment", "MakeupSession", "MakeupRegistration", "SchoolYear", "DemoRecord"];
+const TABLES = ["User", "ClassGroup", "ClassMembership", "Subject", "TeachingAssignment", "EnrollmentWindow", "Block", "SubjectOccurrence", "StudentEnrollment", "MakeupSession", "MakeupRegistration", "SchoolYear", "Event", "EventItem", "EventRegistration", "EventImage", "DemoRecord"];
 const snapshot = () => Object.fromEntries(TABLES.map((t) => [t, Number(sql(`select count(*) from "${t}"`))]));
 const demoUsers = (role: string) => Number(sql(`select count(*) from "User" where role='${role}' and email like '%@ukazka.invalid'`));
 
@@ -61,6 +61,11 @@ test("ukázková data: naplnit, stránky rolí, smazat jen vlastní, znovu napln
   check("makeup sessions in the next two weeks plus one past with attendance", sql(`select count(*) from "MakeupSession" where id like 'demo-ms-%'`) === "11" && sql(`select count(*) from "MakeupSession" where id like 'demo-ms-%' and "startsAt" > now() and "startsAt" < now() + interval '17 days'`) === "10" && sql(`select count(*) from "MakeupSession" where id like 'demo-ms-%' and "endsAt" < now()`) === "1");
   check("past session has attendance", Number(sql(`select count(*) from "MakeupRegistration" r join "MakeupSession" s on s.id=r."sessionId" where s."endsAt" < now() and r.id like 'demo-mr-%' and r.attendance in ('ATTENDED','NO_SHOW')`)) >= 5);
   check("registrations with notes", Number(sql(`select count(*) from "MakeupRegistration" where id like 'demo-mr-%' and note is not null`)) > 5);
+  // U13: událost „Den otevřených dveří“ s obrázkem, 8 termíny, formulářem a 25 registracemi
+  check("demo event with image, 8 items, form and 25 registrations", sql(`select count(*) from "Event" where id='demo-ev-01' and title='Den otevřených dveří' and status='PUBLISHED' and "imageId"='demo-evimg-01'`) === "1" && sql(`select count(*) from "EventItem" where "eventId"='demo-ev-01'`) === "8" && sql(`select count(*) from "EventField" where "eventId"='demo-ev-01'`) === "7" && sql(`select count(*) from "EventRegistration" where "eventId"='demo-ev-01'`) === "25");
+  check("demo event image is a WebP", sql(`select mime||'|'||(size = octet_length(data))::text||'|'||encode(substring(data from 1 for 4), 'escape') from "EventImage" where id='demo-evimg-01'`) === "image/webp|true|RIFF");
+  check("demo registrations use .invalid addresses and respect capacity", sql(`select count(*) from "EventRegistration" where "eventId"='demo-ev-01' and email not like '%@ukazka.invalid'`) === "0" && sql(`select count(*) from (select i.id from "EventItem" i join "EventRegistrationItem" ri on ri."itemId"=i.id join "EventRegistration" r on r.id=ri."registrationId" where i."eventId"='demo-ev-01' and r.status<>'CANCELLED' group by i.id, i.capacity having sum(1+r.guests) > i.capacity) x`) === "0");
+  check("demo event evidence", sql(`select string_agg(model||':'||n, ',' order by model) from (select model, count(*) n from "DemoRecord" where model in ('Event','EventImage','EventRegistration') group by model) x`) === "Event:1,EventImage:1,EventRegistration:25");
   check("evidence covers all created records", sql(`select count(*) from "DemoRecord" where model='User'`) === "259" && sql(`select count(*) from "DemoRecord" where model='StudentEnrollment'`) === sql(`select count(*) from "StudentEnrollment" where id like 'demo-enr-%'`));
   check("no e-mails during seeding", sql(`select count(*) from "EmailLog"`) === "0");
   check("audit entry", sql(`select count(*) from "AuditLog" where action='system.demo.seed'`) === "1");
@@ -70,6 +75,7 @@ test("ukázková data: naplnit, stránky rolí, smazat jen vlastní, znovu napln
   check("UI counts students", (await pa.locator('[data-testid="demo-count-User.STUDENT"]').innerText()).includes("240"));
   check("UI counts guests", (await pa.locator('[data-testid="demo-count-User.GUEST"]').innerText()).includes("4"));
   check("UI lists module records", (await pa.locator('[data-testid="demo-count-MakeupSession"]').innerText()).includes("11"));
+  check("UI lists demo event records", (await pa.locator('[data-testid="demo-count-EventRegistration"]').innerText()).includes("25"));
 
   // druhé naplnění je zablokované (tlačítko i server)
   check("seed button disabled while data exist", await pa.locator('[data-testid="demo-seed-open"]').isDisabled());
@@ -138,6 +144,8 @@ test("ukázková data: naplnit, stránky rolí, smazat jen vlastní, znovu napln
   const occ = sql(`select id from "SubjectOccurrence" where id like 'demo-win-open-blk-1-occ-%' order by id limit 1`);
   sql(`insert into "StudentEnrollment"(id,"studentId","subjectOccurrenceId","createdById","updatedAt") values ('real_enr','usr_stud2','${occ}','usr_stud2',now())`);
   sql(`insert into "MakeupSession"(id,"teacherId","startsAt","endsAt",room,capacity,"createdById","updatedAt") values ('real_ms','usr_teacher',now()+interval '3 days',now()+interval '3 days 1 hour','Skutečná učebna',5,'usr_teacher',now()),('real_ms_demo','demo-teacher-06',now()+interval '4 days',now()+interval '4 days 1 hour','Kabinet',5,'demo-teacher-06',now())`);
+  // skutečná událost, kterou založil ukázkový učitel (po smazání ji převezme admin)
+  sql(`insert into "Event"(id,slug,title,status,"createdById","updatedAt") values ('real_ev','skutecna-udalost','Skutečná událost','DRAFT','demo-teacher-06',now())`);
   sql(`insert into "MakeupRegistration"(id,"sessionId","studentId","createdById","updatedAt") values ('real_mr','real_ms','usr_stud1','usr_stud1',now())`);
   sql(`insert into "User"(id,"firstName","lastName",email,role,"requestedClassGroupId","updatedAt") values ('real_guest','Skutečný','Host','host@skola.cz','GUEST',(select id from "ClassGroup" where id='demo-class-4C'),now())`);
   sql(`insert into "TeachingAssignment"(id,"teacherId","subjectId","classGroupId","schoolYearId") select 'real_ta','usr_teacher','demo-subj-mat',c.id,y.id from "ClassGroup" c, "SchoolYear" y where c.id='${cls3A}' and y."isCurrent"`);
@@ -151,7 +159,8 @@ test("ukázková data: naplnit, stránky rolí, smazat jen vlastní, znovu napln
   check("evidence empty", sql(`select count(*) from "DemoRecord"`) === "0");
   const after = snapshot();
   // původní data + skutečné záznamy, které na ukázkových nezávisejí (real_ms, real_ms_demo po převzetí adminem, real_mr, real_guest, +1 schválený host je z ukázkových dat, tedy smazán)
-  check("only original data left", JSON.stringify(after) === JSON.stringify({ ...baseline, User: baseline.User + 1, MakeupSession: baseline.MakeupSession + 2, MakeupRegistration: baseline.MakeupRegistration + 1 }), JSON.stringify({ baseline, after }));
+  check("only original data left", JSON.stringify(after) === JSON.stringify({ ...baseline, User: baseline.User + 1, MakeupSession: baseline.MakeupSession + 2, MakeupRegistration: baseline.MakeupRegistration + 1, Event: baseline.Event + 1 }), JSON.stringify({ baseline, after }));
+  check("real event of demo teacher taken over by admin", sql(`select "createdById" from "Event" where id='real_ev'`) === "usr_admin");
   check("real session of demo teacher taken over by admin", sql(`select "teacherId" from "MakeupSession" where id='real_ms_demo'`) === "usr_admin");
   check("real enrollment in demo window removed by cascade", sql(`select count(*) from "StudentEnrollment" where id='real_enr'`) === "0");
   check("real teaching assignment on demo subject removed by cascade", sql(`select count(*) from "TeachingAssignment" where id='real_ta'`) === "0");

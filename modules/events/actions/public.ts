@@ -1,5 +1,6 @@
 "use server";
 
+import { loadEventTextDefaults } from "@/modules/events/text-defaults";
 import { headers } from "next/headers";
 import { checkRateLimit, checkSubmission } from "@/lib/antibot";
 import { audit, PUBLIC_ACTOR } from "@/lib/audit";
@@ -165,7 +166,7 @@ export async function registerForEvent(slug: string, input: RegisterInput) {
             odkaz: appUrl(`/akce/${created.event.slug}/r/${token}`),
             kod: created.registration.code,
             misto: created.event.place ?? "—",
-            text: created.event.confirmationText ?? "",
+            text: created.event.confirmationText?.trim() || (await loadEventTextDefaults()).confirmationText,
           },
         },
       ]);

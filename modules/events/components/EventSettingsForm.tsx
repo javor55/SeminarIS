@@ -337,10 +337,10 @@ export function EventSettingsForm({ values, teachers, canDelete }: { values: Eve
             ))}
           </NativeSelect>
         </Field>
-        <Field id="confirmationText" label="Text potvrzení" hint="Zobrazí se na potvrzovací stránce a v potvrzovacím e-mailu.">
+        <Field id="confirmationText" label="Text potvrzení" hint="Zobrazí se na potvrzovací stránce a v potvrzovacím e-mailu. Prázdné = výchozí text z nastavení modulu Události (pokud je nastavený).">
           <Textarea id="confirmationText" rows={3} value={v.confirmationText} onChange={(e) => set({ confirmationText: e.target.value })} maxLength={5000} />
         </Field>
-        <Field id="consentText" label="Text souhlasu se zpracováním osobních údajů" hint="Účastník ho musí zaškrtnout. Prázdné = výchozí text s odkazem na stránku Zpracování osobních údajů.">
+        <Field id="consentText" label="Text souhlasu se zpracováním osobních údajů" hint="Účastník ho musí zaškrtnout. Prázdné = výchozí text z nastavení modulu Události, jinak vestavěný text; odkaz na stránku Zpracování osobních údajů se přidá vždy.">
           <Textarea id="consentText" rows={3} value={v.consentText} onChange={(e) => set({ consentText: e.target.value })} maxLength={5000} />
         </Field>
       </Section>
