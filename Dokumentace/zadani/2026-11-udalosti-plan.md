@@ -346,6 +346,10 @@ DRAFT / před otevřením / otevřeno / uzavřeno a viditelnost USERS je E2E.
 (ověř Playwrightem bez test módu).
 
 ## U9 Odeslání registrace, potvrzení na obrazovce a e-mailem
+**Poznámky z U6 (zapracovat):** (a) ověř povinný souhlas na serveru (`validateAnswers` ho zatím
+nekontroluje); (b) pevné pole „Jméno“ může být skryté – registrace i přehledy musí fungovat bez jména
+(zobrazit e-mail); (c) klíč vlastního pole `custom_<n>` se po smazání může znovu použít – jakmile má pole
+odpovědi, mazání zakaž (nabídni „skrýt“), aby se staré odpovědi nepřiřadily novému poli.
 **Cíl:** funkční registrace.
 
 **Udělej:**
