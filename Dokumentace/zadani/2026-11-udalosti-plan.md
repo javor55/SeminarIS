@@ -29,7 +29,7 @@ Vlna C – veřejná registrace:
 - [x] U9 Odeslání registrace, potvrzení na obrazovce a e-mailem (PR #26)
 
 Vlna D – po registraci:
-- [x] U10 Správa registrace účastníkem (odkaz, kód + e-mail, změna, zrušení, `.ics`)
+- [x] U10 Správa registrace účastníkem (odkaz, kód + e-mail, změna, zrušení, `.ics`) (PR #27)
 - [x] U11 Nástroje organizátora (seznam, ruční úpravy, odebrání, přesun, export, QR odkazu)
 - [ ] U12 E-maily modulu v Upozorněních, statistika odeslaných e-mailů, hromadný e-mail
 
