@@ -106,7 +106,7 @@ test("rozložení: přihlášení, registrace a dialogy (telefon i počítač)",
   for (const [vname, viewport] of Object.entries(VIEWPORTS)) {
     const anon = await browser.newContext({ viewport, hasTouch: vname === "phone" });
     const pa = await anon.newPage();
-    for (const url of ["/login", "/register", "/ochrana-udaju", "/akce/den-otevrenych-dveri", "/akce/verejna", `/akce/verejna/hotovo?t=${"L".repeat(43)}`]) {
+    for (const url of ["/login", "/register", "/ochrana-udaju", "/akce/den-otevrenych-dveri", "/akce/verejna", `/akce/verejna/hotovo?t=${"L".repeat(43)}`, `/akce/verejna/r/${"L".repeat(43)}`]) {
       await pa.goto(url);
       await pa.waitForLoadState("networkidle");
       const p = await problems(pa);

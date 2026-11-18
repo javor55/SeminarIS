@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 type Props = {
   link: string;
   code: string;
-  /** Adresa `.ics` souboru (vytváří ji správa registrace) */
-  icsHref: string;
+  /** Adresa `.ics` souboru (tlačítko se bez ní nezobrazí, třeba když termíny nemají čas) */
+  icsHref?: string | null;
   /** Hotový text potvrzení ke stažení */
   fileText: string;
   fileName: string;
@@ -60,11 +60,13 @@ export function ConfirmationActions({ link, code, icsHref, fileText, fileName }:
       <Button type="button" variant="outline" className="h-11 md:h-9" onClick={download} data-testid="download-confirmation">
         <Download /> Stáhnout potvrzení
       </Button>
-      <Button asChild variant="outline" className="h-11 md:h-9">
-        <a href={icsHref} data-testid="add-to-calendar">
-          <CalendarPlus /> Přidat do kalendáře
-        </a>
-      </Button>
+      {icsHref && (
+        <Button asChild variant="outline" className="h-11 md:h-9">
+          <a href={icsHref} data-testid="add-to-calendar">
+            <CalendarPlus /> Přidat do kalendáře
+          </a>
+        </Button>
+      )}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { canUserRegister } from "@/modules/events/audience-roles";
 import { loadPublicEvent, loadStudentAudienceInfo } from "@/modules/events/public-data";
 import { registrationPhase } from "@/modules/events/public-state";
 import { PublicRegistration } from "@/modules/events/components/PublicRegistration";
+import { RecoverRegistration } from "@/modules/events/components/RecoverRegistration";
 
 // Veřejná stránka události (bez přihlášení; u viditelnosti „jen pro přihlášené“ se přihlášení vyžaduje až pro registraci).
 // Stav registrace se počítá z aktuálního času, proto se stránka nikdy neukládá do cache.
@@ -146,6 +147,9 @@ export default async function PublicEventPage({ params, searchParams }: Params) 
           </div>
         )}
       </section>
+
+      {/* Kdo už je registrovaný, najde svou registraci podle kódu a e-mailu (i po skončení registrace) */}
+      {event.status !== "DRAFT" && <RecoverRegistration slug={event.slug} />}
     </article>
   );
 }
