@@ -104,6 +104,24 @@ export function startOfSchoolDay(d: Date = new Date(), offsetDays = 0): Date {
   return new Date(t);
 }
 
+/**
+ * Okamžik daný kalendářním dnem ("2026-12-01") a časem ("09:30") v pásmu školy.
+ * Vrací `null`, pokud den nebo čas nemají správný tvar nebo neexistují.
+ */
+export function schoolDateTime(dayKey: string, time: string): Date | null {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dayKey);
+  const t = /^(\d{1,2}):(\d{2})$/.exec(time);
+  if (!d || !t) return null;
+  const [y, m, day, h, min] = [Number(d[1]), Number(d[2]), Number(d[3]), Number(t[1]), Number(t[2])];
+  if (h > 23 || min > 59) return null;
+  const check = new Date(Date.UTC(y, m - 1, day));
+  if (check.getUTCFullYear() !== y || check.getUTCMonth() !== m - 1 || check.getUTCDate() !== day) return null;
+  const guess = Date.UTC(y, m - 1, day, h, min);
+  let result = guess - zoneOffsetMs(new Date(guess));
+  result = guess - zoneOffsetMs(new Date(result));
+  return new Date(result);
+}
+
 /** Začátek měsíce (1. den půlnoc) v pásmu školy. */
 export function startOfSchoolMonth(d: Date = new Date()): Date {
   const { year, month } = schoolDayParts(d);

@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { TabLinks } from "@/components/tab-links";
 import { requirePagePermission } from "@/lib/session";
-import { loadEvent, listTeachers } from "@/modules/events/data";
+import { loadEvent, loadEventItems, listTeachers } from "@/modules/events/data";
 import { CopyLinkButton } from "@/modules/events/components/CopyLinkButton";
 import { EventSettingsForm } from "@/modules/events/components/EventSettingsForm";
+import { EventItemsTab } from "@/modules/events/components/EventItemsTab";
 import { EventStatusActions } from "@/modules/events/components/EventStatusActions";
 import { EventStatusBadge } from "@/modules/events/components/EventStatusBadge";
 
@@ -16,7 +17,6 @@ const TABS = [
 ];
 
 const PLACEHOLDERS: Record<string, string> = {
-  items: "Termíny, na které se účastníci registrují, přibudou v další verzi.",
   form: "Nastavení formuláře účastníka přibude v další verzi.",
   registrations: "Seznam registrací přibude v další verzi.",
 };
@@ -57,6 +57,8 @@ export default async function EventDetailPage({ params, searchParams }: { params
           teachers={teachers}
           canDelete={event.status === "DRAFT" && event.registrationCount === 0}
         />
+      ) : activeTab === "items" ? (
+        <EventItemsTab eventId={event.id} items={await loadEventItems(event.id)} readOnly={event.status === "ARCHIVED"} />
       ) : (
         <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground" data-testid="tab-placeholder">
           {PLACEHOLDERS[activeTab]}
