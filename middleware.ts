@@ -37,5 +37,5 @@ export default withAuth(
 // Chráněno je vše kromě veřejné úvodní stránky, přihlášení/registrace, API a statických souborů.
 // (Matcher musí být statický, proto se negeneruje z registru modulů.)
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|login|register).+)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|login|register|ochrana-udaju).+)"],
 };

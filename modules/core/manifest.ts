@@ -1,5 +1,22 @@
 import type { ModuleManifest } from "@/modules/types";
 
+// Výchozí obecná šablona textu o zpracování osobních údajů; admin doplní místa v hranatých závorkách.
+// Odstavce se oddělují prázdným řádkem, řádek začínající „# “ je mezititulek.
+export const PRIVACY_TEXT_TEMPLATE = `# Kdo údaje zpracovává
+Správcem osobních údajů je [NÁZEV ŠKOLY]. Pověřenec pro ochranu osobních údajů: [KONTAKT NA POVĚŘENCE].
+
+# Jaké údaje a proč
+Zpracováváme údaje, které sami uvedete při registraci nebo ve formuláři (například jméno, e-mailová adresa, telefon a další údaje požadované u konkrétní akce). Používáme je pouze k zajištění zápisu, registrace na akce, komunikaci s vámi (potvrzení, změny, připomínky) a organizaci akce.
+
+# Jak dlouho údaje uchováváme
+Údaje o registracích na akce uchováváme po dobu konání akce a poté nejvýše 90 dní, následně je smažeme nebo anonymizujeme. Údaje o uživatelských účtech uchováváme po dobu, kdy účet potřebujeme k provozu školy.
+
+# Komu údaje předáváme
+Údaje nepředáváme třetím stranám k jejich vlastním účelům. Technické zpracování zajišťují poskytovatelé hostingu a e-mailových služeb, kteří jsou vázáni povinností mlčenlivosti.
+
+# Vaše práva
+Máte právo na přístup ke svým údajům, jejich opravu nebo výmaz, omezení zpracování, vznesení námitky a právo podat stížnost u Úřadu pro ochranu osobních údajů. Uplatnit je můžete na kontaktu: [KONTAKT NA POVĚŘENCE].`;
+
 export const coreModule = {
   id: "core",
   name: "Jádro systému",
@@ -123,6 +140,27 @@ export const coreModule = {
       label: "Kdo se smí přihlásit heslem",
       description: "Platí jen při zapnutém Microsoft 365. Admin se heslem přihlásí vždy.",
       audit: { action: "settings.auth", group: "Nastavení přihlašování" },
+    },
+    // Zpracování osobních údajů (veřejná stránka /ochrana-udaju)
+    {
+      key: "privacy.controller",
+      type: "string",
+      default: "",
+      label: "Správce osobních údajů",
+      description: "Název školy nebo organizace, která údaje zpracovává. Zobrazí se na stránce Zpracování osobních údajů.",
+      maxLength: 200,
+      placeholder: "např. Gymnázium Příklad",
+      audit: { action: "settings.privacy", group: "Zpracování osobních údajů" },
+    },
+    {
+      key: "privacy.text",
+      type: "string",
+      default: PRIVACY_TEXT_TEMPLATE,
+      label: "Text o zpracování osobních údajů",
+      description: "Obsah veřejné stránky /ochrana-udaju. Doplňte místa v hranatých závorkách. Prázdné řádky oddělují odstavce.",
+      maxLength: 20000,
+      multiline: true,
+      audit: { action: "settings.privacy", group: "Zpracování osobních údajů" },
     },
     // Uchovávání historie změn (vlastní karta v sekci Historie)
     {

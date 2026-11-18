@@ -60,6 +60,8 @@ export type SettingDeclaration = {
   // Jen pro `string`
   maxLength?: number;
   placeholder?: string;
+  // Jen pro `string`: dlouhý text (vícerádkové pole)
+  multiline?: boolean;
   // Název akce v historii změn (výchozí `settings.value`) a společný popis pro více nastavení,
   // která se mají zapsat jedním záznamem (např. všechna e-mailová nastavení)
   audit?: { action: string; group?: string };

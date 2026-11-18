@@ -127,6 +127,11 @@ export function LoginForm({ microsoftEnabled, passwordNote, errorCode }: LoginFo
               Vytvořit účet
             </Link>
           </div>
+          <div className="text-center text-xs text-muted-foreground">
+            <Link href="/ochrana-udaju" className="hover:underline" data-testid="privacy-link">
+              Zpracování osobních údajů
+            </Link>
+          </div>
         </form>
       </div>
     </div>

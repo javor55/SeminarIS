@@ -46,7 +46,7 @@ test("rozložení: nic se nepřekrývá ani nepřetéká (student, učitel, admi
       "/dashboard", "/admin", "/enrollments/enr_ls_2025", "/users", "/subjects", "/makeup",
       // F15: zbytek aplikace
       "/subjects/sm", "/users/usr_stud1", "/users?tab=approvals", "/enrollments", "/enrollments/settings", "/makeup/settings", "/profile",
-      "/admin/school-year", "/admin/registration", "/admin/modules", "/admin/notifications", "/admin/history", "/admin/diagnostics", "/admin/demo",
+      "/admin/school-year", "/admin/registration", "/admin/modules", "/admin/notifications", "/admin/history", "/admin/diagnostics", "/admin/demo", "/ochrana-udaju",
     ],
   };
   for (const [vname, viewport] of Object.entries(VIEWPORTS)) {
@@ -79,7 +79,7 @@ test("rozložení: přihlášení, registrace a dialogy (telefon i počítač)",
   for (const [vname, viewport] of Object.entries(VIEWPORTS)) {
     const anon = await browser.newContext({ viewport, hasTouch: vname === "phone" });
     const pa = await anon.newPage();
-    for (const url of ["/login", "/register"]) {
+    for (const url of ["/login", "/register", "/ochrana-udaju"]) {
       await pa.goto(url);
       await pa.waitForLoadState("networkidle");
       const p = await problems(pa);

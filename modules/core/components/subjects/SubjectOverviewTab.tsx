@@ -1,3 +1,4 @@
+import { sanitizeRichHtml } from "@/lib/html";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { subjectGradesLabel } from "@/lib/school";
 import { formatDateTime } from "@/lib/datetime";
@@ -50,7 +51,7 @@ export function SubjectOverviewTab({ subject, showAudit }: { subject: SubjectDet
           {subject.syllabus ? (
             <div
               className="prose prose-sm max-w-none max-h-96 overflow-y-auto pr-2"
-              dangerouslySetInnerHTML={{ __html: subject.syllabus }}
+              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(subject.syllabus) }}
             />
           ) : (
             <p className="text-sm text-muted-foreground">Sylabus není k dispozici.</p>

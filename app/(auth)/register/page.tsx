@@ -187,7 +187,7 @@ export default function RegisterPage() {
           </form>
         </CardContent>
         
-        <CardFooter className="text-sm text-muted-foreground justify-center">
+        <CardFooter className="text-sm text-muted-foreground justify-center flex-col">
           <p>
             Máte již účet?{" "}
             <Link
@@ -197,6 +197,11 @@ export default function RegisterPage() {
               Přihlaste se
             </Link>
             </p>
+          <p className="w-full text-center text-xs mt-2">
+            <Link href="/ochrana-udaju" className="hover:underline" data-testid="privacy-link">
+              Zpracování osobních údajů
+            </Link>
+          </p>
         </CardFooter>
       </Card>
     </div>
