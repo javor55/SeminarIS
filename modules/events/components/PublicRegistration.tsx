@@ -257,7 +257,7 @@ function ItemRow({ item, selected, single, limitReached, onToggle }: { item: Pub
         type="button"
         size="sm"
         variant={selected ? "outline" : full ? "secondary" : "default"}
-        className={cn("h-11 min-w-24 shrink-0 md:h-8", selected && "border-success text-success")}
+        className={cn("h-11 min-w-24 shrink-0 md:h-8", selected && "border-success bg-success/15 text-success hover:bg-success/20 hover:text-success")}
         disabled={full}
         aria-pressed={selected}
         data-testid="item-pick"

@@ -24,8 +24,8 @@ Vlna B – termíny a formulář:
 - [x] U6 Formulář účastníka (pevná a vlastní pole) (PR #24)
 
 Vlna C – veřejná registrace:
-- [ ] U7 Veřejná stránka události (zobrazení, bez odeslání)
-- [ ] U8 Ochrana proti robotům (proof-of-work, honeypot, limity)
+- [x] U7 Veřejná stránka události (zobrazení, bez odeslání)
+- [x] U8 Ochrana proti robotům (proof-of-work, honeypot, limity)
 - [ ] U9 Odeslání registrace, potvrzení na obrazovce a e-mailem
 
 Vlna D – po registraci:
@@ -352,6 +352,11 @@ DRAFT / před otevřením / otevřeno / uzavřeno a viditelnost USERS je E2E.
 (ověř Playwrightem bez test módu).
 
 ## U9 Odeslání registrace, potvrzení na obrazovce a e-mailem
+**Poznámky z U7/U8 (pro U9):** (a) odeslání volá `checkSubmission` z `lib/antibot.ts` (`solution` = pole `altcha`,
+`honeypot` = pole `website`, `renderToken` = pole `renderToken`; výsledek `honeypot` = falešný úspěch bez zápisu); (b) kontrola
+„smí se registrovat“ = `canUserRegister` (`modules/events/audience-roles.ts`) + `loadStudentAudienceInfo` (`public-data.ts`);
+(c) obsazenost včetně doprovodu: `loadTakenByItem` (uvnitř transakce počítej znovu); (d) `PublicRegistration` po validaci jen
+zobrazí `submit-pending`, tam napoj odeslání; (e) limity: `checkRateLimit(key, limit, windowSeconds, tx)`.
 **Poznámky z U6 (zapracovat):** (a) ověř povinný souhlas na serveru (`validateAnswers` ho zatím
 nekontroluje); (b) pevné pole „Jméno“ může být skryté – registrace i přehledy musí fungovat bez jména
 (zobrazit e-mail); (c) klíč vlastního pole `custom_<n>` se po smazání může znovu použít – jakmile má pole

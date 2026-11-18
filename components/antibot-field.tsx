@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Ochrana proti robotům (proof-of-work ve stylu ALTCHA): po zobrazení stáhne výzvu a ve Web Workeru hledá číslo, jehož
@@ -120,7 +120,6 @@ export function AntibotField({ onChange, name = "altcha", className }: { onChang
       )}
       {state === "done" && (
         <>
-          <Check className="h-4 w-4 text-success" aria-hidden="true" />
           <span className="text-success" data-testid="antibot-status">✓ Ověřeno</span>
         </>
       )}
