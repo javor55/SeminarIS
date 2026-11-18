@@ -26,7 +26,8 @@ async function getKey(): Promise<string> {
   return row!.value;
 }
 
-const testMode = () => process.env.ANTIBOT_TEST_MODE === "1";
+// Testovací režim (jen E2E a CI). V ostrém provozu na Vercelu se ignoruje, i kdyby proměnná omylem zůstala nastavená.
+const testMode = () => process.env.ANTIBOT_TEST_MODE === "1" && process.env.VERCEL_ENV !== "production";
 
 /** Jednorázová spotřeba řešení: hash výzvy se zapíše do `EventRateLimit` (`pow:<hash>`); podruhé už zápis selže. */
 async function consume(challenge: string, expires: Date): Promise<boolean> {
